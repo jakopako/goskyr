@@ -1,8 +1,8 @@
 package main
 
 import (
-	"context"
-	"flag"
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,41 +12,41 @@ import (
 	"time"
 
 	"github.com/goodsign/monday"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
-	"gopkg.in/yaml.v2"
 )
 
-type Config struct {
-	DB struct {
-		User     string `yaml:"user"`
-		Password string `yaml:"password"`
-		Cluster  string `yaml:"cluster"`
-		Database string `yaml:"database"`
-	} `yaml:"db"`
-}
+// type Config struct {
+// 	DB struct {
+// 		User     string `yaml:"user"`
+// 		Password string `yaml:"password"`
+// 		Cluster  string `yaml:"cluster"`
+// 		Database string `yaml:"database"`
+// 	} `yaml:"db"`
+// }
 
+// TODO: it's ugly to copy paste this from the croncert-api project.
 type Concert struct {
-	Artist   string    `bson:"artist,omitempty"`
-	Location string    `bson:"location,omitempty"`
-	Date     time.Time `bson:"date,omitempty"`
-	Link     string    `bson:"link,omitempty"`
-	Comment  string    `bson:"comment,omitempty"`
+	Artist   string    `bson:"artist,omitempty" json:"artist,omitempty" validate:"required" example:"SuperArtist"`
+	Location string    `bson:"location,omitempty" json:"location,omitempty" validate:"required" example:"SuperLocation"`
+	Date     time.Time `bson:"date,omitempty" json:"date,omitempty" validate:"required" example:"2021-10-31T19:00:00.000Z"`
+	Link     string    `bson:"link,omitempty" json:"link,omitempty" validate:"required,url" example:"http://link.to/concert/page"`
+	Comment  string    `bson:"comment,omitempty" json:"comment,omitempty" example:"Super exciting comment."`
 }
 
 type concertCrawler interface {
 	getConcerts() []Concert
 }
 
-type helsinkiCrawler struct {
-	url string
-}
+type helsinkiCrawler struct{}
 
-func (hc helsinkiCrawler) getConcerts() []Concert {
+type mehrspurCrawler struct{}
+
+func (helsinkiCrawler) getConcerts() []Concert {
+	log.Println("Fetching Helsinki concerts.")
+	url := "https://www.helsinkiklub.ch/"
 	concerts := []Concert{}
-	res, err := http.Get(hc.url)
+	res, err := http.Get(url)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -72,11 +72,20 @@ func (hc helsinkiCrawler) getConcerts() []Concert {
 				for _, attr := range token.Attr {
 					if attr.Key == "class" && attr.Val == "event" {
 						if currentConcert.Artist != "" {
+							// Occasionally, the year of the concert is wrong even though we try
+							// to parse it from the context, e.g. because there is simply no year.
+							// Therefore we apply the following check.
+							currentTime := time.Now()
+							if currentTime.After(currentConcert.Date) {
+								d := currentConcert.Date
+								year := currentTime.Year() + 1
+								currentConcert.Date = time.Date(int(year), d.Month(), d.Day(), d.Hour(), d.Minute(), d.Second(), d.Nanosecond(), d.Location())
+							}
 							concerts = append(concerts, currentConcert)
 						}
 						currentConcert = Concert{
 							Location: "Helsinki",
-							Link:     hc.url}
+							Link:     url}
 					}
 					if attr.Key == "id" && attr.Val == "col2" {
 						parse = false
@@ -97,7 +106,7 @@ func (hc helsinkiCrawler) getConcerts() []Concert {
 						month = token.String()
 						year := time.Now().Year()
 						loc, _ := time.LoadLocation("Europe/Berlin")
-						layout := "2 January 2006 15:00"
+						layout := "2 January 2006 15:04"
 						d := fmt.Sprintf("%s %s %d 20:00", day, month, year)
 						t, err := monday.ParseInLocation(layout, d, loc, monday.LocaleDeDE)
 						if err != nil {
@@ -123,68 +132,160 @@ func (hc helsinkiCrawler) getConcerts() []Concert {
 	return concerts
 }
 
-func writeConcertsToMongoDB(c concertCrawler, config *Config) {
-	//client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://localhost:27017/croncert"))
-	clientOpts := options.Client()
-	connString := fmt.Sprintf("mongodb+srv://%s:%s@%s/%s?retryWrites=true&w=majority", config.DB.User, config.DB.Password, config.DB.Cluster, config.DB.Database)
-	clientOpts.ApplyURI(connString)
-	client, err := mongo.NewClient(clientOpts)
+func (mehrspurCrawler) getConcerts() []Concert {
+	log.Println("Fetching Mehrspur concerts.")
+	url := "https://www.mehrspur.ch/veranstaltungen"
+	concerts := []Concert{}
+	res, err := http.Get(url)
 	if err != nil {
 		log.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	err = client.Connect(ctx)
-	if err != nil {
-		log.Fatal(err)
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
 	}
-	//defer client.Disconnect(ctx)
-	croncertDatabase := client.Database("croncert")
-	concertsCollection := croncertDatabase.Collection("concerts")
-	opts := options.Replace().SetUpsert(true)
+	z := html.NewTokenizer(res.Body)
+	var currentConcert Concert
+	var token, previousToken html.Token
+	token = html.Token{}
+	// var day, month string
+	postSection, headerPostSection, dateSection, timeSection, commentSection := false, false, false, false, false
+	var dateString string
+	var yearString string
+	for {
+		tokenType := z.Next()
+		previousToken = token
+		token = z.Token()
+		if tokenType == html.ErrorToken {
+			break
+		}
+		if tokenType == html.StartTagToken {
+			if !postSection {
+				if token.DataAtom == atom.Div {
+					for _, attr := range token.Attr {
+						if attr.Key == "id" {
+							re := regexp.MustCompile("^post-[0-9]{5}$")
+							match := re.Match([]byte(attr.Val))
+							if match {
+								//fmt.Println(attr.Val)
+								postSection = true
+								if currentConcert.Artist != "" {
+									concerts = append(concerts, currentConcert)
+								}
+								currentConcert = Concert{Location: "Mehrspur"}
+							}
+						}
+					}
+				}
+			} else {
+				if token.DataAtom == atom.H3 {
+					for _, attr := range token.Attr {
+						if attr.Key == "class" && attr.Val == "block_under_title" {
+							headerPostSection = true
+						}
+					}
+				} else if headerPostSection {
+					if token.DataAtom == atom.A {
+						for _, attr := range token.Attr {
+							if attr.Key == "href" {
+								//fmt.Println(attr.Val)
+								currentConcert.Link = attr.Val
+							}
+						}
+					}
+				} else if token.DataAtom == atom.Li {
+					for _, attr := range token.Attr {
+						if attr.Key == "class" {
+							if attr.Val == "event-date" {
+								dateSection = true
+							} else if attr.Val == "event-time" {
+								timeSection = true
+							}
+						}
+					}
+				} else if token.DataAtom == atom.Div {
+					for _, attr := range token.Attr {
+						if attr.Key == "class" && attr.Val == "event-excerpt-fluid" {
+							commentSection = true
+						}
+					}
+				}
+			}
+		} else if tokenType == html.TextToken {
+			if headerPostSection {
+				//fmt.Println(html.UnescapeString(token.String()))
+				headerPostSection = false
+				currentConcert.Artist = html.UnescapeString(token.String())
+			} else if dateSection {
+				dateSection = false
+				dateString = html.UnescapeString(token.String())
+				//dateString = dateString[3:]
+				//fmt.Println(dateString)
+			} else if timeSection {
+				timeSection = false
+				loc, _ := time.LoadLocation("Europe/Berlin")
+				layout := "Mon 2.Jan. 2006 15:04"
+				d := fmt.Sprintf("%s %s %s", dateString, yearString, token.String())
+				t, err := monday.ParseInLocation(layout, d, loc, monday.LocaleDeDE)
+				if err != nil {
+					log.Fatalf("Couldn't parse date %s: %v", d, err)
+				}
+				currentConcert.Date = t
+				//fmt.Println(t)
+			} else if commentSection {
+				//fmt.Println(html.UnescapeString(token.String()))
+				commentSection = false
+				postSection = false
+				currentConcert.Comment = html.UnescapeString(token.String())
+			} else if !postSection && previousToken.DataAtom == atom.P {
+				re := regexp.MustCompile("^20[0-9]{2}")
+				match := re.Match([]byte(token.String()))
+				if match {
+					yearString = token.String()
+					//fmt.Println(yearString)
+				}
+			}
+		}
+	}
+	concerts = append(concerts, currentConcert)
+	return concerts
+
+}
+
+func writeConcertsToAPI(c concertCrawler) {
+	apiUrl := os.Getenv("CRONCERT_API")
+	client := &http.Client{
+		Timeout: time.Second * 10,
+	}
 	for _, concert := range c.getConcerts() {
-		_, err = concertsCollection.ReplaceOne(ctx, concert, concert, opts)
+		concertJSON, err := json.Marshal(concert)
 		if err != nil {
 			log.Fatal(err)
+		}
+		req, _ := http.NewRequest("POST", apiUrl, bytes.NewBuffer(concertJSON))
+		req.Header = map[string][]string{
+			"Content-Type": {"application/json"},
+		}
+		req.SetBasicAuth(os.Getenv("API_POST_USER"), os.Getenv("API_POST_PASSWORD"))
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if resp.StatusCode != 201 {
+			log.Fatalf("Something went wrong while adding a new concert. Status Code: %d", resp.StatusCode)
+
 		}
 	}
 }
 
-func parseFlags() (string, error) {
-	var configPath string
-	flag.StringVar(&configPath, "config", "./croncert.yml", "path to config file")
-	flag.Parse()
-	return configPath, nil
-}
-
-func newConfig(configPath string) (*Config, error) {
-	config := &Config{}
-	file, err := os.Open(configPath)
-	if err != nil {
-		return nil, err
+func prettyPrintConcerts(concerts []Concert) {
+	for _, concert := range concerts {
+		fmt.Printf("Artist: %v\nLocation: %v\nDate: %v\nLink: %v\nComment: %v\n\n",
+			concert.Artist, concert.Location, concert.Date, concert.Link, concert.Comment)
 	}
-	defer file.Close()
-	d := yaml.NewDecoder(file)
-	if err := d.Decode(&config); err != nil {
-		return nil, err
-	}
-
-	return config, nil
 }
 
 func main() {
-	cfgPath, err := parseFlags()
-	if err != nil {
-		log.Fatal(err)
-	}
-	cfg, err := newConfig(cfgPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	hc := helsinkiCrawler{url: "https://www.helsinkiklub.ch/"}
-	// for _, concert := range c {
-	// 	fmt.Printf("Artist: %v,\nLocation: %v,\nDate: %v,\nLink: %v,\nComment: %v\n\n",
-	// 		concert.Artist, concert.Location, concert.Date, concert.Link, concert.Comment)
-	// }
-	writeConcertsToMongoDB(hc, cfg)
+	//writeConcertsToAPI(helsinkiCrawler{})
+	writeConcertsToAPI(mehrspurCrawler{})
 }

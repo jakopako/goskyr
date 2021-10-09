@@ -167,7 +167,6 @@ func (mehrspurCrawler) getConcerts() []Concert {
 							re := regexp.MustCompile("^post-[0-9]{5}$")
 							match := re.Match([]byte(attr.Val))
 							if match {
-								//fmt.Println(attr.Val)
 								postSection = true
 								if currentConcert.Artist != "" {
 									concerts = append(concerts, currentConcert)
@@ -188,7 +187,6 @@ func (mehrspurCrawler) getConcerts() []Concert {
 					if token.DataAtom == atom.A {
 						for _, attr := range token.Attr {
 							if attr.Key == "href" {
-								//fmt.Println(attr.Val)
 								currentConcert.Link = attr.Val
 							}
 						}
@@ -213,14 +211,11 @@ func (mehrspurCrawler) getConcerts() []Concert {
 			}
 		} else if tokenType == html.TextToken {
 			if headerPostSection {
-				//fmt.Println(html.UnescapeString(token.String()))
 				headerPostSection = false
 				currentConcert.Artist = html.UnescapeString(token.String())
 			} else if dateSection {
 				dateSection = false
 				dateString = html.UnescapeString(token.String())
-				//dateString = dateString[3:]
-				//fmt.Println(dateString)
 			} else if timeSection {
 				timeSection = false
 				loc, _ := time.LoadLocation("Europe/Berlin")
@@ -231,9 +226,7 @@ func (mehrspurCrawler) getConcerts() []Concert {
 					log.Fatalf("Couldn't parse date %s: %v", d, err)
 				}
 				currentConcert.Date = t
-				//fmt.Println(t)
 			} else if commentSection {
-				//fmt.Println(html.UnescapeString(token.String()))
 				commentSection = false
 				postSection = false
 				currentConcert.Comment = html.UnescapeString(token.String())
@@ -242,7 +235,6 @@ func (mehrspurCrawler) getConcerts() []Concert {
 				match := re.Match([]byte(token.String()))
 				if match {
 					yearString = token.String()
-					//fmt.Println(yearString)
 				}
 			}
 		}

@@ -3,12 +3,14 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/goodsign/monday"
@@ -38,11 +40,42 @@ type concertCrawler interface {
 	getConcerts() []Concert
 }
 
-type helsinkiCrawler struct{}
+type helsinkiCrawler struct {
+	Name string
+}
 
-type mehrspurCrawler struct{}
+func NewHelsinkiCrawler() helsinkiCrawler {
+	return helsinkiCrawler{
+		Name: "Helsinki",
+	}
+}
 
-func (helsinkiCrawler) getConcerts() []Concert {
+type mehrspurCrawler struct {
+	Name string
+}
+
+func NewMehrspurCrawler() mehrspurCrawler {
+	return mehrspurCrawler{
+		Name: "Mehrspur",
+	}
+}
+
+type umboCrawler struct {
+	Name string
+}
+
+func NewUmboCrawler() umboCrawler {
+	return umboCrawler{
+		Name: "Umbo",
+	}
+}
+
+// Next:
+//  + Moods (https://www.moods.club/en/)
+//  + Bogen F (https://www.bogenf.ch/konzerte/aktuell/)
+//  + Kasheme (https://kasheme.com/program/)
+
+func (c helsinkiCrawler) getConcerts() []Concert {
 	log.Println("Fetching Helsinki concerts.")
 	url := "https://www.helsinkiklub.ch/"
 	concerts := []Concert{}
@@ -84,7 +117,7 @@ func (helsinkiCrawler) getConcerts() []Concert {
 							concerts = append(concerts, currentConcert)
 						}
 						currentConcert = Concert{
-							Location: "Helsinki",
+							Location: c.Name,
 							Link:     url}
 					}
 					if attr.Key == "id" && attr.Val == "col2" {
@@ -132,7 +165,7 @@ func (helsinkiCrawler) getConcerts() []Concert {
 	return concerts
 }
 
-func (mehrspurCrawler) getConcerts() []Concert {
+func (c mehrspurCrawler) getConcerts() []Concert {
 	log.Println("Fetching Mehrspur concerts.")
 	url := "https://www.mehrspur.ch/veranstaltungen"
 	concerts := []Concert{}
@@ -171,7 +204,7 @@ func (mehrspurCrawler) getConcerts() []Concert {
 								if currentConcert.Artist != "" {
 									concerts = append(concerts, currentConcert)
 								}
-								currentConcert = Concert{Location: "Mehrspur"}
+								currentConcert = Concert{Location: c.Name}
 							}
 						}
 					}
@@ -244,6 +277,71 @@ func (mehrspurCrawler) getConcerts() []Concert {
 
 }
 
+func (c umboCrawler) getConcerts() []Concert {
+	log.Println("Fetching Umbo concerts.")
+	url := "https://www.umbo.wtf/"
+	concerts := []Concert{}
+	res, err := http.Get(url)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
+	}
+	z := html.NewTokenizer(res.Body)
+	var currentConcert Concert
+	var token, previousToken html.Token
+	token = html.Token{}
+	for {
+		tokenType := z.Next()
+		previousToken = token
+		token = z.Token()
+		if tokenType == html.ErrorToken {
+			break
+		}
+		if tokenType == html.TextToken {
+			for _, attr := range previousToken.Attr {
+				if attr.Key == "class" {
+					switch attr.Val {
+					case "text-block-26":
+						if currentConcert.Artist != "" {
+							concerts = append(concerts, currentConcert)
+						}
+						loc, _ := time.LoadLocation("Europe/Berlin")
+						layout := "2.1.2006 15:04"
+						// d := fmt.Sprintf("%s %s %s", dateString, yearString, token.String())
+						t, err := monday.ParseInLocation(layout, token.String(), loc, monday.LocaleDeDE)
+						if err != nil {
+							log.Fatalf("Couldn't parse date %s: %v", token.String(), err)
+						}
+						currentConcert = Concert{
+							Location: c.Name,
+							Date:     t,
+						}
+						//fmt.Println(t)
+					case "text-block-21":
+						//fmt.Println(token.String())
+						currentConcert.Artist = html.UnescapeString(token.String())
+					case "text-block-28":
+						//fmt.Println(token.String())
+						currentConcert.Comment = html.UnescapeString(token.String())
+					}
+				}
+			}
+			if token.String() == "mehr erfahren" {
+				for _, attr := range previousToken.Attr {
+					if attr.Key == "href" {
+						currentConcert.Link = fmt.Sprintf("%s%s", strings.TrimRight(url, "/"), attr.Val)
+					}
+				}
+			}
+		}
+	}
+	concerts = append(concerts, currentConcert)
+	return concerts
+}
+
 func writeConcertsToAPI(c concertCrawler) {
 	apiUrl := os.Getenv("CRONCERT_API")
 	client := &http.Client{
@@ -270,14 +368,32 @@ func writeConcertsToAPI(c concertCrawler) {
 	}
 }
 
-func prettyPrintConcerts(concerts []Concert) {
-	for _, concert := range concerts {
+func prettyPrintConcerts(c concertCrawler) {
+	for _, concert := range c.getConcerts() {
 		fmt.Printf("Artist: %v\nLocation: %v\nDate: %v\nLink: %v\nComment: %v\n\n",
 			concert.Artist, concert.Location, concert.Date, concert.Link, concert.Comment)
 	}
 }
 
 func main() {
-	//writeConcertsToAPI(helsinkiCrawler{})
-	writeConcertsToAPI(mehrspurCrawler{})
+	crawlAndStoreAll := flag.Bool("all", false, "Use this flag to crawl all available concert websites and store the results.")
+	//debugCrawler := flag.String("debug", "", "The name of the crawler.")
+	flag.Parse()
+
+	crawlers := []concertCrawler{
+		NewHelsinkiCrawler(),
+		NewMehrspurCrawler(),
+		NewUmboCrawler(),
+	}
+
+	if *crawlAndStoreAll {
+		for _, c := range crawlers {
+			writeConcertsToAPI(c)
+		}
+	}
+	// writeConcertsToAPI(helsinkiCrawler{})
+	// writeConcertsToAPI(mehrspurCrawler{})
+	// writeConcertsToAPI(umboCrawler{})
+	// prettyPrintConcerts(umboCrawler{})
+
 }

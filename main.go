@@ -389,26 +389,34 @@ func prettyPrintConcerts(c concertCrawler) {
 }
 
 func main() {
-	crawlAndStoreAll := flag.Bool("all", false, "Use this flag to crawl all available concert websites and store the results.")
-	debugCrawler := flag.String("debug", "", "The name of the crawler.")
+	everyCrawler := flag.Bool("all", false, "Use this flag to indicate that all crawlers should be run.")
+	singleCrawler := flag.String("single", "", "The name of the crawler to be run.")
+	storeData := flag.Bool("store", false, "If set to true the crawled data will be written to the API.")
+
 	flag.Parse()
 
-	crawlers := []concertCrawler{
+	allCrawlers := []concertCrawler{
 		NewHelsinkiCrawler(),
 		NewMehrspurCrawler(),
 		NewUmboCrawler(),
 	}
 
-	if *crawlAndStoreAll && *debugCrawler == "" {
-		for _, c := range crawlers {
-			writeConcertsToAPI(c)
-		}
+	var todoCrawlers []concertCrawler
+	if *everyCrawler {
+		todoCrawlers = allCrawlers
 	} else {
-		for _, c := range crawlers {
-			if c.getName() == *debugCrawler {
-				prettyPrintConcerts(c)
+		for _, c := range allCrawlers {
+			if c.getName() == *singleCrawler {
+				todoCrawlers = append(todoCrawlers, c)
 			}
 		}
 	}
 
+	for _, c := range todoCrawlers {
+		if *storeData {
+			writeConcertsToAPI(c)
+		} else {
+			prettyPrintConcerts(c)
+		}
+	}
 }

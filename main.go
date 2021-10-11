@@ -71,6 +71,16 @@ func NewUmboCrawler() umboCrawler {
 	}
 }
 
+type moodsCrawler struct {
+	Name string
+}
+
+func NewMoodsCrawler() moodsCrawler {
+	return moodsCrawler{
+		Name: "Moods",
+	}
+}
+
 // Next:
 //  + Moods (https://www.moods.club/en/)
 //  + Bogen F (https://www.bogenf.ch/konzerte/aktuell/)
@@ -355,6 +365,91 @@ func (c umboCrawler) getConcerts() []Concert {
 	return concerts
 }
 
+func (c moodsCrawler) getName() string {
+	return c.Name
+}
+
+func (c moodsCrawler) getConcerts() []Concert {
+	log.Println("Fetching Moods concerts.")
+	url := "https://www.moods.club/en/?a=1"
+	baseUrl := "https://www.moods.club"
+	concerts := []Concert{}
+	res, err := http.Get(url)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
+	}
+	z := html.NewTokenizer(res.Body)
+	var currentConcert Concert
+	var token, previousToken html.Token
+	var day, month string
+	year := time.Now().Year()
+	token = html.Token{}
+	for {
+		tokenType := z.Next()
+		previousToken = token
+		token = z.Token()
+		if tokenType == html.ErrorToken {
+			break
+		}
+		if tokenType == html.StartTagToken {
+			if token.DataAtom == atom.Div {
+				for _, attr := range token.Attr {
+					if attr.Key == "class" && strings.HasPrefix(attr.Val, "event") {
+						if currentConcert.Artist != "" {
+							concerts = append(concerts, currentConcert)
+						}
+						currentConcert = Concert{
+							Location: c.Name,
+						}
+					}
+				}
+			} else if token.DataAtom == atom.A {
+				if currentConcert.Link == "" {
+					for _, attr := range token.Attr {
+						if attr.Key == "href" {
+							// TODO: get all relevant information from those subpages.
+							// Should be way easier to extract.
+							currentConcert.Link = fmt.Sprintf("%s%s", baseUrl, attr.Val)
+						}
+					}
+				}
+			}
+		} else if tokenType == html.TextToken {
+			if previousToken.Type == html.StartTagToken {
+				if previousToken.DataAtom == atom.Span {
+					for _, attr := range previousToken.Attr {
+						if attr.Key == "class" {
+							switch attr.Val {
+							case "day":
+								day = token.String()
+								fmt.Println(day)
+							case "month_name":
+								month = token.String()
+								fmt.Println(month)
+								fmt.Println(year)
+							}
+						}
+					}
+				} else if previousToken.DataAtom == atom.H2 {
+					currentConcert.Artist = html.UnescapeString(token.String())
+				} else if previousToken.DataAtom == atom.Div {
+					for _, attr := range previousToken.Attr {
+						if attr.Key == "class" && attr.Val == "content" && currentConcert.Comment == "" {
+							currentConcert.Comment = html.UnescapeString(token.String())
+						}
+					}
+				}
+			}
+		}
+	}
+	concerts = append(concerts, currentConcert)
+	return concerts
+}
+
 func writeConcertsToAPI(c concertCrawler) {
 	apiUrl := os.Getenv("CRONCERT_API")
 	client := &http.Client{
@@ -399,6 +494,7 @@ func main() {
 		NewHelsinkiCrawler(),
 		NewMehrspurCrawler(),
 		NewUmboCrawler(),
+		NewMoodsCrawler(),
 	}
 
 	var todoCrawlers []concertCrawler

@@ -38,6 +38,7 @@ type Concert struct {
 
 type concertCrawler interface {
 	getConcerts() []Concert
+	getName() string
 }
 
 type helsinkiCrawler struct {
@@ -74,6 +75,10 @@ func NewUmboCrawler() umboCrawler {
 //  + Moods (https://www.moods.club/en/)
 //  + Bogen F (https://www.bogenf.ch/konzerte/aktuell/)
 //  + Kasheme (https://kasheme.com/program/)
+
+func (c helsinkiCrawler) getName() string {
+	return c.Name
+}
 
 func (c helsinkiCrawler) getConcerts() []Concert {
 	log.Println("Fetching Helsinki concerts.")
@@ -163,6 +168,10 @@ func (c helsinkiCrawler) getConcerts() []Concert {
 	}
 	concerts = append(concerts, currentConcert)
 	return concerts
+}
+
+func (c mehrspurCrawler) getName() string {
+	return c.Name
 }
 
 func (c mehrspurCrawler) getConcerts() []Concert {
@@ -277,6 +286,10 @@ func (c mehrspurCrawler) getConcerts() []Concert {
 
 }
 
+func (c umboCrawler) getName() string {
+	return c.Name
+}
+
 func (c umboCrawler) getConcerts() []Concert {
 	log.Println("Fetching Umbo concerts.")
 	url := "https://www.umbo.wtf/"
@@ -377,7 +390,7 @@ func prettyPrintConcerts(c concertCrawler) {
 
 func main() {
 	crawlAndStoreAll := flag.Bool("all", false, "Use this flag to crawl all available concert websites and store the results.")
-	//debugCrawler := flag.String("debug", "", "The name of the crawler.")
+	debugCrawler := flag.String("debug", "", "The name of the crawler.")
 	flag.Parse()
 
 	crawlers := []concertCrawler{
@@ -386,14 +399,16 @@ func main() {
 		NewUmboCrawler(),
 	}
 
-	if *crawlAndStoreAll {
+	if *crawlAndStoreAll && *debugCrawler == "" {
 		for _, c := range crawlers {
 			writeConcertsToAPI(c)
 		}
+	} else {
+		for _, c := range crawlers {
+			if c.getName() == *debugCrawler {
+				prettyPrintConcerts(c)
+			}
+		}
 	}
-	// writeConcertsToAPI(helsinkiCrawler{})
-	// writeConcertsToAPI(mehrspurCrawler{})
-	// writeConcertsToAPI(umboCrawler{})
-	// prettyPrintConcerts(umboCrawler{})
 
 }

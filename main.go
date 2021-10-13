@@ -385,8 +385,10 @@ func (c moodsCrawler) getConcerts() []Concert {
 	z := html.NewTokenizer(res.Body)
 	var currentConcert Concert
 	var token, previousToken html.Token
+	eventSection, commentSection := false, false
 	var day, month string
-	year := time.Now().Year()
+	now := time.Now()
+	year := now.Year()
 	token = html.Token{}
 	for {
 		tokenType := z.Next()
@@ -405,41 +407,84 @@ func (c moodsCrawler) getConcerts() []Concert {
 						currentConcert = Concert{
 							Location: c.Name,
 						}
+						eventSection = true
 					}
 				}
 			} else if token.DataAtom == atom.A {
-				if currentConcert.Link == "" {
+				if currentConcert.Link == "" && eventSection {
 					for _, attr := range token.Attr {
 						if attr.Key == "href" {
 							// TODO: get all relevant information from those subpages.
 							// Should be way easier to extract.
 							currentConcert.Link = fmt.Sprintf("%s%s", baseUrl, attr.Val)
-						}
-					}
-				}
-			}
-		} else if tokenType == html.TextToken {
-			if previousToken.Type == html.StartTagToken {
-				if previousToken.DataAtom == atom.Span {
-					for _, attr := range previousToken.Attr {
-						if attr.Key == "class" {
-							switch attr.Val {
-							case "day":
-								day = token.String()
-								fmt.Println(day)
-							case "month_name":
-								month = token.String()
-								fmt.Println(month)
-								fmt.Println(year)
+							res2, err := http.Get(currentConcert.Link)
+							if err != nil {
+								log.Fatal(err)
 							}
-						}
-					}
-				} else if previousToken.DataAtom == atom.H2 {
-					currentConcert.Artist = html.UnescapeString(token.String())
-				} else if previousToken.DataAtom == atom.Div {
-					for _, attr := range previousToken.Attr {
-						if attr.Key == "class" && attr.Val == "content" && currentConcert.Comment == "" {
-							currentConcert.Comment = html.UnescapeString(token.String())
+							defer res2.Body.Close()
+							if res2.StatusCode != 200 {
+								log.Fatalf("status code error: %d %s", res2.StatusCode, res2.Status)
+							}
+							y := html.NewTokenizer(res2.Body)
+							token = html.Token{}
+							for {
+								tokenType := y.Next()
+								previousToken = token
+								token = y.Token()
+								if tokenType == html.ErrorToken {
+									break
+								}
+								if tokenType == html.StartTagToken {
+									if token.DataAtom == atom.Meta {
+										for _, attr := range token.Attr {
+											if attr.Key == "name" && attr.Val == "description" {
+												commentSection = true
+											} else if attr.Key == "content" && commentSection {
+												if attr.Val != "Meta description defaults" {
+													currentConcert.Comment = attr.Val
+												}
+												commentSection = false
+											}
+										}
+									}
+								} else if tokenType == html.TextToken {
+									if previousToken.DataAtom == atom.Title && previousToken.Type == html.StartTagToken {
+										currentConcert.Artist = strings.Split(html.UnescapeString(token.String()), " | ")[0]
+									} else if previousToken.DataAtom == atom.Span {
+										for _, attr := range previousToken.Attr {
+											if attr.Key == "class" {
+												switch attr.Val {
+												case "day":
+													day = token.String()
+												case "month_name":
+													month = token.String()
+												case "time":
+													tmp := html.UnescapeString(token.String())
+													if strings.HasPrefix(tmp, "Start: ") {
+														tString := fmt.Sprintf("%s %s %d %s", day, month, year, strings.TrimPrefix(tmp, "Start: "))
+														loc, _ := time.LoadLocation("Europe/Berlin")
+														layout := "2 Jan 2006 15:04"
+														t, err := monday.ParseInLocation(layout, tString, loc, monday.LocaleEnUS)
+														if err != nil {
+															log.Fatalf("Couldn't parse date %s: %v", tString, err)
+														}
+														if len(concerts) > 0 {
+															if t.Before(concerts[len(concerts)-1].Date) {
+																tString = fmt.Sprintf("%s %s %d %s", day, month, year+1, strings.TrimPrefix(tmp, "Start: "))
+																t, err = monday.ParseInLocation(layout, tString, loc, monday.LocaleEnUS)
+																if err != nil {
+																	log.Fatalf("Couldn't parse date %s: %v", tString, err)
+																}
+															}
+															currentConcert.Date = t
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
 						}
 					}
 				}

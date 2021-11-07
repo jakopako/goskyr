@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/goodsign/monday"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
@@ -39,6 +40,18 @@ type Concert struct {
 type concertCrawler interface {
 	getConcerts() []Concert
 	getName() string
+}
+
+type configCrawler struct {
+	Name string
+	Url  string
+}
+
+func NewConfigCrawler(name string, url string) configCrawler {
+	return configCrawler{
+		Name: name,
+		Url:  url,
+	}
 }
 
 type helsinkiCrawler struct {
@@ -507,6 +520,37 @@ func (c moodsCrawler) getConcerts() []Concert {
 	return concerts
 }
 
+func (c configCrawler) getName() string {
+	return c.Name
+}
+
+func (c configCrawler) getConcerts() []Concert {
+	concerts := []Concert{}
+	res, err := http.Get(c.Url)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
+	}
+	doc, err := goquery.NewDocumentFromReader(res.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	doc.Find(".event .header").Each(func(i int, s *goquery.Selection) {
+		topSelection := s.Find(".agenda .top")
+		if len(topSelection.Nodes) > 0 {
+			name := topSelection.Nodes[0].FirstChild.Data
+			desc := topSelection.Find(".addition").Nodes[0].FirstChild.Data
+			fmt.Printf("Name: %s\n", name)
+			fmt.Printf("Description: %s\n\n", desc)
+		}
+	})
+
+	return concerts
+}
+
 func writeConcertsToAPI(c concertCrawler) {
 	apiUrl := os.Getenv("CRONCERT_API")
 	client := &http.Client{
@@ -552,6 +596,7 @@ func main() {
 		NewMehrspurCrawler(),
 		NewUmboCrawler(),
 		NewMoodsCrawler(),
+		NewConfigCrawler("HelsinkiConfig", "https://www.helsinkiklub.ch/"),
 	}
 
 	var todoCrawlers []concertCrawler

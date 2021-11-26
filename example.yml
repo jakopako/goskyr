@@ -1,0 +1,12 @@
+crawler:
+  - name: Helsinki
+    url: https://www.helsinkiklub.ch/
+    event: ".event .header"
+    fields:
+      artist: ".agenda .top"
+      comment: ".agenda .top .addition"
+      day:
+      month:
+      url:
+
+    date_format: ""

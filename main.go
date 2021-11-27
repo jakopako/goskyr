@@ -584,31 +584,26 @@ func prettyPrintConcerts(c concertCrawler) {
 	}
 }
 
+type Config struct {
+	Crawlers []Crawler `yaml:"crawlers"`
+}
+
+type Crawler struct {
+	Name   string `yaml:"name"`
+	URL    string `yaml:"url"`
+	Event  string `yaml:"event"`
+	Fields struct {
+		Artist string `yaml:"artist"`
+	} `yaml:"fields"`
+}
+
 func main() {
 	everyCrawler := flag.Bool("all", false, "Use this flag to indicate that all crawlers should be run.")
 	singleCrawler := flag.String("single", "", "The name of the crawler to be run.")
 	storeData := flag.Bool("store", false, "If set to true the crawled data will be written to the API.")
+	configFile := flag.String("config", "./example.yml", "The location of the configuration file.")
 
 	flag.Parse()
-
-	allCrawlers := []concertCrawler{
-		NewHelsinkiCrawler(),
-		NewMehrspurCrawler(),
-		NewUmboCrawler(),
-		NewMoodsCrawler(),
-		NewConfigCrawler("HelsinkiConfig", "https://www.helsinkiklub.ch/"),
-	}
-
-	var todoCrawlers []concertCrawler
-	if *everyCrawler {
-		todoCrawlers = allCrawlers
-	} else {
-		for _, c := range allCrawlers {
-			if c.getName() == *singleCrawler {
-				todoCrawlers = append(todoCrawlers, c)
-			}
-		}
-	}
 
 	for _, c := range todoCrawlers {
 		if *storeData {

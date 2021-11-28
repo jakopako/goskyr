@@ -1,0 +1,19 @@
+crawlers:
+  - name: Helsinki
+    url: https://www.helsinkiklub.ch/
+    event: ".event .header"
+    fields:
+      artist: ".agenda .top"
+      comment: ".agenda .top .addition"
+  #     day:
+  #     month:
+
+  #   date_format: ""
+
+  - name: Mehrspur
+    url: "https://www.mehrspur.ch/veranstaltungen"
+    event: ".post-holder"
+    fields:
+      artist: ".block_under_title a"
+      url: ".block_under_title a"
+      comment: ".event-excerpt-fluid"

@@ -17,3 +17,10 @@ crawlers:
       artist: ".block_under_title a"
       url: ".block_under_title a"
       comment: ".event-excerpt-fluid"
+
+  - name: Umbo
+    url: "https://www.umbo.wtf/"
+    event: ".w-dyn-item"
+    fields:
+      artist: ".text-block-21"
+      url: ".div-block-19 .w-clearfix a"

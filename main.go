@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -15,21 +16,47 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+type EventType string
+
+const (
+	Concert EventType = "concert"
+)
+
+func (et EventType) IsValid() error {
+	switch et {
+	case Concert:
+		return nil
+	}
+	errorString := fmt.Sprintf("invalid event type: %s", et)
+	return errors.New(errorString)
+}
+
+// func (et EventType) String() string {
+// 	return []string{"undefined", "concert"}[et]
+// }
+
 // TODO: it's ugly to copy paste this from the croncert-api project.
-type Concert struct {
-	Artist   string    `bson:"artist,omitempty" json:"artist,omitempty" validate:"required" example:"SuperArtist"`
+type Event struct {
+	Title    string    `bson:"title,omitempty" json:"title,omitempty" validate:"required" example:"ExcitingTitle"`
 	Location string    `bson:"location,omitempty" json:"location,omitempty" validate:"required" example:"SuperLocation"`
 	Date     time.Time `bson:"date,omitempty" json:"date,omitempty" validate:"required" example:"2021-10-31T19:00:00.000Z"`
 	URL      string    `bson:"url,omitempty" json:"url,omitempty" validate:"required,url" example:"http://link.to/concert/page"`
 	Comment  string    `bson:"comment,omitempty" json:"comment,omitempty" example:"Super exciting comment."`
+	Type     EventType `bson:"type,omitempty" json:"type,omitempty" validate:"required" example:"concert"`
 }
 
-func (c Crawler) getConcerts() []Concert {
-	concerts := []Concert{}
+func (c Crawler) getEvents() ([]Event, error) {
+	events := []Event{}
+	eventType := EventType(c.Type)
+	err := eventType.IsValid()
+	if err != nil {
+		return events, err
+	}
+
 	res, err := http.Get(c.URL)
 
 	if err != nil {
-		log.Fatal(err)
+		return events, err
 	}
 
 	defer res.Body.Close()
@@ -40,20 +67,28 @@ func (c Crawler) getConcerts() []Concert {
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 
 	if err != nil {
-		log.Fatal(err)
+		return events, err
 	}
 
 	doc.Find(c.Event).Each(func(i int, s *goquery.Selection) {
-		currentConcert := Concert{
+		currentEvent := Event{
 			Location: c.Name,
+			Type:     EventType(c.Type),
 		}
 
-		artist := s.Find(c.Fields.Artist)
-		currentConcert.Artist = strings.TrimSuffix(artist.Text(), artist.Children().Text())
-		currentConcert.URL = s.Find(c.Fields.URL).AttrOr("href", c.URL)
-		currentConcert.Comment = s.Find(c.Fields.Comment).Text()
+		title := s.Find(c.Fields.Title)
+		currentEvent.Title = strings.TrimSuffix(title.Text(), title.Children().Text())
+		url := s.Find(c.Fields.URL.Loc).AttrOr("href", c.URL)
+		if c.Fields.URL.Relative {
+			url = c.URL + url
+		}
+		currentEvent.URL = url
+		currentEvent.Comment = s.Find(c.Fields.Comment).Text()
 
-		concerts = append(concerts, currentConcert)
+		fmt.Println(s.Find(c.Fields.Date.Day).Text())
+		fmt.Println(s.Find(c.Fields.Date.Month).Text())
+
+		events = append(events, currentEvent)
 
 		// topSelection := s.Find(".agenda .top")
 		// if len(topSelection.Nodes) > 0 {
@@ -64,15 +99,21 @@ func (c Crawler) getConcerts() []Concert {
 		// }
 	})
 
-	return concerts
+	return events, nil
 }
 
-func writeConcertsToAPI(c Crawler) {
+func writeEventsToAPI(c Crawler) {
 	apiUrl := os.Getenv("CRONCERT_API")
 	client := &http.Client{
 		Timeout: time.Second * 10,
 	}
-	for _, concert := range c.getConcerts() {
+	events, err := c.getEvents()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, concert := range events {
 		concertJSON, err := json.Marshal(concert)
 		if err != nil {
 			log.Fatal(err)
@@ -93,10 +134,15 @@ func writeConcertsToAPI(c Crawler) {
 	}
 }
 
-func prettyPrintConcerts(c Crawler) {
-	for _, concert := range c.getConcerts() {
-		fmt.Printf("Artist: %v\nLocation: %v\nDate: %v\nURL: %v\nComment: %v\n\n",
-			concert.Artist, concert.Location, concert.Date, concert.URL, concert.Comment)
+func prettyPrintEvents(c Crawler) {
+	events, err := c.getEvents()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, event := range events {
+		fmt.Printf("Title: %v\nLocation: %v\nDate: %v\nURL: %v\nComment: %v\nType: %v\n\n",
+			event.Title, event.Location, event.Date, event.URL, event.Comment, event.Type)
 	}
 }
 
@@ -106,11 +152,19 @@ type Config struct {
 
 type Crawler struct {
 	Name   string `yaml:"name"`
+	Type   string `yaml:"type"`
 	URL    string `yaml:"url"`
 	Event  string `yaml:"event"`
 	Fields struct {
-		Artist  string `yaml:"artist"`
-		URL     string `yaml:"url"`
+		Title string `yaml:"title"`
+		URL   struct {
+			Loc      string `yaml:"loc"`
+			Relative bool   `yaml:"relative"`
+		} `yaml:"url"`
+		Date struct {
+			Day   string `yaml:"day"`
+			Month string `yaml:"month"`
+		} `yaml:"date"`
 		Comment string `yaml:"comment"`
 	} `yaml:"fields"`
 }
@@ -146,17 +200,17 @@ func main() {
 		if *singleCrawler != "" {
 			if *singleCrawler == c.Name {
 				if *storeData {
-					writeConcertsToAPI(c)
+					writeEventsToAPI(c)
 				} else {
-					prettyPrintConcerts(c)
+					prettyPrintEvents(c)
 				}
 				break
 			}
 		} else {
 			if *storeData {
-				writeConcertsToAPI(c)
+				writeEventsToAPI(c)
 			} else {
-				prettyPrintConcerts(c)
+				prettyPrintEvents(c)
 			}
 		}
 	}

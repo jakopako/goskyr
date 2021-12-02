@@ -61,3 +61,21 @@ crawlers:
           loc: ".text-block-26"
           layout: "2.1.2006 15:04"
         location: "Europe/Berlin"
+
+  - name: Sender
+    type: concert
+    url: "https://gds.fm/SENDER"
+    city: "Zurich"
+    event: ".event-list__item"
+    fields:
+      title:
+        - ".event-preview__title"
+      url:
+        loc: "" # does not work because jquerys find only searches in descendants
+        relative: true
+      date:
+        day_month_year_time:
+          loc: ".event-preview__date-long"
+          layout: "January 02, 2006, 03:04 PM"
+        location: "GMT"
+        language: "en_US"

@@ -112,7 +112,13 @@ func (c Crawler) getEvents() ([]Event, error) {
 		currentEvent.Title = title
 
 		// extract the url
-		url := s.Find(c.Fields.URL.Loc).AttrOr("href", c.URL)
+		var url string
+		if c.Fields.URL.Loc == "" {
+			url = s.AttrOr("href", c.URL)
+		} else {
+			url = s.Find(c.Fields.URL.Loc).AttrOr("href", c.URL)
+		}
+
 		if c.Fields.URL.Relative {
 			url = c.URL + url
 		}

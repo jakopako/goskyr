@@ -71,7 +71,7 @@ crawlers:
       title:
         - ".event-preview__title"
       url:
-        loc: "" # does not work because jquerys find only searches in descendants
+        loc: "" # This means that we look in the event node itself for an href
         relative: true
       date:
         day_month_year_time:

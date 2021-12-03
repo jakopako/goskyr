@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/goodsign/monday"
 	"gopkg.in/yaml.v2"
 )
 
@@ -53,8 +54,12 @@ func (c Crawler) getEvents() ([]Event, error) {
 		return events, err
 	}
 
-	res, err := http.Get(c.URL)
+	loc, err := time.LoadLocation(c.Fields.Date.Location)
+	if err != nil {
+		return events, err
+	}
 
+	res, err := http.Get(c.URL)
 	if err != nil {
 		return events, err
 	}
@@ -64,8 +69,8 @@ func (c Crawler) getEvents() ([]Event, error) {
 	if res.StatusCode != 200 {
 		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
 	}
-	doc, err := goquery.NewDocumentFromReader(res.Body)
 
+	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
 		return events, err
 	}
@@ -76,17 +81,59 @@ func (c Crawler) getEvents() ([]Event, error) {
 			Type:     EventType(c.Type),
 		}
 
-		title := s.Find(c.Fields.Title)
-		currentEvent.Title = strings.TrimSuffix(title.Text(), title.Children().Text())
+		// extract the title
+		var title string
+		for _, titleLoc := range c.Fields.Title {
+			titleSelection := s.Find(titleLoc).First()
+			title = strings.TrimSuffix(titleSelection.Text(), titleSelection.Children().Text())
+			if title != "" {
+				break
+			}
+		}
+		if title == "" {
+			return
+		}
+
+		currentEvent.Title = title
+
+		// extract the url
 		url := s.Find(c.Fields.URL.Loc).AttrOr("href", c.URL)
 		if c.Fields.URL.Relative {
 			url = c.URL + url
 		}
 		currentEvent.URL = url
-		currentEvent.Comment = s.Find(c.Fields.Comment).Text()
 
-		fmt.Println(s.Find(c.Fields.Date.Day).Text())
-		fmt.Println(s.Find(c.Fields.Date.Month).Text())
+		// extract the comment
+		var comment string
+		for _, commentLoc := range c.Fields.Comment {
+			comment = s.Find(commentLoc).Text()
+			if comment != "" {
+				break
+			}
+		}
+		currentEvent.Comment = comment
+
+		// extract date and time
+		day := s.Find(c.Fields.Date.Day.Loc).Text()
+		month := s.Find(c.Fields.Date.Month.Loc).Text()
+		year := time.Now().Year()
+		timeString := "20:00"
+
+		layout := fmt.Sprintf("%s %s 2006 15:04", c.Fields.Date.Day.Layout, c.Fields.Date.Month.Layout)
+		dateTimeString := fmt.Sprintf("%s %s %d %s", day, month, year, timeString)
+		t, err := monday.ParseInLocation(layout, dateTimeString, loc, monday.Locale(c.Fields.Date.Language))
+		if err != nil {
+			log.Printf("Couldn't parse date: %s", err)
+			return
+		}
+
+		// if the date t does not come after the previous event's date we increase the year by 1
+		if len(events) > 0 {
+			if events[len(events)-1].Date.After(t) {
+				t = time.Date(int(year+1), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
+			}
+		}
+		currentEvent.Date = t
 
 		events = append(events, currentEvent)
 
@@ -156,16 +203,24 @@ type Crawler struct {
 	URL    string `yaml:"url"`
 	Event  string `yaml:"event"`
 	Fields struct {
-		Title string `yaml:"title"`
+		Title []string `yaml:"title"`
 		URL   struct {
 			Loc      string `yaml:"loc"`
 			Relative bool   `yaml:"relative"`
 		} `yaml:"url"`
 		Date struct {
-			Day   string `yaml:"day"`
-			Month string `yaml:"month"`
+			Day struct {
+				Loc    string `yaml:"loc"`
+				Layout string `yaml:"layout"`
+			} `yaml:"day"`
+			Month struct {
+				Loc    string `yaml:"loc"`
+				Layout string `yaml:"layout"`
+			} `yaml:"month"`
+			Location string `yaml:"location"`
+			Language string `yaml:"language"`
 		} `yaml:"date"`
-		Comment string `yaml:"comment"`
+		Comment []string `yaml:"comment"`
 	} `yaml:"fields"`
 }
 

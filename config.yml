@@ -4,13 +4,21 @@ crawlers:
     url: https://www.helsinkiklub.ch
     event: ".event .header"
     fields:
-      title: ".agenda .top"
-      comment: ".agenda .top .addition"
+      title: # only the first option that results in an non-empty title is taken into account.
+        - ".agenda .top"
+        - ".agenda .support"
+      comment:
+        - ".agenda .top .addition"
+        - ".agenda .support .addition"
       date:
-        day: ".day"
-        month: ".month"
+        day:
+          loc: ".day"
+          layout: "2"
+        month:
+          loc: ".month"
+          layout: "January" # has to be in English
         location: "Europe/Berlin"
-        language: "DE"
+        language: "de_DE"
   #     day:
   #     month:
 
@@ -21,17 +29,20 @@ crawlers:
     url: "https://www.mehrspur.ch/veranstaltungen"
     event: ".post-holder"
     fields:
-      title: ".block_under_title a"
-      url: 
+      title:
+        - ".block_under_title a"
+      url:
         loc: ".block_under_title a"
-      comment: ".event-excerpt-fluid"
+      comment:
+        - ".event-excerpt-fluid"
 
   - name: Umbo
     type: concert
     url: "https://www.umbo.wtf"
     event: ".w-dyn-item"
     fields:
-      title: ".text-block-21"
+      title:
+        - ".text-block-21"
       url:
         loc: ".w-inline-block"
         relative: true

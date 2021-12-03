@@ -4,10 +4,10 @@ crawlers:
     url: https://www.helsinkiklub.ch
     event: ".event .header"
     fields:
-      title: # only the first option that results in an non-empty title is taken into account.
+      title: # only the first option that results in a non-empty title is taken into account.
         - ".agenda .top"
         - ".agenda .support"
-      comment:
+      comment: # only the first option that results in a non-empty comment is taken into account.
         - ".agenda .top .addition"
         - ".agenda .support .addition"
       date:

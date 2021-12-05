@@ -40,6 +40,7 @@ func (et EventType) IsValid() error {
 type Event struct {
 	Title    string    `bson:"title,omitempty" json:"title,omitempty" validate:"required" example:"ExcitingTitle"`
 	Location string    `bson:"location,omitempty" json:"location,omitempty" validate:"required" example:"SuperLocation"`
+	City     string    `bson:"city,omitempty" json:"city,omitempty" validate:"required" example:"SuperCity"`
 	Date     time.Time `bson:"date,omitempty" json:"date,omitempty" validate:"required" example:"2021-10-31T19:00:00.000Z"`
 	URL      string    `bson:"url,omitempty" json:"url,omitempty" validate:"required,url" example:"http://link.to/concert/page"`
 	Comment  string    `bson:"comment,omitempty" json:"comment,omitempty" example:"Super exciting comment."`
@@ -54,9 +55,22 @@ func (c Crawler) getEvents() ([]Event, error) {
 		return events, err
 	}
 
+	// city
+	if c.City == "" {
+		err := errors.New("city cannot be an empty string")
+		return events, err
+	}
+
+	// time zone
 	loc, err := time.LoadLocation(c.Fields.Date.Location)
 	if err != nil {
 		return events, err
+	}
+
+	// locale (language)
+	mLocale := "de_DE"
+	if c.Fields.Date.Language != "" {
+		mLocale = c.Fields.Date.Language
 	}
 
 	res, err := http.Get(c.URL)
@@ -78,6 +92,7 @@ func (c Crawler) getEvents() ([]Event, error) {
 	doc.Find(c.Event).Each(func(i int, s *goquery.Selection) {
 		currentEvent := Event{
 			Location: c.Name,
+			City:     c.City,
 			Type:     EventType(c.Type),
 		}
 
@@ -114,20 +129,46 @@ func (c Crawler) getEvents() ([]Event, error) {
 		currentEvent.Comment = comment
 
 		// extract date and time
-		day := s.Find(c.Fields.Date.Day.Loc).Text()
-		month := s.Find(c.Fields.Date.Month.Loc).Text()
 		year := time.Now().Year()
-		timeString := "20:00"
 
-		layout := fmt.Sprintf("%s %s 2006 15:04", c.Fields.Date.Day.Layout, c.Fields.Date.Month.Layout)
-		dateTimeString := fmt.Sprintf("%s %s %d %s", day, month, year, timeString)
-		t, err := monday.ParseInLocation(layout, dateTimeString, loc, monday.Locale(c.Fields.Date.Language))
+		var dateTimeString, layout string
+		if c.Fields.Date.DayMonthYearTime.Loc != "" {
+			dateTimeString = s.Find(c.Fields.Date.DayMonthYearTime.Loc).Text()
+			layout = c.Fields.Date.DayMonthYearTime.Layout
+		} else {
+			var dayMonthString, dayMonthStringLayout string
+			if c.Fields.Date.DayMonth.Loc != "" {
+				dayMonthString = s.Find(c.Fields.Date.DayMonth.Loc).Text()
+				dayMonthStringLayout = c.Fields.Date.DayMonth.Layout
+			} else if c.Fields.Date.Day.Loc != "" && c.Fields.Date.Month.Loc != "" {
+				dayString := s.Find(c.Fields.Date.Day.Loc).Text()
+				monthString := s.Find(c.Fields.Date.Month.Loc).Text()
+				dayMonthString = dayString + " " + monthString
+				dayMonthStringLayout = c.Fields.Date.Day.Layout + " " + c.Fields.Date.Month.Layout
+			}
+
+			var timeString, timeStringLayout string
+			if c.Fields.Date.Time.Loc == "" {
+				timeString = "20:00"
+				timeStringLayout = "15:04"
+			} else {
+				timeString = s.Find(c.Fields.Date.Time.Loc).Text()
+				timeStringLayout = c.Fields.Date.Time.Layout
+			}
+
+			layout = fmt.Sprintf("%s 2006 %s", dayMonthStringLayout, timeStringLayout)
+			dateTimeString = fmt.Sprintf("%s %d %s", dayMonthString, year, timeString)
+		}
+
+		t, err := monday.ParseInLocation(layout, dateTimeString, loc, monday.Locale(mLocale))
 		if err != nil {
 			log.Printf("Couldn't parse date: %s", err)
 			return
 		}
 
 		// if the date t does not come after the previous event's date we increase the year by 1
+		// actually this is only necessary if we have to guess the date but currently for ease of implementation
+		// this check is done always.
 		if len(events) > 0 {
 			if events[len(events)-1].Date.After(t) {
 				t = time.Date(int(year+1), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
@@ -188,8 +229,8 @@ func prettyPrintEvents(c Crawler) {
 	}
 
 	for _, event := range events {
-		fmt.Printf("Title: %v\nLocation: %v\nDate: %v\nURL: %v\nComment: %v\nType: %v\n\n",
-			event.Title, event.Location, event.Date, event.URL, event.Comment, event.Type)
+		fmt.Printf("Title: %v\nLocation: %v\nCity: %v\nDate: %v\nURL: %v\nComment: %v\nType: %v\n\n",
+			event.Title, event.Location, event.City, event.Date, event.URL, event.Comment, event.Type)
 	}
 }
 
@@ -201,6 +242,7 @@ type Crawler struct {
 	Name   string `yaml:"name"`
 	Type   string `yaml:"type"`
 	URL    string `yaml:"url"`
+	City   string `yaml:"city"`
 	Event  string `yaml:"event"`
 	Fields struct {
 		Title []string `yaml:"title"`
@@ -217,6 +259,18 @@ type Crawler struct {
 				Loc    string `yaml:"loc"`
 				Layout string `yaml:"layout"`
 			} `yaml:"month"`
+			DayMonth struct {
+				Loc    string `yaml:"loc"`
+				Layout string `yaml:"layout"`
+			} `yaml:"day_month"`
+			DayMonthYearTime struct {
+				Loc    string `yaml:"loc"`
+				Layout string `yaml:"layout"`
+			} `yaml:"day_month_year_time"`
+			Time struct {
+				Loc    string `yaml:"loc"`
+				Layout string `yaml:"layout"`
+			} `yaml:"time"`
 			Location string `yaml:"location"`
 			Language string `yaml:"language"`
 		} `yaml:"date"`

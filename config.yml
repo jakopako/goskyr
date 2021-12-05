@@ -2,6 +2,7 @@ crawlers:
   - name: Helsinki
     type: concert
     url: https://www.helsinkiklub.ch
+    city: "Zurich"
     event: ".event .header"
     fields:
       title: # only the first option that results in a non-empty title is taken into account.
@@ -19,14 +20,11 @@ crawlers:
           layout: "January" # has to be in English
         location: "Europe/Berlin"
         language: "de_DE"
-  #     day:
-  #     month:
-
-  #   date_format: ""
 
   - name: Mehrspur
     type: concert
     url: "https://www.mehrspur.ch/veranstaltungen"
+    city: "Zurich"
     event: ".post-holder"
     fields:
       title:
@@ -35,14 +33,31 @@ crawlers:
         loc: ".block_under_title a"
       comment:
         - ".event-excerpt-fluid"
+      date:
+        day_month:
+          loc: ".event-date"
+          layout: "Mon 2.Jan."
+        time:
+          loc: ".event-time"
+          layout: "15:04"
+        location: "Europe/Berlin"
+        language: "de_DE"
 
   - name: Umbo
     type: concert
     url: "https://www.umbo.wtf"
+    city: "Zurich"
     event: ".w-dyn-item"
     fields:
       title:
         - ".text-block-21"
+      comment:
+        - ".text-block-28"
       url:
         loc: ".w-inline-block"
         relative: true
+      date:
+        day_month_year_time:
+          loc: ".text-block-26"
+          layout: "2.1.2006 15:04"
+        location: "Europe/Berlin"

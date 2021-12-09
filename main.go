@@ -183,14 +183,6 @@ func (c Crawler) getEvents() ([]Event, error) {
 		currentEvent.Date = t
 
 		events = append(events, currentEvent)
-
-		// topSelection := s.Find(".agenda .top")
-		// if len(topSelection.Nodes) > 0 {
-		// 	name := topSelection.Nodes[0].FirstChild.Data
-		// 	desc := topSelection.Find(".addition").Nodes[0].FirstChild.Data
-		// 	fmt.Printf("Name: %s\n", name)
-		// 	fmt.Printf("Description: %s\n\n", desc)
-		// }
 	})
 
 	return events, nil

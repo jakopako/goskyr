@@ -71,7 +71,7 @@ crawlers:
       title:
         - ".event-preview__title"
       url:
-        loc: "" # This means that we look in the event node itself for an href
+        loc: "" # An empty string means that we look in the event node itself for an href
         relative: true
       date:
         day_month_year_time:

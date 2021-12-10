@@ -32,10 +32,6 @@ func (et EventType) IsValid() error {
 	return errors.New(errorString)
 }
 
-// func (et EventType) String() string {
-// 	return []string{"undefined", "concert"}[et]
-// }
-
 // TODO: it's ugly to copy paste this from the croncert-api project.
 type Event struct {
 	Title    string    `bson:"title,omitempty" json:"title,omitempty" validate:"required" example:"ExcitingTitle"`
@@ -120,7 +116,11 @@ func (c Crawler) getEvents() ([]Event, error) {
 		}
 
 		if c.Fields.URL.Relative {
-			url = c.URL + url
+			baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
+			if !strings.HasPrefix(url, "/") {
+				baseURL = baseURL + "/"
+			}
+			url = baseURL + url
 		}
 		currentEvent.URL = url
 

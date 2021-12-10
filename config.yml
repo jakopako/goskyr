@@ -79,3 +79,24 @@ crawlers:
           layout: "January 02, 2006, 03:04 PM"
         location: "GMT"
         language: "en_US"
+
+  - name: Unterfahrt
+    type: concert
+    url: "https://www.unterfahrt.de/programm.php"
+    city: "Munich"
+    event: ".b-events__el"
+    fields:
+      title: 
+        - ".b-events__el-title"
+      comment:
+        - ".b-events__el-text"
+      url:
+        loc: ".o-btn-cta__link"
+        relative: true
+      date:
+        day_month_year_time:
+          loc: ".b-events__el-date"
+          layout: "Mon•2•1•2006, 15••04"
+        location: "Europe/Berlin"
+        language: "de_DE"
+

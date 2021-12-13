@@ -100,3 +100,18 @@ crawlers:
         location: "Europe/Berlin"
         language: "de_DE"
 
+  - name: Moods
+    type: concert
+    url: "https://www.moods.club/en/?a=1"
+    # url: "https://www.moods.club/en/program/event/11365/zurich-jazz-orchestra-feat-barbara-dennerlein.html"
+    # url: "https://www.moods.club/en/program/event/11505/shems-bendali-quintet.html"
+    city: "Zurich"
+    event: ".event"
+    fields:
+      url:
+        loc: "a"
+        relative: true
+        on_subpage: ["comment", "day", "month", "time"]
+      title:
+        - "h2"
+      

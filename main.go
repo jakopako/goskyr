@@ -92,21 +92,6 @@ func (c Crawler) getEvents() ([]Event, error) {
 			Type:     EventType(c.Type),
 		}
 
-		// extract the title
-		var title string
-		for _, titleLoc := range c.Fields.Title {
-			titleSelection := s.Find(titleLoc).First()
-			title = strings.TrimSuffix(titleSelection.Text(), titleSelection.Children().Text())
-			if title != "" {
-				break
-			}
-		}
-		if title == "" {
-			return
-		}
-
-		currentEvent.Title = title
-
 		// extract the url
 		var url string
 		if c.Fields.URL.Loc == "" {
@@ -123,6 +108,21 @@ func (c Crawler) getEvents() ([]Event, error) {
 			url = baseURL + url
 		}
 		currentEvent.URL = url
+
+		// extract the title
+		var title string
+		for _, titleLoc := range c.Fields.Title {
+			titleSelection := s.Find(titleLoc).First()
+			title = strings.TrimSuffix(titleSelection.Text(), titleSelection.Children().Text())
+			if title != "" {
+				break
+			}
+		}
+		if title == "" {
+			return
+		}
+
+		currentEvent.Title = title
 
 		// extract the comment
 		var comment string
@@ -245,8 +245,9 @@ type Crawler struct {
 	Fields struct {
 		Title []string `yaml:"title"`
 		URL   struct {
-			Loc      string `yaml:"loc"`
-			Relative bool   `yaml:"relative"`
+			Loc       string   `yaml:"loc"`
+			Relative  bool     `yaml:"relative"`
+			OnSubpage []string `yaml:"on_subpage"`
 		} `yaml:"url"`
 		Date struct {
 			Day struct {

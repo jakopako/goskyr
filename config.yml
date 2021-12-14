@@ -111,7 +111,19 @@ crawlers:
       url:
         loc: "a"
         relative: true
-        on_subpage: ["comment", "day", "month", "time"]
+        on_subpage: ["comment", "date"]
       title:
         - "h2"
+      date:
+        day:
+          loc: ".date .day"
+          layout: "2"
+        month:
+          loc: ".date .month_name"
+          layout: "Jan"
+        time:
+          loc: ".time"
+          layout: "Start: 15:04"
+        location: "Europe/Berlin"
+        language: "en_US"
       

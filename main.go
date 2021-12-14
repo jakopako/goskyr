@@ -44,6 +44,7 @@ type Event struct {
 }
 
 func (c Crawler) getEvents() ([]Event, error) {
+	dynamicFields := []string{"title", "comment", "url", "date"}
 	events := []Event{}
 	eventType := EventType(c.Type)
 	err := eventType.IsValid()
@@ -92,74 +93,167 @@ func (c Crawler) getEvents() ([]Event, error) {
 			Type:     EventType(c.Type),
 		}
 
+		for _, f := range dynamicFields {
+			fOnSubpage := false
+			for _, sf := range c.Fields.URL.OnSubpage {
+				if f == sf {
+					fOnSubpage = true
+				}
+			}
+			if !fOnSubpage {
+				err := extractField(f, s, &c, &currentEvent, events, loc, mLocale, res)
+				if err != nil {
+					log.Println(err)
+				}
+			}
+		}
+
 		// extract the url
-		var url string
-		if c.Fields.URL.Loc == "" {
-			url = s.AttrOr("href", c.URL)
-		} else {
-			url = s.Find(c.Fields.URL.Loc).AttrOr("href", c.URL)
-		}
+		// var url string
+		// if c.Fields.URL.Loc == "" {
+		// 	url = s.AttrOr("href", c.URL)
+		// } else {
+		// 	url = s.Find(c.Fields.URL.Loc).AttrOr("href", c.URL)
+		// }
 
-		if c.Fields.URL.Relative {
-			baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
-			if !strings.HasPrefix(url, "/") {
-				baseURL = baseURL + "/"
+		// if c.Fields.URL.Relative {
+		// 	baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
+		// 	if !strings.HasPrefix(url, "/") {
+		// 		baseURL = baseURL + "/"
+		// 	}
+		// 	url = baseURL + url
+		// }
+		// currentEvent.URL = url
+
+		if len(c.Fields.URL.OnSubpage) > 0 {
+			resSub, err := http.Get(currentEvent.URL)
+			if err != nil {
+				return
 			}
-			url = baseURL + url
-		}
-		currentEvent.URL = url
 
-		// extract the title
-		var title string
-		for _, titleLoc := range c.Fields.Title {
-			titleSelection := s.Find(titleLoc).First()
-			title = strings.TrimSuffix(titleSelection.Text(), titleSelection.Children().Text())
-			if title != "" {
-				break
+			defer resSub.Body.Close()
+
+			if resSub.StatusCode != 200 {
+				log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
 			}
-		}
-		if title == "" {
-			return
-		}
 
-		currentEvent.Title = title
-
-		// extract the comment
-		var comment string
-		for _, commentLoc := range c.Fields.Comment {
-			comment = s.Find(commentLoc).Text()
-			if comment != "" {
-				break
+			docSub, err := goquery.NewDocumentFromReader(resSub.Body)
+			if err != nil {
+				return
+			}
+			for _, item := range c.Fields.URL.OnSubpage {
+				extractField(item, docSub.Selection, &c, &currentEvent, events, loc, mLocale, resSub)
 			}
 		}
-		currentEvent.Comment = comment
 
+		// // extract the title
+		// var title string
+		// for _, titleLoc := range c.Fields.Title {
+		// 	titleSelection := s.Find(titleLoc).First()
+		// 	title = strings.TrimSuffix(titleSelection.Text(), titleSelection.Children().Text())
+		// 	if title != "" {
+		// 		break
+		// 	}
+		// }
+		// if title == "" {
+		// 	return
+		// }
+
+		// currentEvent.Title = title
+
+		// // extract the comment
+		// var comment string
+		// for _, commentLoc := range c.Fields.Comment {
+		// 	comment = s.Find(commentLoc).Text()
+		// 	if comment != "" {
+		// 		break
+		// 	}
+		// }
+		// currentEvent.Comment = comment
+
+		// // extract date and time
+		// year := time.Now().Year()
+
+		// var dateTimeString, layout string
+		// if c.Fields.Date.DayMonthYearTime.Loc != "" {
+		// 	dateTimeString = s.Find(c.Fields.Date.DayMonthYearTime.Loc).Text()
+		// 	layout = c.Fields.Date.DayMonthYearTime.Layout
+		// } else {
+		// 	var dayMonthString, dayMonthStringLayout string
+		// 	if c.Fields.Date.DayMonth.Loc != "" {
+		// 		dayMonthString = s.Find(c.Fields.Date.DayMonth.Loc).Text()
+		// 		dayMonthStringLayout = c.Fields.Date.DayMonth.Layout
+		// 	} else if c.Fields.Date.Day.Loc != "" && c.Fields.Date.Month.Loc != "" {
+		// 		dayString := s.Find(c.Fields.Date.Day.Loc).Text()
+		// 		monthString := s.Find(c.Fields.Date.Month.Loc).Text()
+		// 		dayMonthString = dayString + " " + monthString
+		// 		dayMonthStringLayout = c.Fields.Date.Day.Layout + " " + c.Fields.Date.Month.Layout
+		// 	}
+
+		// 	var timeString, timeStringLayout string
+		// 	if c.Fields.Date.Time.Loc == "" {
+		// 		timeString = "20:00"
+		// 		timeStringLayout = "15:04"
+		// 	} else {
+		// 		timeString = s.Find(c.Fields.Date.Time.Loc).Text()
+		// 		timeStringLayout = c.Fields.Date.Time.Layout
+		// 	}
+
+		// 	layout = fmt.Sprintf("%s 2006 %s", dayMonthStringLayout, timeStringLayout)
+		// 	dateTimeString = fmt.Sprintf("%s %d %s", dayMonthString, year, timeString)
+		// }
+
+		// t, err := monday.ParseInLocation(layout, dateTimeString, loc, monday.Locale(mLocale))
+		// if err != nil {
+		// 	log.Printf("Couldn't parse date: %s", err)
+		// 	return
+		// }
+
+		// // if the date t does not come after the previous event's date we increase the year by 1
+		// // actually this is only necessary if we have to guess the date but currently for ease of implementation
+		// // this check is done always.
+		// if len(events) > 0 {
+		// 	if events[len(events)-1].Date.After(t) {
+		// 		t = time.Date(int(year+1), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
+		// 	}
+		// }
+		// currentEvent.Date = t
+
+		events = append(events, currentEvent)
+	})
+
+	return events, nil
+}
+
+func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Event, events []Event, loc *time.Location, mLocale string, res *http.Response) error {
+	switch item {
+	case "date":
 		// extract date and time
 		year := time.Now().Year()
 
 		var dateTimeString, layout string
-		if c.Fields.Date.DayMonthYearTime.Loc != "" {
-			dateTimeString = s.Find(c.Fields.Date.DayMonthYearTime.Loc).Text()
-			layout = c.Fields.Date.DayMonthYearTime.Layout
+		if crawler.Fields.Date.DayMonthYearTime.Loc != "" {
+			dateTimeString = s.Find(crawler.Fields.Date.DayMonthYearTime.Loc).Text()
+			layout = crawler.Fields.Date.DayMonthYearTime.Layout
 		} else {
 			var dayMonthString, dayMonthStringLayout string
-			if c.Fields.Date.DayMonth.Loc != "" {
-				dayMonthString = s.Find(c.Fields.Date.DayMonth.Loc).Text()
-				dayMonthStringLayout = c.Fields.Date.DayMonth.Layout
-			} else if c.Fields.Date.Day.Loc != "" && c.Fields.Date.Month.Loc != "" {
-				dayString := s.Find(c.Fields.Date.Day.Loc).Text()
-				monthString := s.Find(c.Fields.Date.Month.Loc).Text()
+			if crawler.Fields.Date.DayMonth.Loc != "" {
+				dayMonthString = s.Find(crawler.Fields.Date.DayMonth.Loc).Text()
+				dayMonthStringLayout = crawler.Fields.Date.DayMonth.Layout
+			} else if crawler.Fields.Date.Day.Loc != "" && crawler.Fields.Date.Month.Loc != "" {
+				dayString := s.Find(crawler.Fields.Date.Day.Loc).Text()
+				monthString := s.Find(crawler.Fields.Date.Month.Loc).Text()
 				dayMonthString = dayString + " " + monthString
-				dayMonthStringLayout = c.Fields.Date.Day.Layout + " " + c.Fields.Date.Month.Layout
+				dayMonthStringLayout = crawler.Fields.Date.Day.Layout + " " + crawler.Fields.Date.Month.Layout
 			}
 
 			var timeString, timeStringLayout string
-			if c.Fields.Date.Time.Loc == "" {
+			if crawler.Fields.Date.Time.Loc == "" {
 				timeString = "20:00"
 				timeStringLayout = "15:04"
 			} else {
-				timeString = s.Find(c.Fields.Date.Time.Loc).Text()
-				timeStringLayout = c.Fields.Date.Time.Layout
+				timeString = s.Find(crawler.Fields.Date.Time.Loc).Text()
+				timeStringLayout = crawler.Fields.Date.Time.Layout
 			}
 
 			layout = fmt.Sprintf("%s 2006 %s", dayMonthStringLayout, timeStringLayout)
@@ -168,10 +262,8 @@ func (c Crawler) getEvents() ([]Event, error) {
 
 		t, err := monday.ParseInLocation(layout, dateTimeString, loc, monday.Locale(mLocale))
 		if err != nil {
-			log.Printf("Couldn't parse date: %s", err)
-			return
+			return err
 		}
-
 		// if the date t does not come after the previous event's date we increase the year by 1
 		// actually this is only necessary if we have to guess the date but currently for ease of implementation
 		// this check is done always.
@@ -180,12 +272,47 @@ func (c Crawler) getEvents() ([]Event, error) {
 				t = time.Date(int(year+1), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
 			}
 		}
-		currentEvent.Date = t
+		event.Date = t
+	case "title":
+		var title string
+		for _, titleLoc := range crawler.Fields.Title {
+			titleSelection := s.Find(titleLoc).First()
+			title = strings.TrimSuffix(titleSelection.Text(), titleSelection.Children().Text())
+			if title != "" {
+				break
+			}
+		}
+		if title == "" {
+			return errors.New("empty event title")
+		}
+		event.Title = title
+	case "comment":
+		var comment string
+		for _, commentLoc := range crawler.Fields.Comment {
+			comment = s.Find(commentLoc).Text()
+			if comment != "" {
+				break
+			}
+		}
+		event.Comment = comment
+	case "url":
+		var url string
+		if crawler.Fields.URL.Loc == "" {
+			url = s.AttrOr("href", crawler.URL)
+		} else {
+			url = s.Find(crawler.Fields.URL.Loc).AttrOr("href", crawler.URL)
+		}
 
-		events = append(events, currentEvent)
-	})
-
-	return events, nil
+		if crawler.Fields.URL.Relative {
+			baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
+			if !strings.HasPrefix(url, "/") {
+				baseURL = baseURL + "/"
+			}
+			url = baseURL + url
+		}
+		event.URL = url
+	}
+	return nil
 }
 
 func writeEventsToAPI(c Crawler) {

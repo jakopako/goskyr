@@ -139,10 +139,13 @@ func (c Crawler) getEvents() ([]Event, error) {
 
 			docSub, err := goquery.NewDocumentFromReader(resSub.Body)
 			if err != nil {
-				return
+				log.Fatalf("error while reading document: %v", err)
 			}
 			for _, item := range c.Fields.URL.OnSubpage {
-				extractField(item, docSub.Selection, &c, &currentEvent, events, loc, mLocale, resSub)
+				err := extractField(item, docSub.Selection, &c, &currentEvent, events, loc, mLocale, resSub)
+				if err != nil {
+					log.Fatalf("error while parsing field %s: %v", item, err)
+				}
 			}
 		}
 
@@ -252,7 +255,10 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 				timeString = "20:00"
 				timeStringLayout = "15:04"
 			} else {
-				timeString = s.Find(crawler.Fields.Date.Time.Loc).Text()
+				// Normally, there should be only one occurence of the time. However, on the
+				// Moods website there are two of which we only want the last. Let's see how
+				// well this works for other websites.
+				timeString = s.Find(crawler.Fields.Date.Time.Loc).Last().Text()
 				timeStringLayout = crawler.Fields.Date.Time.Layout
 			}
 
@@ -289,7 +295,7 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 	case "comment":
 		var comment string
 		for _, commentLoc := range crawler.Fields.Comment {
-			comment = s.Find(commentLoc).Text()
+			comment = strings.TrimSpace(s.Find(commentLoc).First().Text())
 			if comment != "" {
 				break
 			}

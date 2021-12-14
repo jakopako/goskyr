@@ -114,6 +114,8 @@ crawlers:
         on_subpage: ["comment", "date"]
       title:
         - "h2"
+      comment:
+        - ".left .content"
       date:
         day:
           loc: ".date .day"

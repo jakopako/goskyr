@@ -239,6 +239,7 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 			dateTimeString = s.Find(crawler.Fields.Date.DayMonthYearTime.Loc).Text()
 			layout = crawler.Fields.Date.DayMonthYearTime.Layout
 		} else {
+			//if crawler.Fields.Date.DayMonthYear.
 			var dayMonthString, dayMonthStringLayout string
 			if crawler.Fields.Date.DayMonth.Loc != "" {
 				dayMonthString = s.Find(crawler.Fields.Date.DayMonth.Loc).Text()
@@ -258,7 +259,13 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 				// Normally, there should be only one occurence of the time. However, on the
 				// Moods website there are two of which we only want the last. Let's see how
 				// well this works for other websites.
-				timeString = s.Find(crawler.Fields.Date.Time.Loc).Last().Text()
+
+				//timeString = s.Find(crawler.Fields.Date.Time.Loc).Last().Text()
+				//timeString = s.Find(crawler.Fields.Date.Time.Loc).First().Text()
+				timeStringSelection := s.Find(crawler.Fields.Date.Time.Loc)
+				fmt.Println(event.URL)
+				fmt.Println(timeStringSelection.Text())
+				timeString = timeStringSelection.Get(crawler.Fields.Date.Time.NodeIndex).FirstChild.Data
 				timeStringLayout = crawler.Fields.Date.Time.Layout
 			}
 
@@ -369,6 +376,12 @@ type Config struct {
 	Crawlers []Crawler `yaml:"crawlers"`
 }
 
+type Locator struct {
+	Loc       string `yaml:"loc"`
+	Layout    string `yaml:"layout"`
+	NodeIndex int    `yaml:"node_index"`
+}
+
 type Crawler struct {
 	Name   string `yaml:"name"`
 	Type   string `yaml:"type"`
@@ -383,28 +396,14 @@ type Crawler struct {
 			OnSubpage []string `yaml:"on_subpage"`
 		} `yaml:"url"`
 		Date struct {
-			Day struct {
-				Loc    string `yaml:"loc"`
-				Layout string `yaml:"layout"`
-			} `yaml:"day"`
-			Month struct {
-				Loc    string `yaml:"loc"`
-				Layout string `yaml:"layout"`
-			} `yaml:"month"`
-			DayMonth struct {
-				Loc    string `yaml:"loc"`
-				Layout string `yaml:"layout"`
-			} `yaml:"day_month"`
-			DayMonthYearTime struct {
-				Loc    string `yaml:"loc"`
-				Layout string `yaml:"layout"`
-			} `yaml:"day_month_year_time"`
-			Time struct {
-				Loc    string `yaml:"loc"`
-				Layout string `yaml:"layout"`
-			} `yaml:"time"`
-			Location string `yaml:"location"`
-			Language string `yaml:"language"`
+			Day              Locator `yaml:"day"`
+			Month            Locator `yaml:"month"`
+			DayMonth         Locator `yaml:"day_month"`
+			DayMonthYear     Locator `yaml:"day_month_year`
+			DayMonthYearTime Locator `yaml:"day_month_year_time"`
+			Time             Locator `yaml:"time"`
+			Location         string  `yaml:"location"`
+			Language         string  `yaml:"language"`
 		} `yaml:"date"`
 		Comment []string `yaml:"comment"`
 	} `yaml:"fields"`

@@ -103,8 +103,6 @@ crawlers:
   - name: Moods
     type: concert
     url: "https://www.moods.club/en/?a=1"
-    # url: "https://www.moods.club/en/program/event/11365/zurich-jazz-orchestra-feat-barbara-dennerlein.html"
-    # url: "https://www.moods.club/en/program/event/11505/shems-bendali-quintet.html"
     city: "Zurich"
     event: ".event"
     fields:
@@ -124,8 +122,31 @@ crawlers:
           loc: ".date .month_name"
           layout: "Jan"
         time:
-          loc: ".time"
+          loc: ".right .time"
           layout: "Start: 15:04"
+          node_index: -1 # -1 means the last node
         location: "Europe/Berlin"
         language: "en_US"
+
+  - name: ImportExport
+    type: concert
+    url: "https://import-export.cc/"
+    city: "Munich"
+    event: ".events a"
+    fields:
+      url:
+        loc: ""
+        on_subpage: ["date"]
+      title:
+        - ".io-title"
+      date:
+        day_month_year:
+          loc: ".event .event-info .io-big"
+          layout: "2.1.2006"
+          node_index: 0
+        time:
+          loc: ".event .event-info .io-big"
+          node_index: 3 # We need this in case there are multiple nodes that would be selected with the given loc
+          layout: "Einlass: 15.04"
+        location: "Europe/Berlin"
       

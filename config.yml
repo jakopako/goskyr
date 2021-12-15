@@ -133,6 +133,7 @@ crawlers:
     url: "https://import-export.cc/"
     city: "Munich"
     event: ".events a"
+    exclude: ".old" # events that have a node with this class will be excluded from the results. TO IMPLEMENT
     fields:
       url:
         loc: ""
@@ -142,11 +143,12 @@ crawlers:
       date:
         day_month_year:
           loc: ".event .event-info .io-big"
-          layout: "2.1.2006"
+          layout: "Mon. 2.1.06"
           node_index: 0
         time:
           loc: ".event .event-info .io-big"
           node_index: 3 # We need this in case there are multiple nodes that would be selected with the given loc
-          layout: "Einlass: 15.04"
+          layout: "Beginn: 15.04"
         location: "Europe/Berlin"
+        language: de_DE
       

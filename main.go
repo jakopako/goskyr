@@ -234,12 +234,29 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 		// extract date and time
 		year := time.Now().Year()
 
+		fmt.Println(event.URL)
+
+		var timeString, timeStringLayout string
+		if crawler.Fields.Date.Time.Loc == "" {
+			timeString = "20:00"
+			timeStringLayout = "15:04"
+		} else {
+			//timeString = s.Find(crawler.Fields.Date.Time.Loc).Last().Text()
+			//timeString = s.Find(crawler.Fields.Date.Time.Loc).First().Text()
+			timeStringSelection := s.Find(crawler.Fields.Date.Time.Loc)
+			timeString = timeStringSelection.Get(crawler.Fields.Date.Time.NodeIndex).FirstChild.Data
+			timeStringLayout = crawler.Fields.Date.Time.Layout
+		}
+
 		var dateTimeString, layout string
 		if crawler.Fields.Date.DayMonthYearTime.Loc != "" {
 			dateTimeString = s.Find(crawler.Fields.Date.DayMonthYearTime.Loc).Text()
 			layout = crawler.Fields.Date.DayMonthYearTime.Layout
+		} else if crawler.Fields.Date.DayMonthYear.Loc != "" {
+			dayMonthYearString := s.Find(crawler.Fields.Date.DayMonthYear.Loc).Get(crawler.Fields.Date.DayMonthYear.NodeIndex).FirstChild.Data
+			dateTimeString = fmt.Sprintf("%s %s", dayMonthYearString, timeString)
+			layout = fmt.Sprintf("%s %s", crawler.Fields.Date.DayMonthYear.Layout, timeStringLayout)
 		} else {
-			//if crawler.Fields.Date.DayMonthYear.
 			var dayMonthString, dayMonthStringLayout string
 			if crawler.Fields.Date.DayMonth.Loc != "" {
 				dayMonthString = s.Find(crawler.Fields.Date.DayMonth.Loc).Text()
@@ -249,24 +266,6 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 				monthString := s.Find(crawler.Fields.Date.Month.Loc).Text()
 				dayMonthString = dayString + " " + monthString
 				dayMonthStringLayout = crawler.Fields.Date.Day.Layout + " " + crawler.Fields.Date.Month.Layout
-			}
-
-			var timeString, timeStringLayout string
-			if crawler.Fields.Date.Time.Loc == "" {
-				timeString = "20:00"
-				timeStringLayout = "15:04"
-			} else {
-				// Normally, there should be only one occurence of the time. However, on the
-				// Moods website there are two of which we only want the last. Let's see how
-				// well this works for other websites.
-
-				//timeString = s.Find(crawler.Fields.Date.Time.Loc).Last().Text()
-				//timeString = s.Find(crawler.Fields.Date.Time.Loc).First().Text()
-				timeStringSelection := s.Find(crawler.Fields.Date.Time.Loc)
-				fmt.Println(event.URL)
-				fmt.Println(timeStringSelection.Text())
-				timeString = timeStringSelection.Get(crawler.Fields.Date.Time.NodeIndex).FirstChild.Data
-				timeStringLayout = crawler.Fields.Date.Time.Layout
 			}
 
 			layout = fmt.Sprintf("%s 2006 %s", dayMonthStringLayout, timeStringLayout)
@@ -399,7 +398,7 @@ type Crawler struct {
 			Day              Locator `yaml:"day"`
 			Month            Locator `yaml:"month"`
 			DayMonth         Locator `yaml:"day_month"`
-			DayMonthYear     Locator `yaml:"day_month_year`
+			DayMonthYear     Locator `yaml:"day_month_year"`
 			DayMonthYearTime Locator `yaml:"day_month_year_time"`
 			Time             Locator `yaml:"time"`
 			Location         string  `yaml:"location"`

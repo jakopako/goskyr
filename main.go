@@ -9,11 +9,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/goodsign/monday"
+	"golang.org/x/net/html"
 	"gopkg.in/yaml.v2"
 )
 
@@ -87,6 +89,10 @@ func (c Crawler) getEvents() ([]Event, error) {
 	}
 
 	doc.Find(c.Event).Each(func(i int, s *goquery.Selection) {
+		if s.Find(c.Exclude).Length() > 0 {
+			return
+		}
+
 		currentEvent := Event{
 			Location: c.Name,
 			City:     c.City,
@@ -103,27 +109,10 @@ func (c Crawler) getEvents() ([]Event, error) {
 			if !fOnSubpage {
 				err := extractField(f, s, &c, &currentEvent, events, loc, mLocale, res)
 				if err != nil {
-					log.Println(err)
+					log.Fatalln(err)
 				}
 			}
 		}
-
-		// extract the url
-		// var url string
-		// if c.Fields.URL.Loc == "" {
-		// 	url = s.AttrOr("href", c.URL)
-		// } else {
-		// 	url = s.Find(c.Fields.URL.Loc).AttrOr("href", c.URL)
-		// }
-
-		// if c.Fields.URL.Relative {
-		// 	baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
-		// 	if !strings.HasPrefix(url, "/") {
-		// 		baseURL = baseURL + "/"
-		// 	}
-		// 	url = baseURL + url
-		// }
-		// currentEvent.URL = url
 
 		if len(c.Fields.URL.OnSubpage) > 0 {
 			resSub, err := http.Get(currentEvent.URL)
@@ -149,79 +138,6 @@ func (c Crawler) getEvents() ([]Event, error) {
 			}
 		}
 
-		// // extract the title
-		// var title string
-		// for _, titleLoc := range c.Fields.Title {
-		// 	titleSelection := s.Find(titleLoc).First()
-		// 	title = strings.TrimSuffix(titleSelection.Text(), titleSelection.Children().Text())
-		// 	if title != "" {
-		// 		break
-		// 	}
-		// }
-		// if title == "" {
-		// 	return
-		// }
-
-		// currentEvent.Title = title
-
-		// // extract the comment
-		// var comment string
-		// for _, commentLoc := range c.Fields.Comment {
-		// 	comment = s.Find(commentLoc).Text()
-		// 	if comment != "" {
-		// 		break
-		// 	}
-		// }
-		// currentEvent.Comment = comment
-
-		// // extract date and time
-		// year := time.Now().Year()
-
-		// var dateTimeString, layout string
-		// if c.Fields.Date.DayMonthYearTime.Loc != "" {
-		// 	dateTimeString = s.Find(c.Fields.Date.DayMonthYearTime.Loc).Text()
-		// 	layout = c.Fields.Date.DayMonthYearTime.Layout
-		// } else {
-		// 	var dayMonthString, dayMonthStringLayout string
-		// 	if c.Fields.Date.DayMonth.Loc != "" {
-		// 		dayMonthString = s.Find(c.Fields.Date.DayMonth.Loc).Text()
-		// 		dayMonthStringLayout = c.Fields.Date.DayMonth.Layout
-		// 	} else if c.Fields.Date.Day.Loc != "" && c.Fields.Date.Month.Loc != "" {
-		// 		dayString := s.Find(c.Fields.Date.Day.Loc).Text()
-		// 		monthString := s.Find(c.Fields.Date.Month.Loc).Text()
-		// 		dayMonthString = dayString + " " + monthString
-		// 		dayMonthStringLayout = c.Fields.Date.Day.Layout + " " + c.Fields.Date.Month.Layout
-		// 	}
-
-		// 	var timeString, timeStringLayout string
-		// 	if c.Fields.Date.Time.Loc == "" {
-		// 		timeString = "20:00"
-		// 		timeStringLayout = "15:04"
-		// 	} else {
-		// 		timeString = s.Find(c.Fields.Date.Time.Loc).Text()
-		// 		timeStringLayout = c.Fields.Date.Time.Layout
-		// 	}
-
-		// 	layout = fmt.Sprintf("%s 2006 %s", dayMonthStringLayout, timeStringLayout)
-		// 	dateTimeString = fmt.Sprintf("%s %d %s", dayMonthString, year, timeString)
-		// }
-
-		// t, err := monday.ParseInLocation(layout, dateTimeString, loc, monday.Locale(mLocale))
-		// if err != nil {
-		// 	log.Printf("Couldn't parse date: %s", err)
-		// 	return
-		// }
-
-		// // if the date t does not come after the previous event's date we increase the year by 1
-		// // actually this is only necessary if we have to guess the date but currently for ease of implementation
-		// // this check is done always.
-		// if len(events) > 0 {
-		// 	if events[len(events)-1].Date.After(t) {
-		// 		t = time.Date(int(year+1), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
-		// 	}
-		// }
-		// currentEvent.Date = t
-
 		events = append(events, currentEvent)
 	})
 
@@ -231,48 +147,40 @@ func (c Crawler) getEvents() ([]Event, error) {
 func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Event, events []Event, loc *time.Location, mLocale string, res *http.Response) error {
 	switch item {
 	case "date":
-		// extract date and time
 		year := time.Now().Year()
-
-		fmt.Println(event.URL)
 
 		var timeString, timeStringLayout string
 		if crawler.Fields.Date.Time.Loc == "" {
 			timeString = "20:00"
 			timeStringLayout = "15:04"
 		} else {
-			//timeString = s.Find(crawler.Fields.Date.Time.Loc).Last().Text()
-			//timeString = s.Find(crawler.Fields.Date.Time.Loc).First().Text()
-			timeStringSelection := s.Find(crawler.Fields.Date.Time.Loc)
-			timeString = timeStringSelection.Get(crawler.Fields.Date.Time.NodeIndex).FirstChild.Data
-			timeStringLayout = crawler.Fields.Date.Time.Layout
+			timeString, timeStringLayout = getStringAndLayout(&crawler.Fields.Date.Time, s)
 		}
 
-		var dateTimeString, layout string
+		var dateTimeString, dateTimeLayout string
 		if crawler.Fields.Date.DayMonthYearTime.Loc != "" {
-			dateTimeString = s.Find(crawler.Fields.Date.DayMonthYearTime.Loc).Text()
-			layout = crawler.Fields.Date.DayMonthYearTime.Layout
+			dateTimeString, dateTimeLayout = getStringAndLayout(&crawler.Fields.Date.DayMonthYearTime, s)
 		} else if crawler.Fields.Date.DayMonthYear.Loc != "" {
-			dayMonthYearString := s.Find(crawler.Fields.Date.DayMonthYear.Loc).Get(crawler.Fields.Date.DayMonthYear.NodeIndex).FirstChild.Data
+			dayMonthYearString, dayMonthYearLayout := getStringAndLayout(&crawler.Fields.Date.DayMonthYear, s)
+			// dayMonthYearString := s.Find(crawler.Fields.Date.DayMonthYear.Loc).Get(crawler.Fields.Date.DayMonthYear.NodeIndex).FirstChild.Data
 			dateTimeString = fmt.Sprintf("%s %s", dayMonthYearString, timeString)
-			layout = fmt.Sprintf("%s %s", crawler.Fields.Date.DayMonthYear.Layout, timeStringLayout)
+			dateTimeLayout = fmt.Sprintf("%s %s", dayMonthYearLayout, timeStringLayout)
 		} else {
-			var dayMonthString, dayMonthStringLayout string
+			var dayMonthString, dayMonthLayout string
 			if crawler.Fields.Date.DayMonth.Loc != "" {
-				dayMonthString = s.Find(crawler.Fields.Date.DayMonth.Loc).Text()
-				dayMonthStringLayout = crawler.Fields.Date.DayMonth.Layout
+				dayMonthString, dayMonthLayout = getStringAndLayout(&crawler.Fields.Date.DayMonth, s)
 			} else if crawler.Fields.Date.Day.Loc != "" && crawler.Fields.Date.Month.Loc != "" {
-				dayString := s.Find(crawler.Fields.Date.Day.Loc).Text()
-				monthString := s.Find(crawler.Fields.Date.Month.Loc).Text()
+				dayString, dayLayout := getStringAndLayout(&crawler.Fields.Date.Day, s)
+				monthString, monthLayout := getStringAndLayout(&crawler.Fields.Date.Month, s)
 				dayMonthString = dayString + " " + monthString
-				dayMonthStringLayout = crawler.Fields.Date.Day.Layout + " " + crawler.Fields.Date.Month.Layout
+				dayMonthLayout = dayLayout + " " + monthLayout
 			}
 
-			layout = fmt.Sprintf("%s 2006 %s", dayMonthStringLayout, timeStringLayout)
+			dateTimeLayout = fmt.Sprintf("%s 2006 %s", dayMonthLayout, timeStringLayout)
 			dateTimeString = fmt.Sprintf("%s %d %s", dayMonthString, year, timeString)
 		}
 
-		t, err := monday.ParseInLocation(layout, dateTimeString, loc, monday.Locale(mLocale))
+		t, err := monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
 		if err != nil {
 			return err
 		}
@@ -327,6 +235,36 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 	return nil
 }
 
+func getStringAndLayout(dl *DateLocator, s *goquery.Selection) (string, string) {
+	var fieldString, fieldLayout string
+	fieldStringSelection := s.Find(dl.Loc)
+	// A bit hacky..
+	fieldStringNode := fieldStringSelection.Get(dl.NodeIndex).FirstChild
+	for fieldStringNode != nil {
+		if fieldStringNode.Type == html.TextNode {
+			fieldString = fieldStringNode.Data
+			break
+		} else {
+			fieldStringNode = fieldStringNode.NextSibling
+		}
+	}
+	if dl.Regex.Exp != "" {
+		regex, err := regexp.Compile(dl.Regex.Exp)
+		if err != nil {
+			log.Fatal(err)
+		}
+		matchingStrings := regex.FindAllString(fieldString, -1)
+		if dl.Regex.Index == -1 {
+			fieldString = matchingStrings[len(matchingStrings)-1]
+		} else {
+			fieldString = matchingStrings[dl.Regex.Index]
+		}
+	}
+
+	fieldLayout = dl.Layout
+	return fieldString, fieldLayout
+}
+
 func writeEventsToAPI(c Crawler) {
 	apiUrl := os.Getenv("CRONCERT_API")
 	client := &http.Client{
@@ -375,19 +313,36 @@ type Config struct {
 	Crawlers []Crawler `yaml:"crawlers"`
 }
 
-type Locator struct {
+type DateLocator struct {
 	Loc       string `yaml:"loc"`
 	Layout    string `yaml:"layout"`
 	NodeIndex int    `yaml:"node_index"`
+	Regex     struct {
+		Exp   string `yaml:"exp"`
+		Index int    `yaml:"index"`
+	} `yaml:"regex"`
 }
 
+// func NewDateLocator(coversDay bool, coversMonth bool, coversYear bool, coversTime bool) DateLocator {
+// 	dateLocator := DateLocator{
+// 		Covers: map[string]bool{
+// 			"day":   coversDay,
+// 			"month": coversMonth,
+// 			"year":  coversYear,
+// 			"time":  coversTime,
+// 		},
+// 	}
+// 	return dateLocator
+// }
+
 type Crawler struct {
-	Name   string `yaml:"name"`
-	Type   string `yaml:"type"`
-	URL    string `yaml:"url"`
-	City   string `yaml:"city"`
-	Event  string `yaml:"event"`
-	Fields struct {
+	Name    string `yaml:"name"`
+	Type    string `yaml:"type"`
+	URL     string `yaml:"url"`
+	City    string `yaml:"city"`
+	Event   string `yaml:"event"`
+	Exclude string `yaml:"exclude"`
+	Fields  struct {
 		Title []string `yaml:"title"`
 		URL   struct {
 			Loc       string   `yaml:"loc"`
@@ -395,14 +350,14 @@ type Crawler struct {
 			OnSubpage []string `yaml:"on_subpage"`
 		} `yaml:"url"`
 		Date struct {
-			Day              Locator `yaml:"day"`
-			Month            Locator `yaml:"month"`
-			DayMonth         Locator `yaml:"day_month"`
-			DayMonthYear     Locator `yaml:"day_month_year"`
-			DayMonthYearTime Locator `yaml:"day_month_year_time"`
-			Time             Locator `yaml:"time"`
-			Location         string  `yaml:"location"`
-			Language         string  `yaml:"language"`
+			Day              DateLocator `yaml:"day"`
+			Month            DateLocator `yaml:"month"`
+			DayMonth         DateLocator `yaml:"day_month"`
+			DayMonthYear     DateLocator `yaml:"day_month_year"`
+			DayMonthYearTime DateLocator `yaml:"day_month_year_time"`
+			Time             DateLocator `yaml:"time"`
+			Location         string      `yaml:"location"`
+			Language         string      `yaml:"language"`
 		} `yaml:"date"`
 		Comment []string `yaml:"comment"`
 	} `yaml:"fields"`

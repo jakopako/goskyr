@@ -94,9 +94,18 @@ crawlers:
         loc: ".o-btn-cta__link"
         relative: true
       date:
-        day_month_year_time:
+        day_month_year:
           loc: ".b-events__el-date"
-          layout: "Mon•2•1•2006, 15••04"
+          layout: "Mon•2•1•2006"
+          regex: # In case the node contains more than just the desired string the substring can be determined with a regex
+            exp: "[A-Za-z]{2}•[0-9]{1,2}•[0-9]{1,2}•[0-9]{4}"
+            index: 0
+        time:
+          loc: ".b-events__el-date"
+          layout: "15••04"
+          regex:
+            exp: "[0-9]{2}••[0-9]{2}"
+            index: -1
         location: "Europe/Berlin"
         language: "de_DE"
 
@@ -133,7 +142,7 @@ crawlers:
     url: "https://import-export.cc/"
     city: "Munich"
     event: ".events a"
-    exclude: ".old" # events that have a node with this class will be excluded from the results. TO IMPLEMENT
+    exclude: ".old" # events that have a node with this class will be excluded from the results.
     fields:
       url:
         loc: ""

@@ -154,24 +154,24 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 			timeString = "20:00"
 			timeStringLayout = "15:04"
 		} else {
-			timeString, timeStringLayout = getStringAndLayout(&crawler.Fields.Date.Time, s)
+			timeString, timeStringLayout = getDateStringAndLayout(&crawler.Fields.Date.Time, s)
 		}
 
 		var dateTimeString, dateTimeLayout string
 		if crawler.Fields.Date.DayMonthYearTime.Loc != "" {
-			dateTimeString, dateTimeLayout = getStringAndLayout(&crawler.Fields.Date.DayMonthYearTime, s)
+			dateTimeString, dateTimeLayout = getDateStringAndLayout(&crawler.Fields.Date.DayMonthYearTime, s)
 		} else if crawler.Fields.Date.DayMonthYear.Loc != "" {
-			dayMonthYearString, dayMonthYearLayout := getStringAndLayout(&crawler.Fields.Date.DayMonthYear, s)
+			dayMonthYearString, dayMonthYearLayout := getDateStringAndLayout(&crawler.Fields.Date.DayMonthYear, s)
 			// dayMonthYearString := s.Find(crawler.Fields.Date.DayMonthYear.Loc).Get(crawler.Fields.Date.DayMonthYear.NodeIndex).FirstChild.Data
 			dateTimeString = fmt.Sprintf("%s %s", dayMonthYearString, timeString)
 			dateTimeLayout = fmt.Sprintf("%s %s", dayMonthYearLayout, timeStringLayout)
 		} else {
 			var dayMonthString, dayMonthLayout string
 			if crawler.Fields.Date.DayMonth.Loc != "" {
-				dayMonthString, dayMonthLayout = getStringAndLayout(&crawler.Fields.Date.DayMonth, s)
+				dayMonthString, dayMonthLayout = getDateStringAndLayout(&crawler.Fields.Date.DayMonth, s)
 			} else if crawler.Fields.Date.Day.Loc != "" && crawler.Fields.Date.Month.Loc != "" {
-				dayString, dayLayout := getStringAndLayout(&crawler.Fields.Date.Day, s)
-				monthString, monthLayout := getStringAndLayout(&crawler.Fields.Date.Month, s)
+				dayString, dayLayout := getDateStringAndLayout(&crawler.Fields.Date.Day, s)
+				monthString, monthLayout := getDateStringAndLayout(&crawler.Fields.Date.Month, s)
 				dayMonthString = dayString + " " + monthString
 				dayMonthLayout = dayLayout + " " + monthLayout
 			}
@@ -194,27 +194,35 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 		}
 		event.Date = t
 	case "title":
-		var title string
-		for _, titleLoc := range crawler.Fields.Title {
-			titleSelection := s.Find(titleLoc).First()
-			title = strings.TrimSuffix(titleSelection.Text(), titleSelection.Children().Text())
-			if title != "" {
-				break
-			}
-		}
+		// var title string
+		// for _, titleLoc := range crawler.Fields.Title.Locs {
+		// 	titleSelection := s.Find(titleLoc)
+		// 	if len(titleSelection.Nodes) == 0 {
+		// 		continue
+		// 	}
+		// 	title = titleSelection.Get(crawler.Fields.Title.NodeIndex).FirstChild.Data
+		// 	// if titleNode == nil {
+		// 	// 	continue
+		// 	// }
+		// 	//title = strings.TrimSpace(strings.TrimSuffix(titleSelection.Text(), titleSelection.Children().Text()))
+		// 	if title != "" {
+		// 		break
+		// 	}
+		// }
+		title := getMultiFieldString(&crawler.Fields.Title, s)
 		if title == "" {
 			return errors.New("empty event title")
 		}
 		event.Title = title
 	case "comment":
-		var comment string
-		for _, commentLoc := range crawler.Fields.Comment {
-			comment = strings.TrimSpace(s.Find(commentLoc).First().Text())
-			if comment != "" {
-				break
-			}
-		}
-		event.Comment = comment
+		// var comment string
+		// for _, commentLoc := range crawler.Fields.Comment {
+		// 	comment = strings.TrimSpace(s.Find(commentLoc).First().Text())
+		// 	if comment != "" {
+		// 		break
+		// 	}
+		// }
+		event.Comment = getMultiFieldString(&crawler.Fields.Comment, s)
 	case "url":
 		var url string
 		if crawler.Fields.URL.Loc == "" {
@@ -235,9 +243,10 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 	return nil
 }
 
-func getStringAndLayout(dl *DateLocator, s *goquery.Selection) (string, string) {
+func getDateStringAndLayout(dl *DateLocator, s *goquery.Selection) (string, string) {
 	var fieldString, fieldLayout string
 	fieldStringSelection := s.Find(dl.Loc)
+	// TODO: Add possibility to apply a regex across s.Find(dl.Loc).Text()
 	// A bit hacky..
 	fieldStringNode := fieldStringSelection.Get(dl.NodeIndex).FirstChild
 	for fieldStringNode != nil {
@@ -263,6 +272,24 @@ func getStringAndLayout(dl *DateLocator, s *goquery.Selection) (string, string) 
 
 	fieldLayout = dl.Layout
 	return fieldString, fieldLayout
+}
+
+func getMultiFieldString(f *MultiOptionField, s *goquery.Selection) string {
+	var fieldString string
+	for _, fieldLoc := range f.Locs {
+		fieldSelection := s.Find(fieldLoc)
+		if len(fieldSelection.Nodes) == 0 {
+			continue
+		}
+		fieldString = fieldSelection.Get(f.NodeIndex).FirstChild.Data
+		if fieldString != "" {
+			break
+		}
+	}
+	if f.MaxLength > 0 && f.MaxLength < len(fieldString) {
+		return fieldString[:f.MaxLength] + "..."
+	}
+	return fieldString
 }
 
 func writeEventsToAPI(c Crawler) {
@@ -323,17 +350,11 @@ type DateLocator struct {
 	} `yaml:"regex"`
 }
 
-// func NewDateLocator(coversDay bool, coversMonth bool, coversYear bool, coversTime bool) DateLocator {
-// 	dateLocator := DateLocator{
-// 		Covers: map[string]bool{
-// 			"day":   coversDay,
-// 			"month": coversMonth,
-// 			"year":  coversYear,
-// 			"time":  coversTime,
-// 		},
-// 	}
-// 	return dateLocator
-// }
+type MultiOptionField struct {
+	Locs      []string `yaml:"locs"`
+	NodeIndex int      `yaml:"node_index"`
+	MaxLength int      `yaml:"max_length"`
+}
 
 type Crawler struct {
 	Name    string `yaml:"name"`
@@ -343,8 +364,9 @@ type Crawler struct {
 	Event   string `yaml:"event"`
 	Exclude string `yaml:"exclude"`
 	Fields  struct {
-		Title []string `yaml:"title"`
-		URL   struct {
+		Title   MultiOptionField `yaml:"title"`
+		Comment MultiOptionField `yaml:"comment"`
+		URL     struct {
 			Loc       string   `yaml:"loc"`
 			Relative  bool     `yaml:"relative"`
 			OnSubpage []string `yaml:"on_subpage"`
@@ -359,7 +381,6 @@ type Crawler struct {
 			Location         string      `yaml:"location"`
 			Language         string      `yaml:"language"`
 		} `yaml:"date"`
-		Comment []string `yaml:"comment"`
 	} `yaml:"fields"`
 }
 

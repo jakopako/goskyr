@@ -162,7 +162,6 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 			dateTimeString, dateTimeLayout = getDateStringAndLayout(&crawler.Fields.Date.DayMonthYearTime, s)
 		} else if crawler.Fields.Date.DayMonthYear.Loc != "" {
 			dayMonthYearString, dayMonthYearLayout := getDateStringAndLayout(&crawler.Fields.Date.DayMonthYear, s)
-			// dayMonthYearString := s.Find(crawler.Fields.Date.DayMonthYear.Loc).Get(crawler.Fields.Date.DayMonthYear.NodeIndex).FirstChild.Data
 			dateTimeString = fmt.Sprintf("%s %s", dayMonthYearString, timeString)
 			dateTimeLayout = fmt.Sprintf("%s %s", dayMonthYearLayout, timeStringLayout)
 		} else {
@@ -194,34 +193,12 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 		}
 		event.Date = t
 	case "title":
-		// var title string
-		// for _, titleLoc := range crawler.Fields.Title.Locs {
-		// 	titleSelection := s.Find(titleLoc)
-		// 	if len(titleSelection.Nodes) == 0 {
-		// 		continue
-		// 	}
-		// 	title = titleSelection.Get(crawler.Fields.Title.NodeIndex).FirstChild.Data
-		// 	// if titleNode == nil {
-		// 	// 	continue
-		// 	// }
-		// 	//title = strings.TrimSpace(strings.TrimSuffix(titleSelection.Text(), titleSelection.Children().Text()))
-		// 	if title != "" {
-		// 		break
-		// 	}
-		// }
 		title := getMultiFieldString(&crawler.Fields.Title, s)
 		if title == "" {
 			return errors.New("empty event title")
 		}
 		event.Title = title
 	case "comment":
-		// var comment string
-		// for _, commentLoc := range crawler.Fields.Comment {
-		// 	comment = strings.TrimSpace(s.Find(commentLoc).First().Text())
-		// 	if comment != "" {
-		// 		break
-		// 	}
-		// }
 		event.Comment = getMultiFieldString(&crawler.Fields.Comment, s)
 	case "url":
 		var url string
@@ -293,6 +270,8 @@ func getMultiFieldString(f *MultiOptionField, s *goquery.Selection) string {
 }
 
 func writeEventsToAPI(c Crawler) {
+	// Idea: To only have updated/valid information in the Database, remove all future concerts
+	// of this crawler from the database before adding new ones.
 	apiUrl := os.Getenv("CRONCERT_API")
 	client := &http.Client{
 		Timeout: time.Second * 10,

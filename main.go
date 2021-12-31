@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -270,8 +272,6 @@ func getMultiFieldString(f *MultiOptionField, s *goquery.Selection) string {
 }
 
 func writeEventsToAPI(c Crawler) {
-	// Idea: To only have updated/valid information in the Database, remove all future concerts
-	// of this crawler from the database before adding new ones.
 	apiUrl := os.Getenv("CRONCERT_API")
 	client := &http.Client{
 		Timeout: time.Second * 10,
@@ -282,8 +282,31 @@ func writeEventsToAPI(c Crawler) {
 		log.Fatal(err)
 	}
 
-	for _, concert := range events {
-		concertJSON, err := json.Marshal(concert)
+	if len(events) == 0 {
+		log.Printf("Location %s has no events. Skipping.", c.Name)
+		return
+	}
+	// sort events by date asc
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].Date.Before(events[j].Date)
+	})
+
+	// delete events of this crawler from first date on
+	firstDate := events[0].Date.UTC().Format("2006-01-02 15:04")
+	deleteUrl := fmt.Sprintf("%s?location=%s&datetime=%s", apiUrl, url.QueryEscape(c.Name), url.QueryEscape(firstDate))
+	req, _ := http.NewRequest("DELETE", deleteUrl, nil)
+	req.SetBasicAuth(os.Getenv("API_USER"), os.Getenv("API_PASSWORD"))
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if resp.StatusCode != 200 {
+		log.Fatalf("Something went wrong while deleting events. Status Code: %d\nUrl: %s", resp.StatusCode, deleteUrl)
+	}
+
+	// add new events
+	for _, event := range events {
+		concertJSON, err := json.Marshal(event)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -291,13 +314,13 @@ func writeEventsToAPI(c Crawler) {
 		req.Header = map[string][]string{
 			"Content-Type": {"application/json"},
 		}
-		req.SetBasicAuth(os.Getenv("API_POST_USER"), os.Getenv("API_POST_PASSWORD"))
+		req.SetBasicAuth(os.Getenv("API_USER"), os.Getenv("API_PASSWORD"))
 		resp, err := client.Do(req)
 		if err != nil {
 			log.Fatal(err)
 		}
 		if resp.StatusCode != 201 {
-			log.Fatalf("Something went wrong while adding a new concert. Status Code: %d", resp.StatusCode)
+			log.Fatalf("Something went wrong while adding a new event. Status Code: %d", resp.StatusCode)
 
 		}
 	}

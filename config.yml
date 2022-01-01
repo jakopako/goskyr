@@ -104,6 +104,7 @@ crawlers:
       comment:
         locs:
           - ".b-events__el-text"
+        max_length: 200
       url:
         loc: ".o-btn-hex__link"
         relative: true

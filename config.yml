@@ -6,13 +6,13 @@ crawlers:
     event: ".event .header"
     fields:
       title: 
-        locs: # only the first option that results in a non-empty title is taken into account.
-          - ".agenda .top"
-          - ".agenda .support"
+        loc: ".agenda > .top,.support"
+          # - ".agenda .top"
+          # - ".agenda .support"
       comment: 
-        locs: # only the first option that results in a non-empty comment is taken into account.
-          - ".agenda .top .addition"
-          - ".agenda .support .addition"
+        loc: ".agenda > .top .addition,.support .addition"
+          # - ".agenda .top .addition"
+          # - ".agenda .support .addition"
       date:
         day:
           loc: ".day"
@@ -30,11 +30,9 @@ crawlers:
     event: ".post-holder"
     fields:
       title:
-        locs:
-          - ".block_under_title a"
+        loc: ".block_under_title a"
       comment:
-        locs:
-          - ".event-excerpt-fluid"
+        loc: ".event-excerpt-fluid"
       url:
         loc: ".block_under_title a"
       date:
@@ -54,11 +52,9 @@ crawlers:
     event: ".w-dyn-item"
     fields:
       title:
-        locs:
-          - ".text-block-21"
+        loc: ".text-block-21"
       comment:
-        locs:
-          - ".text-block-28"
+        loc: ".text-block-28"
       url:
         loc: ".w-inline-block"
         relative: true
@@ -75,11 +71,9 @@ crawlers:
     event: ".event-list__item"
     fields:
       title:
-        locs:
-          - ".event-preview__title"
+        loc: ".event-preview__title"
       comment:
-        locs:
-          - ".event-detail__content div p"
+        loc: ".event-detail__content div p"
         max_length: 200
       url:
         loc: "" # An empty string means that we look in the event node itself for an href
@@ -99,11 +93,9 @@ crawlers:
     event: ".b-events__el"
     fields:
       title: 
-        locs:
-          - ".b-events__el-title"
+        loc: ".b-events__el-title"
       comment:
-        locs:
-          - ".b-events__el-text"
+        loc: ".b-events__el-text"
         max_length: 200
       url:
         loc: ".o-btn-hex__link"
@@ -135,11 +127,9 @@ crawlers:
         relative: true
         on_subpage: ["comment", "date"]
       title:
-        locs:
-          - "h2"
+        loc: "h2"
       comment:
-        locs:
-          - ".left .content"
+        loc: ".left .content"
         max_length: 200
       date:
         day:
@@ -166,8 +156,7 @@ crawlers:
         loc: ""
         on_subpage: ["date"]
       title:
-        locs:
-          - ".io-title"
+        loc: ".io-title"
       date:
         day_month_year:
           loc: ".event .event-info .io-big"
@@ -189,8 +178,7 @@ crawlers:
       url:
         loc: ".post-title a"
       title:
-        locs:
-          - ".post-title a"
+        loc: ".post-title a"
       date:
         day:
           loc: ".post-date-day"
@@ -201,5 +189,32 @@ crawlers:
         year:
           loc: ".post-date-year"
           layout: "2006"
+        location: "Europe/Berlin"
+        language: "de_DE"
+
+  - name: ElLokal
+    type: concert
+    city: Zurich
+    url: "http://www.ellokal.ch/?lang=de&details=9"
+    event: "#maincontent > .commingupEventsList_0,.commingupEventsList_1"
+    fields:
+      title:
+        loc: ".commingupEventsList_block5 a"
+      comment:
+        loc: ".concertStyleNew .concertDetails"
+      url:
+        loc: ".commingupEventsList_block5 a"
+        relative: true
+        on_subpage: ["comment"]
+      date:
+        day:
+          loc: ".commingupEventsList_block2"
+          layout: "02. "
+        month:
+          loc: ".commingupEventsList_block3"
+          layout: "January"
+        time:
+          loc: ".commingupEventsList_block4"
+          layout: "15Uhr04"
         location: "Europe/Berlin"
         language: "de_DE"

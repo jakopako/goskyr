@@ -195,13 +195,13 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 		}
 		event.Date = t
 	case "title":
-		title := getMultiFieldString(&crawler.Fields.Title, s)
+		title := getFieldString(&crawler.Fields.Title, s)
 		if title == "" {
 			return errors.New("empty event title")
 		}
 		event.Title = title
 	case "comment":
-		event.Comment = getMultiFieldString(&crawler.Fields.Comment, s)
+		event.Comment = getFieldString(&crawler.Fields.Comment, s)
 	case "url":
 		var url string
 		if crawler.Fields.URL.Loc == "" {
@@ -253,20 +253,14 @@ func getDateStringAndLayout(dl *DateLocator, s *goquery.Selection) (string, stri
 	return fieldString, fieldLayout
 }
 
-func getMultiFieldString(f *MultiOptionField, s *goquery.Selection) string {
+func getFieldString(f *Field, s *goquery.Selection) string {
 	var fieldString string
-	for _, fieldLoc := range f.Locs {
-		fieldSelection := s.Find(fieldLoc)
-		if len(fieldSelection.Nodes) == 0 {
-			continue
-		}
+	fieldSelection := s.Find(f.Loc)
+	if len(fieldSelection.Nodes) > 0 {
 		fieldString = fieldSelection.Get(f.NodeIndex).FirstChild.Data
-		if fieldString != "" {
-			break
+		if f.MaxLength > 0 && f.MaxLength < len(fieldString) {
+			return fieldString[:f.MaxLength] + "..."
 		}
-	}
-	if f.MaxLength > 0 && f.MaxLength < len(fieldString) {
-		return fieldString[:f.MaxLength] + "..."
 	}
 	return fieldString
 }
@@ -352,10 +346,10 @@ type DateLocator struct {
 	} `yaml:"regex"`
 }
 
-type MultiOptionField struct {
-	Locs      []string `yaml:"locs"`
-	NodeIndex int      `yaml:"node_index"`
-	MaxLength int      `yaml:"max_length"`
+type Field struct {
+	Loc       string `yaml:"loc"`
+	NodeIndex int    `yaml:"node_index"`
+	MaxLength int    `yaml:"max_length"`
 }
 
 type Crawler struct {
@@ -366,8 +360,8 @@ type Crawler struct {
 	Event   string `yaml:"event"`
 	Exclude string `yaml:"exclude"`
 	Fields  struct {
-		Title   MultiOptionField `yaml:"title"`
-		Comment MultiOptionField `yaml:"comment"`
+		Title   Field `yaml:"title"`
+		Comment Field `yaml:"comment"`
 		URL     struct {
 			Loc       string   `yaml:"loc"`
 			Relative  bool     `yaml:"relative"`

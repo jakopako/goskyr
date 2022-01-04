@@ -218,3 +218,31 @@ crawlers:
           layout: "15Uhr04"
         location: "Europe/Berlin"
         language: "de_DE"
+
+  - name: Mascotte
+    type: concert
+    city: Zurich
+    url: "https://www.mascotte.ch/nu/events/event_list_type/2"
+    event: ".nu-e-concert"
+    fields:
+      title: 
+        loc: ".screen-only h2"
+      comment:
+        loc: ".nu-e-subt"
+      url:
+        loc: ".nu-e-link-share"
+        attr: "data-a2a-url"
+      date:
+        day_month_year:
+          loc: ".screen-only .nu-e-date"
+          layout: "2.1.06"
+          regex:
+            exp: "([0-9]{1,2}\\.){2}[0-9]{2}"
+            index: 0
+        time:
+          loc: ".nu-e-time-age"
+          layout: "15.04"
+          regex:
+            exp: "[0-9]{2}\\.[0-9]{2}"
+            index: 1 
+        location: "Europe/Berlin"

@@ -226,7 +226,7 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 	return nil
 }
 
-func getDateStringAndLayout(dl *DateLocator, s *goquery.Selection) (string, string) {
+func getDateStringAndLayout(dl *DateField, s *goquery.Selection) (string, string) {
 	var fieldString, fieldLayout string
 	fieldStringSelection := s.Find(dl.Loc)
 	// TODO: Add possibility to apply a regex across s.Find(dl.Loc).Text()
@@ -234,13 +234,16 @@ func getDateStringAndLayout(dl *DateLocator, s *goquery.Selection) (string, stri
 	fieldStringNode := fieldStringSelection.Get(dl.NodeIndex).FirstChild
 	for fieldStringNode != nil {
 		if fieldStringNode.Type == html.TextNode {
-			fieldString = fieldStringNode.Data
-			break
-		} else {
-			fieldStringNode = fieldStringNode.NextSibling
+			// we 'abuse' the extractStringRegex func to find the correct text element.
+			var err error
+			fieldString, err = extractStringRegex(&dl.Regex, fieldStringNode.Data)
+			if err == nil {
+				break
+			}
 		}
+		fieldStringNode = fieldStringNode.NextSibling
 	}
-	fieldString = extractStringRegex(&dl.Regex, fieldString)
+	// fieldString = extractStringRegex(&dl.Regex, fieldString)
 	fieldLayout = dl.Layout
 	return fieldString, fieldLayout
 }
@@ -257,25 +260,36 @@ func getFieldString(f *Field, s *goquery.Selection) string {
 			}
 		}
 	}
-	fieldString = extractStringRegex(&f.Regex, fieldString)
+	fieldString, err := extractStringRegex(&f.Regex, fieldString)
+	if err != nil {
+		log.Fatal(err)
+	}
 	return fieldString
 }
 
-func extractStringRegex(rc *RegexConfig, s string) string {
+func extractStringRegex(rc *RegexConfig, s string) (string, error) {
 	extractedString := s
 	if rc.Exp != "" {
 		regex, err := regexp.Compile(rc.Exp)
 		if err != nil {
-			log.Fatal(err)
+			return "", err
 		}
 		matchingStrings := regex.FindAllString(s, -1)
+		if len(matchingStrings) == 0 {
+			msg := fmt.Sprintf("no matching strings found for regex: %s", rc.Exp)
+			return "", errors.New(msg)
+		}
 		if rc.Index == -1 {
 			extractedString = matchingStrings[len(matchingStrings)-1]
 		} else {
+			if rc.Index >= len(matchingStrings) {
+				msg := fmt.Sprintf("regex index out of bounds. regex '%s' gave only %d matches", rc.Exp, len(matchingStrings))
+				return "", errors.New(msg)
+			}
 			extractedString = matchingStrings[rc.Index]
 		}
 	}
-	return extractedString
+	return extractedString, nil
 }
 
 func writeEventsToAPI(c Crawler) {
@@ -354,7 +368,7 @@ type RegexConfig struct {
 	Index int    `yaml:"index"`
 }
 
-type DateLocator struct {
+type DateField struct {
 	Loc       string      `yaml:"loc"`
 	Layout    string      `yaml:"layout"`
 	NodeIndex int         `yaml:"node_index"`
@@ -385,14 +399,14 @@ type Crawler struct {
 			Attr      string   `yaml:"attr"`
 		} `yaml:"url"`
 		Date struct {
-			Day              DateLocator `yaml:"day"`
-			Month            DateLocator `yaml:"month"`
-			DayMonth         DateLocator `yaml:"day_month"`
-			DayMonthYear     DateLocator `yaml:"day_month_year"`
-			DayMonthYearTime DateLocator `yaml:"day_month_year_time"`
-			Time             DateLocator `yaml:"time"`
-			Location         string      `yaml:"location"`
-			Language         string      `yaml:"language"`
+			Day              DateField `yaml:"day"`
+			Month            DateField `yaml:"month"`
+			DayMonth         DateField `yaml:"day_month"`
+			DayMonthYear     DateField `yaml:"day_month_year"`
+			DayMonthYearTime DateField `yaml:"day_month_year_time"`
+			Time             DateField `yaml:"time"`
+			Location         string    `yaml:"location"`
+			Language         string    `yaml:"language"`
 		} `yaml:"date"`
 	} `yaml:"fields"`
 }

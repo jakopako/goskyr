@@ -218,3 +218,13 @@ crawlers:
           layout: "15Uhr04"
         location: "Europe/Berlin"
         language: "de_DE"
+
+  - name: Kaufleuten
+    type: concert
+    city: Zurich
+    url: "https://kaufleuten.ch/events/kultur/konzerte/"
+    event: ".event"
+    fields:
+      title:
+        loc: "h3"
+        

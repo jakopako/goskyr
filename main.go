@@ -236,19 +236,7 @@ func getDateStringAndLayout(dl *DateLocator, s *goquery.Selection) (string, stri
 			fieldStringNode = fieldStringNode.NextSibling
 		}
 	}
-	if dl.Regex.Exp != "" {
-		regex, err := regexp.Compile(dl.Regex.Exp)
-		if err != nil {
-			log.Fatal(err)
-		}
-		matchingStrings := regex.FindAllString(fieldString, -1)
-		if dl.Regex.Index == -1 {
-			fieldString = matchingStrings[len(matchingStrings)-1]
-		} else {
-			fieldString = matchingStrings[dl.Regex.Index]
-		}
-	}
-
+	fieldString = extractStringRegex(&dl.Regex, fieldString)
 	fieldLayout = dl.Layout
 	return fieldString, fieldLayout
 }
@@ -262,7 +250,25 @@ func getFieldString(f *Field, s *goquery.Selection) string {
 			return fieldString[:f.MaxLength] + "..."
 		}
 	}
+	fieldString = extractStringRegex(&f.Regex, fieldString)
 	return fieldString
+}
+
+func extractStringRegex(rc *RegexConfig, s string) string {
+	extractedString := s
+	if rc.Exp != "" {
+		regex, err := regexp.Compile(rc.Exp)
+		if err != nil {
+			log.Fatal(err)
+		}
+		matchingStrings := regex.FindAllString(s, -1)
+		if rc.Index == -1 {
+			extractedString = matchingStrings[len(matchingStrings)-1]
+		} else {
+			extractedString = matchingStrings[rc.Index]
+		}
+	}
+	return extractedString
 }
 
 func writeEventsToAPI(c Crawler) {
@@ -336,20 +342,23 @@ type Config struct {
 	Crawlers []Crawler `yaml:"crawlers"`
 }
 
+type RegexConfig struct {
+	Exp   string `yaml:"exp"`
+	Index int    `yaml:"index"`
+}
+
 type DateLocator struct {
-	Loc       string `yaml:"loc"`
-	Layout    string `yaml:"layout"`
-	NodeIndex int    `yaml:"node_index"`
-	Regex     struct {
-		Exp   string `yaml:"exp"`
-		Index int    `yaml:"index"`
-	} `yaml:"regex"`
+	Loc       string      `yaml:"loc"`
+	Layout    string      `yaml:"layout"`
+	NodeIndex int         `yaml:"node_index"`
+	Regex     RegexConfig `yaml:"regex"`
 }
 
 type Field struct {
-	Loc       string `yaml:"loc"`
-	NodeIndex int    `yaml:"node_index"`
-	MaxLength int    `yaml:"max_length"`
+	Loc       string      `yaml:"loc"`
+	NodeIndex int         `yaml:"node_index"`
+	MaxLength int         `yaml:"max_length"`
+	Regex     RegexConfig `yaml:"regex"`
 }
 
 type Crawler struct {

@@ -204,10 +204,14 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 		event.Comment = getFieldString(&crawler.Fields.Comment, s)
 	case "url":
 		var url string
+		attr := "href"
+		if crawler.Fields.URL.Attr != "" {
+			attr = crawler.Fields.URL.Attr
+		}
 		if crawler.Fields.URL.Loc == "" {
-			url = s.AttrOr("href", crawler.URL)
+			url = s.AttrOr(attr, crawler.URL)
 		} else {
-			url = s.Find(crawler.Fields.URL.Loc).AttrOr("href", crawler.URL)
+			url = s.Find(crawler.Fields.URL.Loc).AttrOr(attr, crawler.URL)
 		}
 
 		if crawler.Fields.URL.Relative {
@@ -245,9 +249,12 @@ func getFieldString(f *Field, s *goquery.Selection) string {
 	var fieldString string
 	fieldSelection := s.Find(f.Loc)
 	if len(fieldSelection.Nodes) > 0 {
-		fieldString = fieldSelection.Get(f.NodeIndex).FirstChild.Data
-		if f.MaxLength > 0 && f.MaxLength < len(fieldString) {
-			return fieldString[:f.MaxLength] + "..."
+		fieldNode := fieldSelection.Get(f.NodeIndex).FirstChild
+		if fieldNode.Type == html.TextNode {
+			fieldString = fieldSelection.Get(f.NodeIndex).FirstChild.Data
+			if f.MaxLength > 0 && f.MaxLength < len(fieldString) {
+				return fieldString[:f.MaxLength] + "..."
+			}
 		}
 	}
 	fieldString = extractStringRegex(&f.Regex, fieldString)
@@ -375,6 +382,7 @@ type Crawler struct {
 			Loc       string   `yaml:"loc"`
 			Relative  bool     `yaml:"relative"`
 			OnSubpage []string `yaml:"on_subpage"`
+			Attr      string   `yaml:"attr"`
 		} `yaml:"url"`
 		Date struct {
 			Day              DateLocator `yaml:"day"`

@@ -264,7 +264,7 @@ func getFieldString(f *Field, s *goquery.Selection) string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return fieldString
+	return strings.TrimSpace(fieldString)
 }
 
 func extractStringRegex(rc *RegexConfig, s string) (string, error) {

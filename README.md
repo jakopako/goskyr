@@ -27,6 +27,10 @@ Currently an event has the following fields:
 
 Have a look at the configuration file `config.yml` for details about how to configure the crawler for a specific website.
 
+## Run the crawler
+
+The crawler can be executed with `go run main.go` to crawl all configured locations and print the results. To run a single crawler add the flag `-single`. To write the events to the event api add the environment variables `API_USER`, `API_PASSWORD` and `EVENT_API` and add the flag `-store` to the go command.
+
 ## Regular execution through Github Actions
 
 The crawler is regularely being executed through Github Actions and its crawled data consequently written to the event api described below.

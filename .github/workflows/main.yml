@@ -31,5 +31,5 @@ jobs:
         env:
           API_USER: ${{ secrets.API_USER }}
           API_PASSWORD: ${{ secrets.API_PASSWORD }}
-          CRONCERT_API: ${{ secrets.CRONCERT_API }}
+          EVENT_API: ${{ secrets.EVENT_API }}
 

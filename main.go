@@ -293,7 +293,7 @@ func extractStringRegex(rc *RegexConfig, s string) (string, error) {
 }
 
 func writeEventsToAPI(c Crawler) {
-	apiUrl := os.Getenv("CRONCERT_API")
+	apiUrl := os.Getenv("EVENT_API")
 	client := &http.Client{
 		Timeout: time.Second * 10,
 	}

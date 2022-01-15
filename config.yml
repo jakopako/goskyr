@@ -104,13 +104,13 @@ crawlers:
         day_month_year:
           loc: ".b-events__el-date"
           layout: "Mon•2•1•2006"
-          regex: # In case the node contains more than just the desired string the substring can be determined with a regex
+          regex_extract: # In case the node contains more than just the desired string the substring can be determined with a regex
             exp: "[A-Za-z]{2}•[0-9]{1,2}•[0-9]{1,2}•[0-9]{4}"
             index: 0
         time:
           loc: ".b-events__el-date"
           layout: "15••04"
-          regex:
+          regex_extract:
             exp: "[0-9]{2}••[0-9]{2}"
             index: -1
         location: "Europe/Berlin"
@@ -236,13 +236,13 @@ crawlers:
         day_month_year:
           loc: ".screen-only .nu-e-date"
           layout: "2.1.06"
-          regex:
+          regex_extract:
             exp: "([0-9]{1,2}\\.){2}[0-9]{2}"
             index: 0
         time:
           loc: ".nu-e-time-age"
           layout: "15.04"
-          regex:
+          regex_extract:
             exp: "[0-9]{2}\\.[0-9]{2}"
             index: 1 
         location: "Europe/Berlin"
@@ -255,7 +255,7 @@ crawlers:
     fields:
       title:
         loc: "h3"
-        regex:
+        regex_extract:
           exp: "[^•]*"
           index: 0
       comment:
@@ -267,14 +267,14 @@ crawlers:
         day_month_year:
           loc: ".event-meta time"
           layout: "Monday, 02.01.2006"
-          regex:
+          regex_extract:
             exp: "[a-zA-Z]+,\\s([0-9]{2}\\.){2}[0-9]{4}"
             index: 0
         time:
           loc: ".event-meta .quick-facts li"
           layout: "15:04"
           node_index: 2 # if there are still multiple text nodes under this node the first one that results in a regex match, will be used
-          regex:
+          regex_extract:
             exp: "[0-9]{2}:[0-9]{2}"
             index: 0
         location: "Europe/Berlin"
@@ -300,4 +300,35 @@ crawlers:
           layout: "Monday 2 Jan 2006 - 15:04"
         location: "Europe/Berlin"
         language: "nl_BE"
+
+  - name: Backstage
+    type: concert
+    city: Munich
+    url: "https://backstage.info/veranstaltungen-2/alle-veranstaltungen"
+    event: ".event"
+    fields:
+      title:
+        loc: ".pos-title a"
+        regex_ignore: "CORONA TESTZENTRUM.*"
+      comment:
+        loc: ".event h3"
+      url:
+        loc: ".pos-title a"
+        relative: true
+        on_subpage: ["comment", "date"]
+      date:
+        day_month_year:
+          loc: ".pos-datum b"
+          layout: "Monday, 2. January 2006"
+        time:
+          loc: ".pos-einlass"
+          layout: "Beginn: 15:04"
+          regex_extract:
+            exp: "Beginn: [0-9]{1,2}:[0-9]{2}"
+            index: 0
+        location: "Europe/Berlin"
+        language: "de_DE"
+
+
+
       

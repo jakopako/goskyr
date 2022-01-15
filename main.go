@@ -140,10 +140,34 @@ func (c Crawler) getEvents() ([]Event, error) {
 			}
 		}
 
-		events = append(events, currentEvent)
+		// check if events should be ignored
+		ie, err := c.ignoreEvent(&currentEvent)
+		if err != nil {
+			log.Fatalf("error while removing events: %v", err)
+		}
+		if !ie {
+			events = append(events, currentEvent)
+		}
 	})
 
 	return events, nil
+}
+
+func (c Crawler) ignoreEvent(event *Event) (bool, error) {
+	fieldRegexMap := map[string]string{
+		event.Title:   c.Fields.Title.RegexIgnore,
+		event.Comment: c.Fields.Comment.RegexIgnore,
+	}
+	for fieldString, fieldRegex := range fieldRegexMap {
+		if fieldRegex != "" {
+			regex, err := regexp.Compile(fieldRegex)
+			if err != nil {
+				return false, err
+			}
+			return regex.MatchString(fieldString), nil
+		}
+	}
+	return false, nil
 }
 
 func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Event, events []Event, loc *time.Location, mLocale string, res *http.Response) error {
@@ -236,7 +260,7 @@ func getDateStringAndLayout(dl *DateField, s *goquery.Selection) (string, string
 		if fieldStringNode.Type == html.TextNode {
 			// we 'abuse' the extractStringRegex func to find the correct text element.
 			var err error
-			fieldString, err = extractStringRegex(&dl.Regex, fieldStringNode.Data)
+			fieldString, err = extractStringRegex(&dl.RegexExtract, fieldStringNode.Data)
 			if err == nil {
 				break
 			}
@@ -260,7 +284,7 @@ func getFieldString(f *Field, s *goquery.Selection) string {
 			}
 		}
 	}
-	fieldString, err := extractStringRegex(&f.Regex, fieldString)
+	fieldString, err := extractStringRegex(&f.RegexExtract, fieldString)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -369,17 +393,18 @@ type RegexConfig struct {
 }
 
 type DateField struct {
-	Loc       string      `yaml:"loc"`
-	Layout    string      `yaml:"layout"`
-	NodeIndex int         `yaml:"node_index"`
-	Regex     RegexConfig `yaml:"regex"`
+	Loc          string      `yaml:"loc"`
+	Layout       string      `yaml:"layout"`
+	NodeIndex    int         `yaml:"node_index"`
+	RegexExtract RegexConfig `yaml:"regex_extract"`
 }
 
 type Field struct {
-	Loc       string      `yaml:"loc"`
-	NodeIndex int         `yaml:"node_index"`
-	MaxLength int         `yaml:"max_length"`
-	Regex     RegexConfig `yaml:"regex"`
+	Loc          string      `yaml:"loc"`
+	NodeIndex    int         `yaml:"node_index"`
+	MaxLength    int         `yaml:"max_length"`
+	RegexExtract RegexConfig `yaml:"regex_extract"`
+	RegexIgnore  string      `yaml:"regex_ignore"`
 }
 
 type Crawler struct {

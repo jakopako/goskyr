@@ -1,0 +1,46 @@
+  - name: Backstage
+    type: concert
+    city: Munich
+    url: "https://backstage.info/veranstaltungen-2/alle-veranstaltungen"
+    event: ".event"
+    fields:
+      title:
+        loc: ".pos-title a"
+        regex_extract:
+          exp: "[^•]*"
+          index: 0
+      comment:
+        loc: ".event h3"
+        regex_extract:
+          exp: "[^•]*"
+          index: 0
+        max_length: 200
+      url:
+        loc: ".pos-title a"
+        relative: true
+        on_subpage: ["comment", "date"]
+      date:
+        day:
+        month:
+        day_month:
+        year:
+        day_month:
+        day_month_year_time:
+        day_month_year:
+          loc: ".pos-datum b"
+          layout: "Monday, 2. January 2006"
+        time:
+          loc: ".pos-einlass"
+          layout: "Beginn: 15:04"
+          regex_extract:
+            exp: "Beginn: [0-9]{1,2}:[0-9]{2}"
+            index: 0
+        time: # another example for time. Combine
+          loc: ".right .time"
+          layout: "Start: 15:04"
+          node_index: -1 # -1 means the last node
+        location: "Europe/Berlin"
+        language: "de_DE"
+    filters:
+      - field: "title"
+        regex_ignore: "CORONA TESTZENTRUM.*"

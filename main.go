@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -319,7 +320,9 @@ func extractStringRegex(rc *RegexConfig, s string) (string, error) {
 	return extractedString, nil
 }
 
-func writeEventsToAPI(c Crawler) {
+func writeEventsToAPI(wg *sync.WaitGroup, c Crawler) {
+	log.Printf("Crawling %s\n", c.Name)
+	defer wg.Done()
 	apiUrl := os.Getenv("EVENT_API")
 	client := &http.Client{
 		Timeout: time.Second * 10,
@@ -372,9 +375,11 @@ func writeEventsToAPI(c Crawler) {
 
 		}
 	}
+	log.Printf("Done crawling and writing %s data to API.\n", c.Name)
 }
 
-func prettyPrintEvents(c Crawler) {
+func prettyPrintEvents(wg *sync.WaitGroup, c Crawler) {
+	defer wg.Done()
 	events, err := c.getEvents()
 	if err != nil {
 		log.Fatal(err)
@@ -472,22 +477,27 @@ func main() {
 		log.Fatal(err)
 	}
 
+	var wg sync.WaitGroup
+
 	for _, c := range config.Crawlers {
 		if *singleCrawler != "" {
 			if *singleCrawler == c.Name {
+				wg.Add(1)
 				if *storeData {
-					writeEventsToAPI(c)
+					writeEventsToAPI(&wg, c)
 				} else {
-					prettyPrintEvents(c)
+					prettyPrintEvents(&wg, c)
 				}
 				break
 			}
 		} else {
+			wg.Add(1)
 			if *storeData {
-				writeEventsToAPI(c)
+				go writeEventsToAPI(&wg, c)
 			} else {
-				prettyPrintEvents(c)
+				go prettyPrintEvents(&wg, c)
 			}
 		}
 	}
+	wg.Wait()
 }

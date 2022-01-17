@@ -328,6 +328,9 @@ crawlers:
             index: 0
         location: "Europe/Berlin"
         language: "de_DE"
+    filters:
+      - field: "title"
+        regex_ignore: "CORONA TESTZENTRUM.*"
 
 
 

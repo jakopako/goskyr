@@ -154,17 +154,20 @@ func (c Crawler) getEvents() ([]Event, error) {
 }
 
 func (c Crawler) ignoreEvent(event *Event) (bool, error) {
-	fieldRegexMap := map[string]string{
-		event.Title:   c.Fields.Title.RegexIgnore,
-		event.Comment: c.Fields.Comment.RegexIgnore,
-	}
-	for fieldString, fieldRegex := range fieldRegexMap {
-		if fieldRegex != "" {
-			regex, err := regexp.Compile(fieldRegex)
-			if err != nil {
-				return false, err
+	for _, filter := range c.Filters {
+		regex, err := regexp.Compile(filter.RegexIgnore)
+		if err != nil {
+			return false, err
+		}
+		switch filter.Field {
+		case "title":
+			if regex.MatchString(event.Title) {
+				return true, nil
 			}
-			return regex.MatchString(fieldString), nil
+		case "comment":
+			if regex.MatchString(event.Comment) {
+				return true, nil
+			}
 		}
 	}
 	return false, nil
@@ -407,6 +410,11 @@ type Field struct {
 	RegexIgnore  string      `yaml:"regex_ignore"`
 }
 
+type Filter struct {
+	Field       string `yaml:"field"`
+	RegexIgnore string `yaml:"regex_ignore"`
+}
+
 type Crawler struct {
 	Name    string `yaml:"name"`
 	Type    string `yaml:"type"`
@@ -434,6 +442,7 @@ type Crawler struct {
 			Language         string    `yaml:"language"`
 		} `yaml:"date"`
 	} `yaml:"fields"`
+	Filters []Filter `yaml:"filters"`
 }
 
 func NewConfig(configPath string) (*Config, error) {

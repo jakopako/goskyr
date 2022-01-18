@@ -75,82 +75,101 @@ func (c Crawler) getEvents() ([]Event, error) {
 		mLocale = c.Fields.Date.Language
 	}
 
-	res, err := http.Get(c.URL)
-	if err != nil {
-		return events, err
-	}
-
-	defer res.Body.Close()
-
-	if res.StatusCode != 200 {
-		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
-	}
-
-	doc, err := goquery.NewDocumentFromReader(res.Body)
-	if err != nil {
-		return events, err
-	}
-
-	doc.Find(c.Event).Each(func(i int, s *goquery.Selection) {
-		if s.Find(c.Exclude).Length() > 0 {
-			return
+	pageUrl := c.URL
+	hasNextPage := true
+	for hasNextPage {
+		res, err := http.Get(pageUrl)
+		if err != nil {
+			return events, err
 		}
 
-		currentEvent := Event{
-			Location: c.Name,
-			City:     c.City,
-			Type:     EventType(c.Type),
+		defer res.Body.Close()
+
+		if res.StatusCode != 200 {
+			log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
 		}
 
-		for _, f := range dynamicFields {
-			fOnSubpage := false
-			for _, sf := range c.Fields.URL.OnSubpage {
-				if f == sf {
-					fOnSubpage = true
-				}
-			}
-			if !fOnSubpage {
-				err := extractField(f, s, &c, &currentEvent, events, loc, mLocale, res)
-				if err != nil {
-					log.Fatalln(err)
-				}
-			}
+		doc, err := goquery.NewDocumentFromReader(res.Body)
+		if err != nil {
+			return events, err
 		}
 
-		if len(c.Fields.URL.OnSubpage) > 0 {
-			resSub, err := http.Get(currentEvent.URL)
-			if err != nil {
+		doc.Find(c.Event).Each(func(i int, s *goquery.Selection) {
+			if s.Find(c.Exclude).Length() > 0 {
 				return
 			}
 
-			defer resSub.Body.Close()
-
-			if resSub.StatusCode != 200 {
-				log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
+			currentEvent := Event{
+				Location: c.Name,
+				City:     c.City,
+				Type:     EventType(c.Type),
 			}
 
-			docSub, err := goquery.NewDocumentFromReader(resSub.Body)
-			if err != nil {
-				log.Fatalf("error while reading document: %v", err)
-			}
-			for _, item := range c.Fields.URL.OnSubpage {
-				err := extractField(item, docSub.Selection, &c, &currentEvent, events, loc, mLocale, resSub)
-				if err != nil {
-					log.Fatalf("error while parsing field %s: %v", item, err)
+			for _, f := range dynamicFields {
+				fOnSubpage := false
+				for _, sf := range c.Fields.URL.OnSubpage {
+					if f == sf {
+						fOnSubpage = true
+					}
+				}
+				if !fOnSubpage {
+					err := extractField(f, s, &c, &currentEvent, events, loc, mLocale, res)
+					if err != nil {
+						log.Fatalln(err)
+					}
 				}
 			}
-		}
 
-		// check if events should be ignored
-		ie, err := c.ignoreEvent(&currentEvent)
-		if err != nil {
-			log.Fatalf("error while removing events: %v", err)
-		}
-		if !ie {
-			events = append(events, currentEvent)
-		}
-	})
+			if len(c.Fields.URL.OnSubpage) > 0 {
+				resSub, err := http.Get(currentEvent.URL)
+				if err != nil {
+					return
+				}
 
+				defer resSub.Body.Close()
+
+				if resSub.StatusCode != 200 {
+					log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
+				}
+
+				docSub, err := goquery.NewDocumentFromReader(resSub.Body)
+				if err != nil {
+					log.Fatalf("error while reading document: %v", err)
+				}
+				for _, item := range c.Fields.URL.OnSubpage {
+					err := extractField(item, docSub.Selection, &c, &currentEvent, events, loc, mLocale, resSub)
+					if err != nil {
+						log.Fatalf("error while parsing field %s: %v", item, err)
+					}
+				}
+			}
+
+			// check if events should be ignored
+			ie, err := c.ignoreEvent(&currentEvent)
+			if err != nil {
+				log.Fatalf("error while removing events: %v", err)
+			}
+			if !ie {
+				events = append(events, currentEvent)
+			}
+		})
+
+		// TODO: correctly determine hasNextPage and pageUrl
+		hasNextPage = false
+		if c.Paginator.Loc != "" {
+			attr := "href"
+			nextUrl, exists := doc.Find(c.Paginator.Loc).Attr(attr)
+			if exists {
+				if c.Paginator.Relative {
+					pageUrl = c.URL + nextUrl
+				} else {
+					pageUrl = nextUrl
+				}
+				hasNextPage = true
+			}
+		}
+		fmt.Printf("%v next page: %s\n", hasNextPage, pageUrl)
+	}
 	return events, nil
 }
 
@@ -447,7 +466,11 @@ type Crawler struct {
 			Language         string    `yaml:"language"`
 		} `yaml:"date"`
 	} `yaml:"fields"`
-	Filters []Filter `yaml:"filters"`
+	Filters   []Filter `yaml:"filters"`
+	Paginator struct {
+		Loc      string `yaml:"loc"`
+		Relative bool   `yaml:"relative"`
+	}
 }
 
 func NewConfig(configPath string) (*Config, error) {

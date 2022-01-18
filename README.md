@@ -25,7 +25,8 @@ Currently an event has the following fields:
 
 ## Configuration
 
-Have a look at the configuration file `config.yml` for details about how to configure the crawler for a specific website.
+Have a look at the configuration file `example-config.yml` for details about how to configure the crawler for a specific website.
+The configuration file currently used in production is `config.yml`.
 
 ## Run the crawler
 

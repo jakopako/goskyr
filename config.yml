@@ -309,7 +309,6 @@ crawlers:
     fields:
       title:
         loc: ".pos-title a"
-        regex_ignore: "CORONA TESTZENTRUM.*"
       comment:
         loc: ".event h3"
       url:

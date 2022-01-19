@@ -72,3 +72,7 @@ crawlers:
     filters: # A list of filters to remove certain items from the event list.
       - field: "title" # The field that has to be checked. Currently, only 'title' & 'comment' are valid values.
         regex_ignore: "CORONA TESTZENTRUM.*" # A regex matches the field values whose events should be excluded.
+    paginator: # can be defined if the events are spread across multiple pages.
+      loc: ".pagination .next"
+      relative: true
+      max_pages: 2 # default is 0 which means there is no limit.

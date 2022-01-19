@@ -77,6 +77,7 @@ func (c Crawler) getEvents() ([]Event, error) {
 
 	pageUrl := c.URL
 	hasNextPage := true
+	currentPage := 0
 	for hasNextPage {
 		res, err := http.Get(pageUrl)
 		if err != nil {
@@ -159,19 +160,31 @@ func (c Crawler) getEvents() ([]Event, error) {
 
 		hasNextPage = false
 		if c.Paginator.Loc != "" {
-			attr := "href"
-			nextUrl, exists := doc.Find(c.Paginator.Loc).Attr(attr)
-			if exists {
-				if c.Paginator.Relative {
-					pageUrl = c.URL + nextUrl
-				} else {
-					pageUrl = nextUrl
+			currentPage += 1
+			if currentPage < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
+				attr := "href"
+				nextUrl, exists := doc.Find(c.Paginator.Loc).Attr(attr)
+				if exists {
+					if c.Paginator.Relative {
+						baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
+						if strings.HasPrefix(nextUrl, "?") {
+							pageUrl = baseURL + res.Request.URL.Path + nextUrl
+						} else if !strings.HasPrefix(nextUrl, "/") {
+							pageUrl = baseURL + "/" + nextUrl
+						} else {
+							pageUrl = baseURL + nextUrl
+						}
+					} else {
+						pageUrl = nextUrl
+					}
+					hasNextPage = true
+					log.Printf("next page: %s\n", pageUrl)
 				}
-				hasNextPage = true
 			}
 		}
 		res.Body.Close()
 	}
+	log.Printf("fetched %d concerts from %s\n", len(events), c.Name)
 	return events, nil
 }
 
@@ -305,7 +318,7 @@ func getDateStringAndLayout(dl *DateField, s *goquery.Selection) (string, string
 func getFieldString(f *Field, s *goquery.Selection) string {
 	var fieldString string
 	fieldSelection := s.Find(f.Loc)
-	if len(fieldSelection.Nodes) > 0 {
+	if len(fieldSelection.Nodes) > f.NodeIndex {
 		fieldNode := fieldSelection.Get(f.NodeIndex).FirstChild
 		if fieldNode.Type == html.TextNode {
 			fieldString = fieldSelection.Get(f.NodeIndex).FirstChild.Data
@@ -477,6 +490,7 @@ type Crawler struct {
 	Paginator struct {
 		Loc      string `yaml:"loc"`
 		Relative bool   `yaml:"relative"`
+		MaxPages int    `yaml:"max_pages"`
 	}
 }
 

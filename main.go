@@ -83,7 +83,7 @@ func (c Crawler) getEvents() ([]Event, error) {
 			return events, err
 		}
 
-		defer res.Body.Close() // does this still work correctly even with the for loop that overrides res?
+		// defer res.Body.Close() // better not defer in a for loop
 
 		if res.StatusCode != 200 {
 			log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
@@ -128,8 +128,6 @@ func (c Crawler) getEvents() ([]Event, error) {
 					return
 				}
 
-				defer resSub.Body.Close()
-
 				if resSub.StatusCode != 200 {
 					log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
 				}
@@ -146,6 +144,7 @@ func (c Crawler) getEvents() ([]Event, error) {
 						return
 					}
 				}
+				resSub.Body.Close()
 			}
 
 			// check if events should be ignored
@@ -157,9 +156,7 @@ func (c Crawler) getEvents() ([]Event, error) {
 				events = append(events, currentEvent)
 			}
 		})
-		//res.Body.Close()
 
-		// TODO: correctly determine hasNextPage and pageUrl
 		hasNextPage = false
 		if c.Paginator.Loc != "" {
 			attr := "href"
@@ -173,6 +170,7 @@ func (c Crawler) getEvents() ([]Event, error) {
 				hasNextPage = true
 			}
 		}
+		res.Body.Close()
 	}
 	return events, nil
 }

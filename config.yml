@@ -284,6 +284,7 @@ crawlers:
     type: concert
     city: Leuven
     url: "https://www.hetdepot.be/programma"
+    # url: "https://www.hetdepot.be/programma?month_filter%5Bmin%5D=&month_filter%5Bmax%5D=&title=&page=1"
     event: ".calendar-item"
     fields:
       title:

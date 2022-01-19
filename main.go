@@ -83,7 +83,7 @@ func (c Crawler) getEvents() ([]Event, error) {
 			return events, err
 		}
 
-		defer res.Body.Close()
+		defer res.Body.Close() // does this still work correctly even with the for loop that overrides res?
 
 		if res.StatusCode != 200 {
 			log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
@@ -115,7 +115,9 @@ func (c Crawler) getEvents() ([]Event, error) {
 				if !fOnSubpage {
 					err := extractField(f, s, &c, &currentEvent, events, loc, mLocale, res)
 					if err != nil {
-						log.Fatalln(err)
+						// if there is an error skip this event and log error instead of completely canceling the crawl.
+						log.Printf("error while parsing field %s: %v. Skipping event.", f, err)
+						return
 					}
 				}
 			}
@@ -139,7 +141,9 @@ func (c Crawler) getEvents() ([]Event, error) {
 				for _, item := range c.Fields.URL.OnSubpage {
 					err := extractField(item, docSub.Selection, &c, &currentEvent, events, loc, mLocale, resSub)
 					if err != nil {
-						log.Fatalf("error while parsing field %s: %v", item, err)
+						// if there is an error skip this event and log error instead of completely canceling the crawl.
+						log.Printf("error while parsing field %s: %v. Skipping event %s.", item, err, currentEvent.Title)
+						return
 					}
 				}
 			}
@@ -153,6 +157,7 @@ func (c Crawler) getEvents() ([]Event, error) {
 				events = append(events, currentEvent)
 			}
 		})
+		//res.Body.Close()
 
 		// TODO: correctly determine hasNextPage and pageUrl
 		hasNextPage = false
@@ -168,7 +173,6 @@ func (c Crawler) getEvents() ([]Event, error) {
 				hasNextPage = true
 			}
 		}
-		fmt.Printf("%v next page: %s\n", hasNextPage, pageUrl)
 	}
 	return events, nil
 }
@@ -228,6 +232,9 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 			dateTimeString = fmt.Sprintf("%s %d %s", dayMonthString, year, timeString)
 		}
 
+		if dateTimeString == "" {
+			return errors.New("empty dateTimeString")
+		}
 		t, err := monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
 		if err != nil {
 			return err
@@ -278,19 +285,21 @@ func getDateStringAndLayout(dl *DateField, s *goquery.Selection) (string, string
 	fieldStringSelection := s.Find(dl.Loc)
 	// TODO: Add possibility to apply a regex across s.Find(dl.Loc).Text()
 	// A bit hacky..
-	fieldStringNode := fieldStringSelection.Get(dl.NodeIndex).FirstChild
-	for fieldStringNode != nil {
-		if fieldStringNode.Type == html.TextNode {
-			// we 'abuse' the extractStringRegex func to find the correct text element.
-			var err error
-			fieldString, err = extractStringRegex(&dl.RegexExtract, fieldStringNode.Data)
-			if err == nil {
-				break
+	if len(fieldStringSelection.Nodes) > 0 {
+		fieldStringNode := fieldStringSelection.Get(dl.NodeIndex).FirstChild
+		for fieldStringNode != nil {
+			if fieldStringNode.Type == html.TextNode {
+				// we 'abuse' the extractStringRegex func to find the correct text element.
+				var err error
+				fieldString, err = extractStringRegex(&dl.RegexExtract, fieldStringNode.Data)
+				if err == nil {
+					break
+				}
 			}
+			fieldStringNode = fieldStringNode.NextSibling
 		}
-		fieldStringNode = fieldStringNode.NextSibling
+		// fieldString = extractStringRegex(&dl.Regex, fieldString)
 	}
-	// fieldString = extractStringRegex(&dl.Regex, fieldString)
 	fieldLayout = dl.Layout
 	return fieldString, fieldLayout
 }

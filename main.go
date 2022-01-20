@@ -49,6 +49,7 @@ type Event struct {
 }
 
 func (c Crawler) getEvents() ([]Event, error) {
+	log.Printf("fetching %s events", c.Name)
 	dynamicFields := []string{"title", "comment", "url", "date"}
 	events := []Event{}
 	eventType := EventType(c.Type)
@@ -75,82 +76,116 @@ func (c Crawler) getEvents() ([]Event, error) {
 		mLocale = c.Fields.Date.Language
 	}
 
-	res, err := http.Get(c.URL)
-	if err != nil {
-		return events, err
-	}
-
-	defer res.Body.Close()
-
-	if res.StatusCode != 200 {
-		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
-	}
-
-	doc, err := goquery.NewDocumentFromReader(res.Body)
-	if err != nil {
-		return events, err
-	}
-
-	doc.Find(c.Event).Each(func(i int, s *goquery.Selection) {
-		if s.Find(c.Exclude).Length() > 0 {
-			return
+	pageUrl := c.URL
+	hasNextPage := true
+	currentPage := 0
+	for hasNextPage {
+		res, err := http.Get(pageUrl)
+		if err != nil {
+			return events, err
 		}
 
-		currentEvent := Event{
-			Location: c.Name,
-			City:     c.City,
-			Type:     EventType(c.Type),
+		// defer res.Body.Close() // better not defer in a for loop
+
+		if res.StatusCode != 200 {
+			log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
 		}
 
-		for _, f := range dynamicFields {
-			fOnSubpage := false
-			for _, sf := range c.Fields.URL.OnSubpage {
-				if f == sf {
-					fOnSubpage = true
-				}
-			}
-			if !fOnSubpage {
-				err := extractField(f, s, &c, &currentEvent, events, loc, mLocale, res)
-				if err != nil {
-					log.Fatalln(err)
-				}
-			}
+		doc, err := goquery.NewDocumentFromReader(res.Body)
+		if err != nil {
+			return events, err
 		}
 
-		if len(c.Fields.URL.OnSubpage) > 0 {
-			resSub, err := http.Get(currentEvent.URL)
-			if err != nil {
+		doc.Find(c.Event).Each(func(i int, s *goquery.Selection) {
+			if s.Find(c.Exclude).Length() > 0 {
 				return
 			}
 
-			defer resSub.Body.Close()
-
-			if resSub.StatusCode != 200 {
-				log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
+			currentEvent := Event{
+				Location: c.Name,
+				City:     c.City,
+				Type:     EventType(c.Type),
 			}
 
-			docSub, err := goquery.NewDocumentFromReader(resSub.Body)
-			if err != nil {
-				log.Fatalf("error while reading document: %v", err)
+			for _, f := range dynamicFields {
+				fOnSubpage := false
+				for _, sf := range c.Fields.URL.OnSubpage {
+					if f == sf {
+						fOnSubpage = true
+					}
+				}
+				if !fOnSubpage {
+					err := extractField(f, s, &c, &currentEvent, events, loc, mLocale, res)
+					if err != nil {
+						// if there is an error skip this event and log error instead of completely canceling the crawl.
+						log.Printf("error while parsing field %s: %v. Skipping event.", f, err)
+						return
+					}
+				}
 			}
-			for _, item := range c.Fields.URL.OnSubpage {
-				err := extractField(item, docSub.Selection, &c, &currentEvent, events, loc, mLocale, resSub)
+
+			if len(c.Fields.URL.OnSubpage) > 0 {
+				resSub, err := http.Get(currentEvent.URL)
 				if err != nil {
-					log.Fatalf("error while parsing field %s: %v", item, err)
+					return
+				}
+
+				if resSub.StatusCode != 200 {
+					log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
+				}
+
+				docSub, err := goquery.NewDocumentFromReader(resSub.Body)
+				if err != nil {
+					log.Fatalf("error while reading document: %v", err)
+				}
+				for _, item := range c.Fields.URL.OnSubpage {
+					err := extractField(item, docSub.Selection, &c, &currentEvent, events, loc, mLocale, resSub)
+					if err != nil {
+						// if there is an error skip this event and log error instead of completely canceling the crawl.
+						log.Printf("error while parsing field %s: %v. Skipping event %s.", item, err, currentEvent.Title)
+						return
+					}
+				}
+				resSub.Body.Close()
+			}
+
+			// check if events should be ignored
+			ie, err := c.ignoreEvent(&currentEvent)
+			if err != nil {
+				log.Fatalf("error while removing events: %v", err)
+			}
+			if !ie {
+				events = append(events, currentEvent)
+			}
+		})
+
+		hasNextPage = false
+		if c.Paginator.Loc != "" {
+			currentPage += 1
+			if currentPage < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
+				attr := "href"
+				nextUrl, exists := doc.Find(c.Paginator.Loc).Attr(attr)
+				if exists {
+					if c.Paginator.Relative {
+						baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
+						if strings.HasPrefix(nextUrl, "?") {
+							pageUrl = baseURL + res.Request.URL.Path + nextUrl
+						} else if !strings.HasPrefix(nextUrl, "/") {
+							pageUrl = baseURL + "/" + nextUrl
+						} else {
+							pageUrl = baseURL + nextUrl
+						}
+					} else {
+						pageUrl = nextUrl
+					}
+					hasNextPage = true
+					log.Printf("next page: %s\n", pageUrl)
 				}
 			}
 		}
-
-		// check if events should be ignored
-		ie, err := c.ignoreEvent(&currentEvent)
-		if err != nil {
-			log.Fatalf("error while removing events: %v", err)
-		}
-		if !ie {
-			events = append(events, currentEvent)
-		}
-	})
-
+		res.Body.Close()
+	}
+	log.Printf("fetched %d %s events\n", len(events), c.Name)
 	return events, nil
 }
 
@@ -209,6 +244,9 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 			dateTimeString = fmt.Sprintf("%s %d %s", dayMonthString, year, timeString)
 		}
 
+		if dateTimeString == "" {
+			return errors.New("empty dateTimeString")
+		}
 		t, err := monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
 		if err != nil {
 			return err
@@ -259,19 +297,21 @@ func getDateStringAndLayout(dl *DateField, s *goquery.Selection) (string, string
 	fieldStringSelection := s.Find(dl.Loc)
 	// TODO: Add possibility to apply a regex across s.Find(dl.Loc).Text()
 	// A bit hacky..
-	fieldStringNode := fieldStringSelection.Get(dl.NodeIndex).FirstChild
-	for fieldStringNode != nil {
-		if fieldStringNode.Type == html.TextNode {
-			// we 'abuse' the extractStringRegex func to find the correct text element.
-			var err error
-			fieldString, err = extractStringRegex(&dl.RegexExtract, fieldStringNode.Data)
-			if err == nil {
-				break
+	if len(fieldStringSelection.Nodes) > 0 {
+		fieldStringNode := fieldStringSelection.Get(dl.NodeIndex).FirstChild
+		for fieldStringNode != nil {
+			if fieldStringNode.Type == html.TextNode {
+				// we 'abuse' the extractStringRegex func to find the correct text element.
+				var err error
+				fieldString, err = extractStringRegex(&dl.RegexExtract, fieldStringNode.Data)
+				if err == nil {
+					break
+				}
 			}
+			fieldStringNode = fieldStringNode.NextSibling
 		}
-		fieldStringNode = fieldStringNode.NextSibling
+		// fieldString = extractStringRegex(&dl.Regex, fieldString)
 	}
-	// fieldString = extractStringRegex(&dl.Regex, fieldString)
 	fieldLayout = dl.Layout
 	return fieldString, fieldLayout
 }
@@ -279,7 +319,7 @@ func getDateStringAndLayout(dl *DateField, s *goquery.Selection) (string, string
 func getFieldString(f *Field, s *goquery.Selection) string {
 	var fieldString string
 	fieldSelection := s.Find(f.Loc)
-	if len(fieldSelection.Nodes) > 0 {
+	if len(fieldSelection.Nodes) > f.NodeIndex {
 		fieldNode := fieldSelection.Get(f.NodeIndex).FirstChild
 		if fieldNode.Type == html.TextNode {
 			fieldString = fieldSelection.Get(f.NodeIndex).FirstChild.Data
@@ -447,7 +487,12 @@ type Crawler struct {
 			Language         string    `yaml:"language"`
 		} `yaml:"date"`
 	} `yaml:"fields"`
-	Filters []Filter `yaml:"filters"`
+	Filters   []Filter `yaml:"filters"`
+	Paginator struct {
+		Loc      string `yaml:"loc"`
+		Relative bool   `yaml:"relative"`
+		MaxPages int    `yaml:"max_pages"`
+	}
 }
 
 func NewConfig(configPath string) (*Config, error) {

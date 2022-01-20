@@ -300,6 +300,9 @@ crawlers:
           layout: "Monday 2 Jan 2006 - 15:04"
         location: "Europe/Berlin"
         language: "nl_BE"
+    paginator:
+      loc: ".pager__item--next a"
+      relative: true
 
   - name: Backstage
     type: concert
@@ -330,7 +333,41 @@ crawlers:
     filters:
       - field: "title"
         regex_ignore: "CORONA TESTZENTRUM.*"
+    paginator:
+      loc: ".pagination .next"
+      relative: true
+      max_pages: 2 # otherwise this crawler takes ages.
 
+  - name: Tonhalle
+    type: concert
+    city: Zurich
+    url: "https://www.tonhalle-orchester.ch/en/home-tz/konzerte/kalender/"
+    event: ".js-calendarlist-list .data"
+    fields:
+      title:
+        loc: ".event h3"
+      comment:
+        loc: ".member .member-name"
+        node_index: 1
+      url:
+        loc: ".desktop-linkoverlay"
+        relative: true
+      date:
+        day_month:
+          loc: ".col-left .date"
+          layout: "2. Jan"
+          regex_extract:
+            exp: "[0-9]{1,2}\\.\\s[a-zA-Z]{3}"
+        time:
+          loc: ".col-left .hour"
+          layout: "15.04"
+          regex_extract:
+            exp: "[0-9]{1,2}\\.[0-9]{2}"
+        location: "Europe/Berlin"
+        language: "de_DE"
+    paginator:
+      loc: ".MarkupPagerNavNext a"
+      relative: true
 
 
       

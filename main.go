@@ -49,6 +49,7 @@ type Event struct {
 }
 
 func (c Crawler) getEvents() ([]Event, error) {
+	log.Printf("fetching %s events", c.Name)
 	dynamicFields := []string{"title", "comment", "url", "date"}
 	events := []Event{}
 	eventType := EventType(c.Type)
@@ -184,7 +185,7 @@ func (c Crawler) getEvents() ([]Event, error) {
 		}
 		res.Body.Close()
 	}
-	log.Printf("fetched %d concerts from %s\n", len(events), c.Name)
+	log.Printf("fetched %d %s events\n", len(events), c.Name)
 	return events, nil
 }
 

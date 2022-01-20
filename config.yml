@@ -363,6 +363,8 @@ crawlers:
           layout: "15.04"
           regex_extract:
             exp: "[0-9]{1,2}\\.[0-9]{2}"
+        location: "Europe/Berlin"
+        language: "de_DE"
     paginator:
       loc: ".MarkupPagerNavNext a"
       relative: true

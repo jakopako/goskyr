@@ -369,5 +369,31 @@ crawlers:
       loc: ".MarkupPagerNavNext a"
       relative: true
 
+  - name: Heldenbar
+    type: concert
+    city: Zurich
+    url: "https://www.heldenbar.ch/programm/"
+    event: ".page-content .vsel-upcoming"
+    fields:
+      title:
+        loc: ".vsel-meta-title a"
+      comment:
+        loc: ".vsel-info p"
+      url:
+        loc: ".vsel-meta-title a"
+        on_subpage: ["date"]
+      date:
+        day_month_year:
+          loc: ".vsel-meta-date span"
+          layout: "2/01/2006"
+          regex_extract:
+            exp: "([0-9]{2}/){2}[0-9]{4}"
+        time:
+          loc: ".vsel-meta-time span"
+          layout: "15:04"
+          regex_extract:
+            exp: "[0-9]{1,2}:[0-9]{2}"
+        location: "Europe/Berlin"
+        language: "de_DE"
 
       

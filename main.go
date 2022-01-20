@@ -49,7 +49,6 @@ type Event struct {
 }
 
 func (c Crawler) getEvents() ([]Event, error) {
-	log.Printf("fetching %s events", c.Name)
 	dynamicFields := []string{"title", "comment", "url", "date"}
 	events := []Event{}
 	eventType := EventType(c.Type)
@@ -179,13 +178,12 @@ func (c Crawler) getEvents() ([]Event, error) {
 						pageUrl = nextUrl
 					}
 					hasNextPage = true
-					log.Printf("next page: %s\n", pageUrl)
+					// log.Printf("next page: %s\n", pageUrl)
 				}
 			}
 		}
 		res.Body.Close()
 	}
-	log.Printf("fetched %d %s events\n", len(events), c.Name)
 	return events, nil
 }
 
@@ -361,7 +359,7 @@ func extractStringRegex(rc *RegexConfig, s string) (string, error) {
 }
 
 func writeEventsToAPI(wg *sync.WaitGroup, c Crawler) {
-	log.Printf("Crawling %s\n", c.Name)
+	log.Printf("crawling %s\n", c.Name)
 	defer wg.Done()
 	apiUrl := os.Getenv("EVENT_API")
 	client := &http.Client{
@@ -377,6 +375,7 @@ func writeEventsToAPI(wg *sync.WaitGroup, c Crawler) {
 		log.Printf("Location %s has no events. Skipping.", c.Name)
 		return
 	}
+	log.Printf("fetched %d %s events\n", len(events), c.Name)
 	// sort events by date asc
 	sort.Slice(events, func(i, j int) bool {
 		return events[i].Date.Before(events[j].Date)

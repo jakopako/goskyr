@@ -396,4 +396,28 @@ crawlers:
         location: "Europe/Berlin"
         language: "de_DE"
 
+  - name: Exil
+    type: concert
+    city: Zurich
+    url: "https://exil.cl/programm"
+    event: "#detail-main article"
+    exclude: ".wct_event"
+    fields:
+      title:
+        loc: ".grid-event-title"
+      comment:
+        loc: ".hyphenate p"
+        max_length: 200
+      date:
+        day_month_year_time:
+          loc: ".grid-event-date"
+          layout: "2006-01-02T15:04"
+          attr: "datetime"
+        location: "Europe/Berlin"
+        language: "de_DE"
+    filters:
+      - field: "title"
+        regex_ignore: ".*abgesagt.*"
+      - field: "title"
+        regex_ignore: "geschlossene Gesellschaft"
       

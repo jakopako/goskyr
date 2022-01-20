@@ -96,7 +96,7 @@ func (c Crawler) getEvents() ([]Event, error) {
 		}
 
 		doc.Find(c.Event).Each(func(i int, s *goquery.Selection) {
-			if s.Find(c.Exclude).Length() > 0 {
+			if s.Find(c.Exclude).Length() > 0 || s.Is(c.Exclude) {
 				return
 			}
 
@@ -296,19 +296,22 @@ func getDateStringAndLayout(dl *DateField, s *goquery.Selection) (string, string
 	// TODO: Add possibility to apply a regex across s.Find(dl.Loc).Text()
 	// A bit hacky..
 	if len(fieldStringSelection.Nodes) > 0 {
-		fieldStringNode := fieldStringSelection.Get(dl.NodeIndex).FirstChild
-		for fieldStringNode != nil {
-			if fieldStringNode.Type == html.TextNode {
-				// we 'abuse' the extractStringRegex func to find the correct text element.
-				var err error
-				fieldString, err = extractStringRegex(&dl.RegexExtract, fieldStringNode.Data)
-				if err == nil {
-					break
+		if dl.Attr == "" {
+			fieldStringNode := fieldStringSelection.Get(dl.NodeIndex).FirstChild
+			for fieldStringNode != nil {
+				if fieldStringNode.Type == html.TextNode {
+					// we 'abuse' the extractStringRegex func to find the correct text element.
+					var err error
+					fieldString, err = extractStringRegex(&dl.RegexExtract, fieldStringNode.Data)
+					if err == nil {
+						break
+					}
 				}
+				fieldStringNode = fieldStringNode.NextSibling
 			}
-			fieldStringNode = fieldStringNode.NextSibling
+		} else {
+			fieldString = fieldStringSelection.AttrOr(dl.Attr, "")
 		}
-		// fieldString = extractStringRegex(&dl.Regex, fieldString)
 	}
 	fieldLayout = dl.Layout
 	return fieldString, fieldLayout
@@ -319,10 +322,12 @@ func getFieldString(f *Field, s *goquery.Selection) string {
 	fieldSelection := s.Find(f.Loc)
 	if len(fieldSelection.Nodes) > f.NodeIndex {
 		fieldNode := fieldSelection.Get(f.NodeIndex).FirstChild
-		if fieldNode.Type == html.TextNode {
-			fieldString = fieldSelection.Get(f.NodeIndex).FirstChild.Data
-			if f.MaxLength > 0 && f.MaxLength < len(fieldString) {
-				return fieldString[:f.MaxLength] + "..."
+		if fieldNode != nil {
+			if fieldNode.Type == html.TextNode {
+				fieldString = strings.TrimSpace(fieldSelection.Get(f.NodeIndex).FirstChild.Data)
+				if f.MaxLength > 0 && f.MaxLength < len(fieldString) {
+					fieldString = fieldString[:f.MaxLength] + "..."
+				}
 			}
 		}
 	}
@@ -330,7 +335,7 @@ func getFieldString(f *Field, s *goquery.Selection) string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return strings.TrimSpace(fieldString)
+	return fieldString
 }
 
 func extractStringRegex(rc *RegexConfig, s string) (string, error) {
@@ -444,6 +449,7 @@ type DateField struct {
 	Layout       string      `yaml:"layout"`
 	NodeIndex    int         `yaml:"node_index"`
 	RegexExtract RegexConfig `yaml:"regex_extract"`
+	Attr         string      `yaml:"attr"`
 }
 
 type Field struct {

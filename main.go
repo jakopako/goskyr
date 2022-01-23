@@ -96,8 +96,10 @@ func (c Crawler) getEvents() ([]Event, error) {
 		}
 
 		doc.Find(c.Event).Each(func(i int, s *goquery.Selection) {
-			if s.Find(c.Exclude).Length() > 0 || s.Is(c.Exclude) {
-				return
+			for _, exclude_selector := range c.ExcludeWithSelector {
+				if s.Find(exclude_selector).Length() > 0 || s.Is(exclude_selector) {
+					return
+				}
 			}
 
 			currentEvent := Event{
@@ -466,13 +468,13 @@ type Filter struct {
 }
 
 type Crawler struct {
-	Name    string `yaml:"name"`
-	Type    string `yaml:"type"`
-	URL     string `yaml:"url"`
-	City    string `yaml:"city"`
-	Event   string `yaml:"event"`
-	Exclude string `yaml:"exclude"`
-	Fields  struct {
+	Name                string   `yaml:"name"`
+	Type                string   `yaml:"type"`
+	URL                 string   `yaml:"url"`
+	City                string   `yaml:"city"`
+	Event               string   `yaml:"event"`
+	ExcludeWithSelector []string `yaml:"exclude_with_selector"`
+	Fields              struct {
 		Title   Field `yaml:"title"`
 		Comment Field `yaml:"comment"`
 		URL     struct {

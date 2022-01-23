@@ -150,7 +150,8 @@ crawlers:
     url: "https://import-export.cc/"
     city: "Munich"
     event: ".events a"
-    exclude: ".old" # events that have a node with this class will be excluded from the results.
+    exclude_with_selector: 
+      - ".old" # events that have a node with this class will be excluded from the results.
     fields:
       url:
         loc: ""
@@ -401,7 +402,8 @@ crawlers:
     city: Zurich
     url: "https://exil.cl/programm"
     event: "#detail-main article"
-    exclude: ".wct_event"
+    exclude_with_selector: 
+      - ".wct_event"
     fields:
       title:
         loc: ".grid-event-title"
@@ -420,4 +422,31 @@ crawlers:
         regex_ignore: ".*abgesagt.*"
       - field: "title"
         regex_ignore: "geschlossene Gesellschaft"
-      
+
+  - name: Strom
+    type: concert
+    city: Munich
+    url: "https://strom-muc.de/"
+    event: ".gdlr-event-item"
+    exclude_with_selector:
+      - ".cancelled-button"
+      - ".coming-soon"
+    fields:
+      title:
+        loc: ".event-title a"
+      url:
+        loc: ".event-title a"
+        on_subpage: ["date"]
+      date:
+        day_month_year:
+          loc: ".gdlr-info-date"
+          layout: "02.01.2006"
+          regex_extract:
+            exp: "([0-9]{2}\\.){2}[0-9]{4}"
+        time:
+          loc: ".gdlr-info-time"
+          layout: "15.04"
+          regex_extract:
+            exp: "[0-9]{2}(\\.|:)[0-9]{2}"
+            index: -1
+        location: "Europe/Berlin"

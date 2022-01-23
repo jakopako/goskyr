@@ -9,7 +9,8 @@ crawlers:
     city: Munich # city of the location.
     url: "https://backstage.info/veranstaltungen-2/alle-veranstaltungen" # url of the page that contains the events.
     event: ".event" # selector for an event.
-    exclude: ".exclude" # exclude events that match this selector.
+    exclude_with_selector:
+      - ".exclude" # exclude events that match this selector.
     fields: # a dictionary of fields. Only those listed below exist but not all are mandatory
       title: # Mandatory field.
         loc: ".pos-title a" # selector for the title

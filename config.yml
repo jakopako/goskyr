@@ -450,3 +450,33 @@ crawlers:
             exp: "[0-9]{2}(\\.|:)[0-9]{2}"
             index: -1
         location: "Europe/Berlin"
+
+  - name: Muffatwerk
+    type: concert
+    city: Munich
+    url: "https://www.muffatwerk.de/de/events/concert"
+    event: ".row .event"
+    fields:
+      title:
+        loc: ".hover-in .center span"
+      url:
+        loc: ".hover-in .right a"
+        relative: true
+      date:
+        day_month:
+          loc: ".hover-in .center"
+          layout: "02.01. "
+          regex_extract:
+            exp: "([0-9]{2}\\.){2}\\s"
+        year:
+          loc: ".date"
+          layout: "06	" # the whitespace in this string is a tab.
+          regex_extract:
+            exp: "[0-9]{2}\\s"
+        time:
+          loc: ".hover-in .center"
+          layout: "15:04"
+          regex_extract:
+            exp: "[0-9]{2}:[0-9]{2}"
+        location: "Europe/Berlin"
+        

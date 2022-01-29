@@ -12,6 +12,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -212,7 +213,16 @@ func (c Crawler) ignoreEvent(event *Event) (bool, error) {
 func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Event, events []Event, loc *time.Location, mLocale string, res *http.Response) error {
 	switch item {
 	case "date":
-		year := time.Now().Year()
+		currentYear := time.Now().Year()
+		yearString := strconv.Itoa(currentYear)
+		yearLayout := "2006"
+
+		if crawler.Fields.Date.Year.Loc != "" {
+			yearStringTmp, yearLayoutTmp := getDateStringAndLayout(&crawler.Fields.Date.Year, s)
+			if yearStringTmp != "" {
+				yearString, yearLayout = yearStringTmp, yearLayoutTmp
+			}
+		}
 
 		var timeString, timeStringLayout string
 		if crawler.Fields.Date.Time.Loc == "" {
@@ -240,8 +250,8 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 				dayMonthLayout = dayLayout + " " + monthLayout
 			}
 
-			dateTimeLayout = fmt.Sprintf("%s 2006 %s", dayMonthLayout, timeStringLayout)
-			dateTimeString = fmt.Sprintf("%s %d %s", dayMonthString, year, timeString)
+			dateTimeLayout = fmt.Sprintf("%s %s %s", dayMonthLayout, yearLayout, timeStringLayout)
+			dateTimeString = fmt.Sprintf("%s %s %s", dayMonthString, yearString, timeString)
 		}
 
 		if dateTimeString == "" {
@@ -255,8 +265,10 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 		// actually this is only necessary if we have to guess the date but currently for ease of implementation
 		// this check is done always.
 		if len(events) > 0 {
-			if events[len(events)-1].Date.After(t) {
-				t = time.Date(int(year+1), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
+			correctYear := currentYear
+			for events[len(events)-1].Date.After(t) {
+				correctYear += 1
+				t = time.Date(int(correctYear), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
 			}
 		}
 		event.Date = t
@@ -486,6 +498,7 @@ type Crawler struct {
 		Date struct {
 			Day              DateField `yaml:"day"`
 			Month            DateField `yaml:"month"`
+			Year             DateField `yaml:"year"`
 			DayMonth         DateField `yaml:"day_month"`
 			DayMonthYear     DateField `yaml:"day_month_year"`
 			DayMonthYearTime DateField `yaml:"day_month_year_time"`

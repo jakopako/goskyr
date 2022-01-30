@@ -166,22 +166,28 @@ func (c Crawler) getEvents() ([]Event, error) {
 			currentPage += 1
 			if currentPage < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
 				attr := "href"
-				nextUrl, exists := doc.Find(c.Paginator.Loc).Attr(attr)
-				if exists {
-					if c.Paginator.Relative {
-						baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
-						if strings.HasPrefix(nextUrl, "?") {
-							pageUrl = baseURL + res.Request.URL.Path + nextUrl
-						} else if !strings.HasPrefix(nextUrl, "/") {
-							pageUrl = baseURL + "/" + nextUrl
-						} else {
-							pageUrl = baseURL + nextUrl
+				//nextUrl, exists := doc.Find(c.Paginator.Loc).Attr(attr)
+				if len(doc.Find(c.Paginator.Loc).Nodes) > c.Paginator.NodeIndex {
+					pagNode := doc.Find(c.Paginator.Loc).Get(c.Paginator.NodeIndex)
+					for _, a := range pagNode.Attr {
+						if a.Key == attr {
+							nextUrl := a.Val
+							if c.Paginator.Relative {
+								baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
+								if strings.HasPrefix(nextUrl, "?") {
+									pageUrl = baseURL + res.Request.URL.Path + nextUrl
+								} else if !strings.HasPrefix(nextUrl, "/") {
+									pageUrl = baseURL + "/" + nextUrl
+								} else {
+									pageUrl = baseURL + nextUrl
+								}
+							} else {
+								pageUrl = nextUrl
+							}
+							hasNextPage = true
+							// log.Printf("next page: %s\n", pageUrl)
 						}
-					} else {
-						pageUrl = nextUrl
 					}
-					hasNextPage = true
-					// log.Printf("next page: %s\n", pageUrl)
 				}
 			}
 		}
@@ -509,9 +515,10 @@ type Crawler struct {
 	} `yaml:"fields"`
 	Filters   []Filter `yaml:"filters"`
 	Paginator struct {
-		Loc      string `yaml:"loc"`
-		Relative bool   `yaml:"relative"`
-		MaxPages int    `yaml:"max_pages"`
+		Loc       string `yaml:"loc"`
+		Relative  bool   `yaml:"relative"`
+		MaxPages  int    `yaml:"max_pages"`
+		NodeIndex int    `yaml:"node_index"`
 	}
 }
 

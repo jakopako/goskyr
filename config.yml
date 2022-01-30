@@ -479,4 +479,47 @@ crawlers:
           regex_extract:
             exp: "[0-9]{2}:[0-9]{2}"
         location: "Europe/Berlin"
+
+  - name: LocomotivClub
+    type: concert
+    city: Bologna
+    url: "https://www.locomotivclub.it/eventtype/calendario/"
+    event: ".qt-item-event"
+    fields:
+      title:
+        loc: ".qt-text-shadow"
+      comment:
+        loc: ".qt-the-content div"
+      url:
+        loc: ".qt-text-shadow"
+        on_subpage: ["comment", "date"]
+      date:
+        day_month_year:
+          loc: ".qt-eventtable tr td"
+          # layout: " Data: 2 Febbraio 2022"
+          layout: " Data: 2 January 2006"
+          regex_extract:
+            exp: "\\sData:.*"
+        time:
+          loc: ".qt-eventtable tr td"
+          node_index: 2
+          # layout: " Inizio concerto: 9:30 pm"
+          layout: " Inizio concerto: 3:04 pm"
+          regex_extract:
+            exp: " Inizio concerto: .*"
+        location: "Europe/Berlin"
+        language: "it_IT"
+    filters:
+      - field: "title"
+        regex_ignore: ".*CANCELED.*"
+      - field: "title"
+        regex_ignore: "ANNULLATO!.*"
+      - field: "title"
+        regex_ignore: ".*Postponed.*"
+    paginator:
+      loc: ".pagination .qt-btn-primary"
+      node_index: -1
+      max_pages: 4
+
+
         

@@ -258,6 +258,7 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 
 			dateTimeLayout = fmt.Sprintf("%s %s %s", dayMonthLayout, yearLayout, timeStringLayout)
 			dateTimeString = fmt.Sprintf("%s %s %s", dayMonthString, yearString, timeString)
+			dateTimeString = strings.Replace(dateTimeString, "Mrz", "Mär", 1) // hack for issue #47
 		}
 
 		if dateTimeString == "" {

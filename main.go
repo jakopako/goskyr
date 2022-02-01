@@ -88,7 +88,8 @@ func (c Crawler) getEvents() ([]Event, error) {
 		// defer res.Body.Close() // better not defer in a for loop
 
 		if res.StatusCode != 200 {
-			log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
+			err_msg := fmt.Sprintf("status code error: %d %s", res.StatusCode, res.Status)
+			return events, errors.New(err_msg)
 		}
 
 		doc, err := goquery.NewDocumentFromReader(res.Body)
@@ -119,8 +120,7 @@ func (c Crawler) getEvents() ([]Event, error) {
 				if !fOnSubpage {
 					err := extractField(f, s, &c, &currentEvent, events, loc, mLocale, res)
 					if err != nil {
-						// if there is an error skip this event and log error instead of completely canceling the crawl.
-						log.Printf("error while parsing field %s: %v. Skipping event.", f, err)
+						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event.", c.Name, f, err)
 						return
 					}
 				}
@@ -129,32 +129,34 @@ func (c Crawler) getEvents() ([]Event, error) {
 			if len(c.Fields.URL.OnSubpage) > 0 {
 				resSub, err := http.Get(currentEvent.URL)
 				if err != nil {
+					log.Printf("%s ERROR: %v. Skipping event %s.", c.Name, err, currentEvent.Title)
 					return
 				}
 
 				if resSub.StatusCode != 200 {
-					log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
+					log.Printf("%s ERROR: status code error: %d %s. Skipping event %s.", c.Name, res.StatusCode, res.Status, currentEvent.Title)
+					return
 				}
 
 				docSub, err := goquery.NewDocumentFromReader(resSub.Body)
 				if err != nil {
-					log.Fatalf("error while reading document: %v", err)
+					log.Printf("%s ERROR: error while reading document: %v. Skipping event %s", c.Name, err, currentEvent.Title)
+					return
 				}
 				for _, item := range c.Fields.URL.OnSubpage {
 					err := extractField(item, docSub.Selection, &c, &currentEvent, events, loc, mLocale, resSub)
 					if err != nil {
-						// if there is an error skip this event and log error instead of completely canceling the crawl.
-						log.Printf("error while parsing field %s: %v. Skipping event %s.", item, err, currentEvent.Title)
+						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %s.", c.Name, item, err, currentEvent.Title)
 						return
 					}
 				}
 				resSub.Body.Close()
 			}
 
-			// check if events should be ignored
+			// check if event should be ignored
 			ie, err := c.ignoreEvent(&currentEvent)
 			if err != nil {
-				log.Fatalf("error while removing events: %v", err)
+				log.Fatalf("%s ERROR: error while applying ignore filter: %v. Not ignoring event %s.", c.Name, err, currentEvent.Title)
 			}
 			if !ie {
 				events = append(events, currentEvent)
@@ -166,7 +168,6 @@ func (c Crawler) getEvents() ([]Event, error) {
 			currentPage += 1
 			if currentPage < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
 				attr := "href"
-				//nextUrl, exists := doc.Find(c.Paginator.Loc).Attr(attr)
 				if len(doc.Find(c.Paginator.Loc).Nodes) > c.Paginator.NodeIndex {
 					pagNode := doc.Find(c.Paginator.Loc).Get(c.Paginator.NodeIndex)
 					for _, a := range pagNode.Attr {
@@ -185,7 +186,6 @@ func (c Crawler) getEvents() ([]Event, error) {
 								pageUrl = nextUrl
 							}
 							hasNextPage = true
-							// log.Printf("next page: %s\n", pageUrl)
 						}
 					}
 				}
@@ -394,11 +394,12 @@ func writeEventsToAPI(wg *sync.WaitGroup, c Crawler) {
 	events, err := c.getEvents()
 
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("%s ERROR: %s", c.Name, err)
+		return
 	}
 
 	if len(events) == 0 {
-		log.Printf("Location %s has no events. Skipping.", c.Name)
+		log.Printf("location %s has no events. Skipping.", c.Name)
 		return
 	}
 	log.Printf("fetched %d %s events\n", len(events), c.Name)
@@ -436,18 +437,19 @@ func writeEventsToAPI(wg *sync.WaitGroup, c Crawler) {
 			log.Fatal(err)
 		}
 		if resp.StatusCode != 201 {
-			log.Fatalf("Something went wrong while adding a new event. Status Code: %d", resp.StatusCode)
+			log.Fatalf("something went wrong while adding a new event. Status Code: %d", resp.StatusCode)
 
 		}
 	}
-	log.Printf("Done crawling and writing %s data to API.\n", c.Name)
+	log.Printf("done crawling and writing %s data to API.\n", c.Name)
 }
 
 func prettyPrintEvents(wg *sync.WaitGroup, c Crawler) {
 	defer wg.Done()
 	events, err := c.getEvents()
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("%s ERROR: %s", c.Name, err)
+		return
 	}
 
 	for _, event := range events {

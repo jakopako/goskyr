@@ -69,6 +69,9 @@ crawlers:
           # Sometimes multiple nodes match the given selector. Then an index can be given to chose the right one.
           # -1 means the last node. The default is 0
           node_index: -1
+          # we only need this if multiple (text) children match the regex or if no regex is given and we need a specific child.
+          # Checkout the Papiersaal crawler config for a real life example. Currently, all keys under 'date' can define this field.
+          child_index: 3
         location: "Europe/Berlin" # The time zone of this event location
         language: "de_DE" # the language that the date & time string(s) are written in.
     filters: # A list of filters to remove certain items from the event list.

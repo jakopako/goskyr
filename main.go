@@ -120,7 +120,7 @@ func (c Crawler) getEvents() ([]Event, error) {
 				if !fOnSubpage {
 					err := extractField(f, s, &c, &currentEvent, events, loc, mLocale, res)
 					if err != nil {
-						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event.", c.Name, f, err)
+						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %s.", c.Name, f, err, currentEvent.Title)
 						return
 					}
 				}
@@ -225,17 +225,19 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 
 		if crawler.Fields.Date.Year.Loc != "" {
 			yearStringTmp, yearLayoutTmp := getDateStringAndLayout(&crawler.Fields.Date.Year, s)
+			// if the found year string is empty we take the default. This might be incorrect but is preferrable to skipping the event entirely.
 			if yearStringTmp != "" {
 				yearString, yearLayout = yearStringTmp, yearLayoutTmp
 			}
 		}
 
-		var timeString, timeStringLayout string
-		if crawler.Fields.Date.Time.Loc == "" {
-			timeString = "20:00"
-			timeStringLayout = "15:04"
-		} else {
-			timeString, timeStringLayout = getDateStringAndLayout(&crawler.Fields.Date.Time, s)
+		timeString, timeLayout := "20:00", "15:04"
+		if crawler.Fields.Date.Time.Loc != "" {
+			timeStringTmp, timeLayoutTmp := getDateStringAndLayout(&crawler.Fields.Date.Time, s)
+			// if the found time string is empty we take the default. This might be incorrect but is preferrable to skipping the event entirely.
+			if timeStringTmp != "" {
+				timeString, timeLayout = timeStringTmp, timeLayoutTmp
+			}
 		}
 
 		var dateTimeString, dateTimeLayout string
@@ -244,7 +246,7 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 		} else if crawler.Fields.Date.DayMonthYear.Loc != "" {
 			dayMonthYearString, dayMonthYearLayout := getDateStringAndLayout(&crawler.Fields.Date.DayMonthYear, s)
 			dateTimeString = fmt.Sprintf("%s %s", dayMonthYearString, timeString)
-			dateTimeLayout = fmt.Sprintf("%s %s", dayMonthYearLayout, timeStringLayout)
+			dateTimeLayout = fmt.Sprintf("%s %s", dayMonthYearLayout, timeLayout)
 		} else {
 			var dayMonthString, dayMonthLayout string
 			if crawler.Fields.Date.DayMonth.Loc != "" {
@@ -256,7 +258,7 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 				dayMonthLayout = dayLayout + " " + monthLayout
 			}
 
-			dateTimeLayout = fmt.Sprintf("%s %s %s", dayMonthLayout, yearLayout, timeStringLayout)
+			dateTimeLayout = fmt.Sprintf("%s %s %s", dayMonthLayout, yearLayout, timeLayout)
 			dateTimeString = fmt.Sprintf("%s %s %s", dayMonthString, yearString, timeString)
 			dateTimeString = strings.Replace(dateTimeString, "Mrz", "Mär", 1) // hack for issue #47
 		}
@@ -271,9 +273,11 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 		// if the date t does not come after the previous event's date we increase the year by 1
 		// actually this is only necessary if we have to guess the date but currently for ease of implementation
 		// this check is done always.
+
+		// We relax this condition slightly as it happens that within a day the events might not be sorted chronologically.
 		if len(events) > 0 {
 			correctYear := currentYear
-			for events[len(events)-1].Date.After(t) {
+			for events[len(events)-1].Date.Round(24 * time.Hour).After(t.Round(24 * time.Hour)) {
 				correctYear += 1
 				t = time.Date(int(correctYear), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
 			}

@@ -318,21 +318,26 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 func getDateStringAndLayout(dl *DateField, s *goquery.Selection) (string, string) {
 	var fieldString, fieldLayout string
 	fieldStringSelection := s.Find(dl.Loc)
-	// TODO: Add possibility to apply a regex across s.Find(dl.Loc).Text()
-	// A bit hacky..
 	if len(fieldStringSelection.Nodes) > 0 {
 		if dl.Attr == "" {
+			currentChildIndex := 0
 			fieldStringNode := fieldStringSelection.Get(dl.NodeIndex).FirstChild
 			for fieldStringNode != nil {
-				if fieldStringNode.Type == html.TextNode {
-					// we 'abuse' the extractStringRegex func to find the correct text element.
-					var err error
-					fieldString, err = extractStringRegex(&dl.RegexExtract, fieldStringNode.Data)
-					if err == nil {
-						break
+				// If the cild index is 0 (default value if not explicitly defined) we loop over all the children.
+				// This makes it easier if there are many children and only one matches the regex. If only one
+				// matches the regex then the child index can even differ inbetween various events.
+				// Plus we do not need to change existing crawler configs.
+				if currentChildIndex == dl.ChildIndex || dl.ChildIndex == 0 {
+					if fieldStringNode.Type == html.TextNode {
+						var err error
+						fieldString, err = extractStringRegex(&dl.RegexExtract, fieldStringNode.Data)
+						if err == nil {
+							break
+						}
 					}
 				}
 				fieldStringNode = fieldStringNode.NextSibling
+				currentChildIndex += 1
 			}
 		} else {
 			fieldString = fieldStringSelection.AttrOr(dl.Attr, "")
@@ -475,6 +480,7 @@ type DateField struct {
 	Loc          string      `yaml:"loc"`
 	Layout       string      `yaml:"layout"`
 	NodeIndex    int         `yaml:"node_index"`
+	ChildIndex   int         `yaml:"child_index"`
 	RegexExtract RegexConfig `yaml:"regex_extract"`
 	Attr         string      `yaml:"attr"`
 }

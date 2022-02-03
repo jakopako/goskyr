@@ -287,6 +287,34 @@ crawlers:
         location: "Europe/Berlin"
 
   ##########
+  # Paris
+  ##########
+  - name: LaCigale
+    type: concert
+    url: "http://www.lacigale.fr/en/"
+    city: "Paris"
+    event: ".spectacle-infos"
+    fields:
+      title:
+        loc: ".title .text-white"
+      url:
+        loc: ".mobile a"
+        on_subpage: ["comment", "date"]
+      comment:
+        loc: ".c-m-7 .infos-wrapper .text-grey"
+      date:
+        day_month_year:
+          loc: ".c-m-7 .date-wrapper .text-grey"
+          layout: "02 January 2006"
+        time:
+          loc: ".c-m-6 .hour"
+          layout: "15 H 04"
+          regex_extract:
+            exp: "[0-9]{2}\\sH\\s[0-9]{2}"
+        location: "Europe/Paris"
+        language: en_US
+
+  ##########
   # Zurich
   ##########
   - name: Helsinki

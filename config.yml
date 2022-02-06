@@ -645,3 +645,29 @@ crawlers:
         regex_ignore: ".*Verschoben.*"
       - field: "title"
         regex_ignore: ".*VERSCHOBEN.*"
+
+  - name: X-TRA
+    type: concert
+    city: Zurich
+    url: "https://www.x-tra.ch/en/agenda/concerts/"
+    event: ".events .tile li"
+    fields:
+      title:
+        loc: ".text h2"
+      url:
+        loc: "a"
+        relative: true
+        on_subpage: ["date", "comment"]
+      comment:
+        loc: ".left .content p"
+        max_length: 200
+      date:
+        day_month_year:
+          loc: ".caption .text h3"
+          layout: "Mon 02.01.06"
+        time:
+          loc: ".time li strong"
+          node_index: 1
+          layout: "3.04 p.m. "
+        location: "Europe/Berlin"
+        language: "en_US"

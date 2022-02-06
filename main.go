@@ -343,7 +343,10 @@ func getDateStringAndLayout(dl *DateField, s *goquery.Selection) (string, string
 			fieldString = fieldStringSelection.AttrOr(dl.Attr, "")
 		}
 	}
-	fieldLayout = dl.Layout
+	// 'p.m.' is not treated as part of the time string by the date parsing library
+	// so we have to replace it with 'pm'
+	fieldLayout = strings.Replace(dl.Layout, "p.m.", "pm", 1)
+	fieldString = strings.Replace(fieldString, "p.m.", "pm", 1)
 	return fieldString, fieldLayout
 }
 

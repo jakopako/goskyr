@@ -11,21 +11,21 @@ crawlers:
     event: ".qt-item-event"
     fields:
       title:
-        loc: ".qt-text-shadow"
+        selector: ".qt-text-shadow"
       comment:
-        loc: ".qt-the-content div"
+        selector: ".qt-the-content div"
       url:
-        loc: ".qt-text-shadow"
+        selector: ".qt-text-shadow"
         on_subpage: ["comment", "date"]
       date:
         day_month_year:
-          loc: ".qt-eventtable tr td"
+          selector: ".qt-eventtable tr td"
           # layout: " Data: 2 Febbraio 2022"
           layout: " Data: 2 January 2006"
           regex_extract:
             exp: "\\sData:.*"
         time:
-          loc: ".qt-eventtable tr td"
+          selector: ".qt-eventtable tr td"
           node_index: 2
           # layout: " Inizio concerto: 9:30 pm"
           layout: " Inizio concerto: 3:04 pm"
@@ -41,7 +41,7 @@ crawlers:
       - field: "title"
         regex_ignore: ".*Postponed.*"
     paginator:
-      loc: ".pagination .qt-btn-primary"
+      selector: ".pagination .qt-btn-primary"
       node_index: -1
       max_pages: 4
 
@@ -55,31 +55,31 @@ crawlers:
     event: ".views-content .event-type-concert"
     fields:
       title:
-        loc: ".node-type-event__title h2 a span"
+        selector: ".node-type-event__title h2 a span"
       comment:
-        loc: ".location-list li"
+        selector: ".location-list li"
       url:
-        loc: ".node-type-event__title h2 a"
+        selector: ".node-type-event__title h2 a"
         relative: true
       date:
         day:
-          loc: ".node-date__day"
+          selector: ".node-date__day"
           layout: "02"
         month:
-          loc: ".node-date__month"
+          selector: ".node-date__month"
           layout: "Jan"
         year:
-          loc: ".node-date__year"
+          selector: ".node-date__year"
           layout: "2006"
         time:
-          loc: ".node-type-event__timing"
+          selector: ".node-type-event__timing"
           layout: "15:04"
           regex_extract:
             exp: "[0-9]{2}:[0-9]{2}"
         location: "Europe/Berlin"
         language: "en_US"
     paginator:
-      loc: ".pager__item a"
+      selector: ".pager__item a"
       relative: true
     filters:
       - field: "title"
@@ -97,21 +97,21 @@ crawlers:
     event: ".calendar-item"
     fields:
       title:
-        loc: ".calendar-item__title"
+        selector: ".calendar-item__title"
       comment:
-        loc: ".calendar-item__intro p"
+        selector: ".calendar-item__intro p"
       url:
-        loc: ".calendar-item__inner a"
+        selector: ".calendar-item__inner a"
         relative: true
         on_subpage: ["date"]
       date:
         day_month_year_time:
-          loc: ".concert__date time"
+          selector: ".concert__date time"
           layout: "Monday 2 Jan 2006 - 15:04"
         location: "Europe/Berlin"
         language: "nl_BE"
     paginator:
-      loc: ".pager__item--next a"
+      selector: ".pager__item--next a"
       relative: true
 
   ##########
@@ -124,22 +124,22 @@ crawlers:
     event: ".b-events__el"
     fields:
       title: 
-        loc: ".b-events__el-title"
+        selector: ".b-events__el-title"
       comment:
-        loc: ".b-events__el-text"
+        selector: ".b-events__el-text"
         max_length: 200
       url:
-        loc: ".o-btn-hex__link"
+        selector: ".o-btn-hex__link"
         relative: true
       date:
         day_month_year:
-          loc: ".b-events__el-date"
+          selector: ".b-events__el-date"
           layout: "Mon•2•1•2006"
           regex_extract: # In case the node contains more than just the desired string the substring can be determined with a regex
             exp: "[A-Za-z]{2}•[0-9]{1,2}•[0-9]{1,2}•[0-9]{4}"
             index: 0
         time:
-          loc: ".b-events__el-date"
+          selector: ".b-events__el-date"
           layout: "15••04"
           regex_extract:
             exp: "[0-9]{2}••[0-9]{2}"
@@ -156,17 +156,17 @@ crawlers:
       - ".old" # events that have a node with this class will be excluded from the results.
     fields:
       url:
-        loc: ""
+        selector: ""
         on_subpage: ["date"]
       title:
-        loc: ".io-title"
+        selector: ".io-title"
       date:
         day_month_year:
-          loc: ".event .event-info .io-big"
+          selector: ".event .event-info .io-big"
           layout: "Mon. 2.1.06"
           node_index: 0
         time:
-          loc: ".event .event-info .io-big"
+          selector: ".event .event-info .io-big"
           node_index: 3 # We need this in case there are multiple nodes that would be selected with the given loc
           layout: "Beginn: 15.04"
         location: "Europe/Berlin"
@@ -179,18 +179,18 @@ crawlers:
     event: ".preview-box-outline"
     fields:
       url:
-        loc: ".post-title a"
+        selector: ".post-title a"
       title:
-        loc: ".post-title a"
+        selector: ".post-title a"
       date:
         day:
-          loc: ".post-date-day"
+          selector: ".post-date-day"
           layout: "02"
         month:
-          loc: ".post-date-month"
+          selector: ".post-date-month"
           layout: "Jan"
         year:
-          loc: ".post-date-year"
+          selector: ".post-date-year"
           layout: "2006"
         location: "Europe/Berlin"
         language: "de_DE"
@@ -202,19 +202,19 @@ crawlers:
     event: ".event"
     fields:
       title:
-        loc: ".pos-title a"
+        selector: ".pos-title a"
       comment:
-        loc: ".event h3"
+        selector: ".event h3"
       url:
-        loc: ".pos-title a"
+        selector: ".pos-title a"
         relative: true
         on_subpage: ["comment", "date"]
       date:
         day_month_year:
-          loc: ".pos-datum b"
+          selector: ".pos-datum b"
           layout: "Monday, 2. January 2006"
         time:
-          loc: ".pos-einlass"
+          selector: ".pos-einlass"
           layout: "Beginn: 15:04"
           regex_extract:
             exp: "Beginn: [0-9]{1,2}:[0-9]{2}"
@@ -225,7 +225,7 @@ crawlers:
       - field: "title"
         regex_ignore: "CORONA TESTZENTRUM.*"
     paginator:
-      loc: ".pagination .next"
+      selector: ".pagination .next"
       relative: true
       max_pages: 2 # otherwise this crawler takes ages.
 
@@ -239,18 +239,18 @@ crawlers:
       - ".coming-soon"
     fields:
       title:
-        loc: ".event-title a"
+        selector: ".event-title a"
       url:
-        loc: ".event-title a"
+        selector: ".event-title a"
         on_subpage: ["date"]
       date:
         day_month_year:
-          loc: ".gdlr-info-date"
+          selector: ".gdlr-info-date"
           layout: "02.01.2006"
           regex_extract:
             exp: "([0-9]{2}\\.){2}[0-9]{4}"
         time:
-          loc: ".gdlr-info-time"
+          selector: ".gdlr-info-time"
           layout: "15.04"
           regex_extract:
             exp: "[0-9]{2}(\\.|:)[0-9]{2}"
@@ -264,23 +264,23 @@ crawlers:
     event: ".row .event"
     fields:
       title:
-        loc: ".hover-in .center span"
+        selector: ".hover-in .center span"
       url:
-        loc: ".hover-in .right a"
+        selector: ".hover-in .right a"
         relative: true
       date:
         day_month:
-          loc: ".hover-in .center"
+          selector: ".hover-in .center"
           layout: "02.01. "
           regex_extract:
             exp: "([0-9]{2}\\.){2}\\s"
         year:
-          loc: ".date"
+          selector: ".date"
           layout: "06	" # the whitespace in this string is a tab.
           regex_extract:
             exp: "[0-9]{2}\\s"
         time:
-          loc: ".hover-in .center"
+          selector: ".hover-in .center"
           layout: "15:04"
           regex_extract:
             exp: "[0-9]{2}:[0-9]{2}"
@@ -296,18 +296,18 @@ crawlers:
     event: ".spectacle-infos"
     fields:
       title:
-        loc: ".title .text-white"
+        selector: ".title .text-white"
       url:
-        loc: ".mobile a"
+        selector: ".mobile a"
         on_subpage: ["comment", "date"]
       comment:
-        loc: ".c-m-7 .infos-wrapper .text-grey"
+        selector: ".c-m-7 .infos-wrapper .text-grey"
       date:
         day_month_year:
-          loc: ".c-m-7 .date-wrapper .text-grey"
+          selector: ".c-m-7 .date-wrapper .text-grey"
           layout: "02 January 2006"
         time:
-          loc: ".c-m-6 .hour"
+          selector: ".c-m-6 .hour"
           layout: "15 H 04"
           regex_extract:
             exp: "[0-9]{2}\\sH\\s[0-9]{2}"
@@ -324,19 +324,19 @@ crawlers:
     event: ".event .header"
     fields:
       title: 
-        loc: ".agenda > .top,.support"
+        selector: ".agenda > .top,.support"
           # - ".agenda .top"
           # - ".agenda .support"
       comment: 
-        loc: ".agenda > .top .addition,.support .addition"
+        selector: ".agenda > .top .addition,.support .addition"
           # - ".agenda .top .addition"
           # - ".agenda .support .addition"
       date:
         day:
-          loc: ".day"
+          selector: ".day"
           layout: "2"
         month:
-          loc: ".month"
+          selector: ".month"
           layout: "January" # has to be in English
         location: "Europe/Berlin"
         language: "de_DE"
@@ -348,17 +348,17 @@ crawlers:
     event: ".post-holder"
     fields:
       title:
-        loc: ".block_under_title a"
+        selector: ".block_under_title a"
       comment:
-        loc: ".event-excerpt-fluid"
+        selector: ".event-excerpt-fluid"
       url:
-        loc: ".block_under_title a"
+        selector: ".block_under_title a"
       date:
         day_month:
-          loc: ".event-date"
+          selector: ".event-date"
           layout: "Mon 2.Jan."
         time:
-          loc: ".event-time"
+          selector: ".event-time"
           layout: "15:04"
         location: "Europe/Berlin"
         language: "de_DE"
@@ -370,15 +370,15 @@ crawlers:
     event: ".w-dyn-item"
     fields:
       title:
-        loc: ".text-block-21"
+        selector: ".text-block-21"
       comment:
-        loc: ".text-block-28"
+        selector: ".text-block-28"
       url:
-        loc: ".w-inline-block"
+        selector: ".w-inline-block"
         relative: true
       date:
         day_month_year_time:
-          loc: ".text-block-26"
+          selector: ".text-block-26"
           layout: "2.1.2006 15:04"
         location: "Europe/Berlin"
 
@@ -389,17 +389,17 @@ crawlers:
     event: ".event-list__item"
     fields:
       title:
-        loc: ".event-preview__title"
+        selector: ".event-preview__title"
       comment:
-        loc: ".event-detail__content div p"
+        selector: ".event-detail__content div p"
         max_length: 200
       url:
-        loc: "" # An empty string means that we look in the event node itself for an href
+        selector: "" # An empty string means that we look in the event node itself for an href
         relative: true
         on_subpage: ["comment"]
       date:
         day_month_year_time:
-          loc: ".event-preview__date-long"
+          selector: ".event-preview__date-long"
           layout: "January 02, 2006, 03:04 PM"
         location: "GMT"
         language: "en_US"
@@ -411,23 +411,23 @@ crawlers:
     event: ".event"
     fields:
       url:
-        loc: "a"
+        selector: "a"
         relative: true
         on_subpage: ["comment", "date"]
       title:
-        loc: "h2"
+        selector: "h2"
       comment:
-        loc: ".left .content"
+        selector: ".left .content"
         max_length: 200
       date:
         day:
-          loc: ".date .day"
+          selector: ".date .day"
           layout: "2"
         month:
-          loc: ".date .month_name"
+          selector: ".date .month_name"
           layout: "Jan"
         time:
-          loc: ".right .time"
+          selector: ".right .time"
           layout: "Start: 15:04"
           node_index: -1 # -1 means the last node
         location: "Europe/Berlin"
@@ -440,22 +440,22 @@ crawlers:
     event: "#maincontent > .commingupEventsList_0,.commingupEventsList_1"
     fields:
       title:
-        loc: ".commingupEventsList_block5 a"
+        selector: ".commingupEventsList_block5 a"
       comment:
-        loc: ".concertStyleNew .concertDetails"
+        selector: ".concertStyleNew .concertDetails"
       url:
-        loc: ".commingupEventsList_block5 a"
+        selector: ".commingupEventsList_block5 a"
         relative: true
         on_subpage: ["comment"]
       date:
         day:
-          loc: ".commingupEventsList_block2"
+          selector: ".commingupEventsList_block2"
           layout: "02. "
         month:
-          loc: ".commingupEventsList_block3"
+          selector: ".commingupEventsList_block3"
           layout: "January"
         time:
-          loc: ".commingupEventsList_block4"
+          selector: ".commingupEventsList_block4"
           layout: "15Uhr04"
         location: "Europe/Berlin"
         language: "de_DE"
@@ -467,21 +467,21 @@ crawlers:
     event: ".nu-e-concert"
     fields:
       title: 
-        loc: ".screen-only h2"
+        selector: ".screen-only h2"
       comment:
-        loc: ".nu-e-subt"
+        selector: ".nu-e-subt"
       url:
-        loc: ".nu-e-link-share"
+        selector: ".nu-e-link-share"
         attr: "data-a2a-url"
       date:
         day_month_year:
-          loc: ".screen-only .nu-e-date"
+          selector: ".screen-only .nu-e-date"
           layout: "2.1.06"
           regex_extract:
             exp: "([0-9]{1,2}\\.){2}[0-9]{2}"
             index: 0
         time:
-          loc: ".nu-e-time-age"
+          selector: ".nu-e-time-age"
           layout: "15.04"
           regex_extract:
             exp: "[0-9]{2}\\.[0-9]{2}"
@@ -495,24 +495,24 @@ crawlers:
     event: ".event"
     fields:
       title:
-        loc: "h3"
+        selector: "h3"
         regex_extract:
           exp: "[^•]*"
           index: 0
       comment:
-        loc: ".subtitle strong"
+        selector: ".subtitle strong"
       url:
-        loc: ".event-link"
+        selector: ".event-link"
         on_subpage: ["date"]
       date:
         day_month_year:
-          loc: ".event-meta time"
+          selector: ".event-meta time"
           layout: "Monday, 02.01.2006"
           regex_extract:
             exp: "[a-zA-Z]+,\\s([0-9]{2}\\.){2}[0-9]{4}"
             index: 0
         time:
-          loc: ".event-meta .quick-facts li"
+          selector: ".event-meta .quick-facts li"
           layout: "15:04"
           node_index: 2 # if there are still multiple text nodes under this node the first one that results in a regex match, will be used
           regex_extract:
@@ -528,28 +528,28 @@ crawlers:
     event: ".js-calendarlist-list .data"
     fields:
       title:
-        loc: ".event h3"
+        selector: ".event h3"
       comment:
-        loc: ".member .member-name"
+        selector: ".member .member-name"
         node_index: 1
       url:
-        loc: ".desktop-linkoverlay"
+        selector: ".desktop-linkoverlay"
         relative: true
       date:
         day_month:
-          loc: ".col-left .date"
+          selector: ".col-left .date"
           layout: "2. Jan"
           regex_extract:
             exp: "[0-9]{1,2}\\.\\s[a-zA-Z]{3}"
         time:
-          loc: ".col-left .hour"
+          selector: ".col-left .hour"
           layout: "15.04"
           regex_extract:
             exp: "[0-9]{1,2}\\.[0-9]{2}"
         location: "Europe/Berlin"
         language: "de_DE"
     paginator:
-      loc: ".MarkupPagerNavNext a"
+      selector: ".MarkupPagerNavNext a"
       relative: true
 
   - name: Heldenbar
@@ -559,20 +559,20 @@ crawlers:
     event: ".page-content .vsel-upcoming"
     fields:
       title:
-        loc: ".vsel-meta-title a"
+        selector: ".vsel-meta-title a"
       comment:
-        loc: ".vsel-info p"
+        selector: ".vsel-info p"
       url:
-        loc: ".vsel-meta-title a"
+        selector: ".vsel-meta-title a"
         on_subpage: ["date"]
       date:
         day_month_year:
-          loc: ".vsel-meta-date span"
+          selector: ".vsel-meta-date span"
           layout: "2/01/2006"
           regex_extract:
             exp: "([0-9]{2}/){2}[0-9]{4}"
         time:
-          loc: ".vsel-meta-time span"
+          selector: ".vsel-meta-time span"
           layout: "15:04"
           regex_extract:
             exp: "[0-9]{1,2}:[0-9]{2}"
@@ -588,13 +588,13 @@ crawlers:
       - ".wct_event"
     fields:
       title:
-        loc: ".grid-event-title"
+        selector: ".grid-event-title"
       comment:
-        loc: ".hyphenate p"
+        selector: ".hyphenate p"
         max_length: 200
       date:
         day_month_year_time:
-          loc: ".grid-event-date"
+          selector: ".grid-event-date"
           layout: "2006-01-02T15:04"
           attr: "datetime"
         location: "Europe/Berlin"
@@ -612,23 +612,23 @@ crawlers:
     event: ".single-act"
     fields:
       title:
-        loc: ".col-sm-8 h2 a strong"
+        selector: ".col-sm-8 h2 a strong"
       url:
-        loc: ".col-sm-8 h2 a"
+        selector: ".col-sm-8 h2 a"
         relative: true
         on_subpage: ["comment"]
       comment:
-        loc: ".col-lg-12 p"
+        selector: ".col-lg-12 p"
         node_index: 2
         max_length: 200
       date:
         day_month_year:
-          loc: ".col-sm-8 h3"
+          selector: ".col-sm-8 h3"
           layout: "Monday, 2. Jan 2006"
           regex_extract:
             exp: "[A-Za-z]+,\\s[0-9]{1,2}\\.\\s[\u00e4A-Za-z]{3,4}\\s[0-9]{4}"
         time:
-          loc: ".col-sm-8 i"
+          selector: ".col-sm-8 i"
           layout: "15h04"
           child_index: 3 # we only need this because multiple children match the regex.
           regex_extract:
@@ -636,7 +636,7 @@ crawlers:
         location: "Europe/Berlin"
         language: "de_DE"
     paginator:
-      loc: ".pull-right"
+      selector: ".pull-right"
       relative: true
     filters:
       - field: "title"
@@ -653,20 +653,20 @@ crawlers:
     event: ".events .tile li"
     fields:
       title:
-        loc: ".text h2"
+        selector: ".text h2"
       url:
-        loc: "a"
+        selector: "a"
         relative: true
         on_subpage: ["date", "comment"]
       comment:
-        loc: ".left .content p"
+        selector: ".left .content p"
         max_length: 200
       date:
         day_month_year:
-          loc: ".caption .text h3"
+          selector: ".caption .text h3"
           layout: "Mon 02.01.06"
         time:
-          loc: ".time li strong"
+          selector: ".time li strong"
           node_index: 1
           layout: "3.04 p.m. "
         location: "Europe/Berlin"

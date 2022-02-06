@@ -164,12 +164,12 @@ func (c Crawler) getEvents() ([]Event, error) {
 		})
 
 		hasNextPage = false
-		if c.Paginator.Loc != "" {
+		if c.Paginator.Selector != "" {
 			currentPage += 1
 			if currentPage < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
 				attr := "href"
-				if len(doc.Find(c.Paginator.Loc).Nodes) > c.Paginator.NodeIndex {
-					pagNode := doc.Find(c.Paginator.Loc).Get(c.Paginator.NodeIndex)
+				if len(doc.Find(c.Paginator.Selector).Nodes) > c.Paginator.NodeIndex {
+					pagNode := doc.Find(c.Paginator.Selector).Get(c.Paginator.NodeIndex)
 					for _, a := range pagNode.Attr {
 						if a.Key == attr {
 							nextUrl := a.Val
@@ -223,7 +223,7 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 		yearString := strconv.Itoa(currentYear)
 		yearLayout := "2006"
 
-		if crawler.Fields.Date.Year.Loc != "" {
+		if crawler.Fields.Date.Year.Selector != "" {
 			yearStringTmp, yearLayoutTmp := getDateStringAndLayout(&crawler.Fields.Date.Year, s)
 			// if the found year string is empty we take the default. This might be incorrect but is preferrable to skipping the event entirely.
 			if yearStringTmp != "" {
@@ -232,7 +232,7 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 		}
 
 		timeString, timeLayout := "20:00", "15:04"
-		if crawler.Fields.Date.Time.Loc != "" {
+		if crawler.Fields.Date.Time.Selector != "" {
 			timeStringTmp, timeLayoutTmp := getDateStringAndLayout(&crawler.Fields.Date.Time, s)
 			// if the found time string is empty we take the default. This might be incorrect but is preferrable to skipping the event entirely.
 			if timeStringTmp != "" {
@@ -241,17 +241,17 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 		}
 
 		var dateTimeString, dateTimeLayout string
-		if crawler.Fields.Date.DayMonthYearTime.Loc != "" {
+		if crawler.Fields.Date.DayMonthYearTime.Selector != "" {
 			dateTimeString, dateTimeLayout = getDateStringAndLayout(&crawler.Fields.Date.DayMonthYearTime, s)
-		} else if crawler.Fields.Date.DayMonthYear.Loc != "" {
+		} else if crawler.Fields.Date.DayMonthYear.Selector != "" {
 			dayMonthYearString, dayMonthYearLayout := getDateStringAndLayout(&crawler.Fields.Date.DayMonthYear, s)
 			dateTimeString = fmt.Sprintf("%s %s", dayMonthYearString, timeString)
 			dateTimeLayout = fmt.Sprintf("%s %s", dayMonthYearLayout, timeLayout)
 		} else {
 			var dayMonthString, dayMonthLayout string
-			if crawler.Fields.Date.DayMonth.Loc != "" {
+			if crawler.Fields.Date.DayMonth.Selector != "" {
 				dayMonthString, dayMonthLayout = getDateStringAndLayout(&crawler.Fields.Date.DayMonth, s)
-			} else if crawler.Fields.Date.Day.Loc != "" && crawler.Fields.Date.Month.Loc != "" {
+			} else if crawler.Fields.Date.Day.Selector != "" && crawler.Fields.Date.Month.Selector != "" {
 				dayString, dayLayout := getDateStringAndLayout(&crawler.Fields.Date.Day, s)
 				monthString, monthLayout := getDateStringAndLayout(&crawler.Fields.Date.Month, s)
 				dayMonthString = dayString + " " + monthString
@@ -297,10 +297,10 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 		if crawler.Fields.URL.Attr != "" {
 			attr = crawler.Fields.URL.Attr
 		}
-		if crawler.Fields.URL.Loc == "" {
+		if crawler.Fields.URL.Selector == "" {
 			url = s.AttrOr(attr, crawler.URL)
 		} else {
-			url = s.Find(crawler.Fields.URL.Loc).AttrOr(attr, crawler.URL)
+			url = s.Find(crawler.Fields.URL.Selector).AttrOr(attr, crawler.URL)
 		}
 
 		if crawler.Fields.URL.Relative {
@@ -317,7 +317,7 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 
 func getDateStringAndLayout(dl *DateField, s *goquery.Selection) (string, string) {
 	var fieldString, fieldLayout string
-	fieldStringSelection := s.Find(dl.Loc)
+	fieldStringSelection := s.Find(dl.Selector)
 	if len(fieldStringSelection.Nodes) > 0 {
 		if dl.Attr == "" {
 			currentChildIndex := 0
@@ -352,7 +352,7 @@ func getDateStringAndLayout(dl *DateField, s *goquery.Selection) (string, string
 
 func getFieldString(f *Field, s *goquery.Selection) string {
 	var fieldString string
-	fieldSelection := s.Find(f.Loc)
+	fieldSelection := s.Find(f.Selector)
 	if len(fieldSelection.Nodes) > f.NodeIndex {
 		fieldNode := fieldSelection.Get(f.NodeIndex).FirstChild
 		if fieldNode != nil {
@@ -480,7 +480,7 @@ type RegexConfig struct {
 }
 
 type DateField struct {
-	Loc          string      `yaml:"loc"`
+	Selector     string      `yaml:"selector"`
 	Layout       string      `yaml:"layout"`
 	NodeIndex    int         `yaml:"node_index"`
 	ChildIndex   int         `yaml:"child_index"`
@@ -489,8 +489,9 @@ type DateField struct {
 }
 
 type Field struct {
-	Loc          string      `yaml:"loc"`
-	NodeIndex    int         `yaml:"node_index"`
+	Selector  string `yaml:"selector"`
+	NodeIndex int    `yaml:"node_index"`
+	// TODO: for consistency have a ChildIndex here as well, see DateField
 	MaxLength    int         `yaml:"max_length"`
 	RegexExtract RegexConfig `yaml:"regex_extract"`
 	RegexIgnore  string      `yaml:"regex_ignore"`
@@ -512,7 +513,7 @@ type Crawler struct {
 		Title   Field `yaml:"title"`
 		Comment Field `yaml:"comment"`
 		URL     struct {
-			Loc       string   `yaml:"loc"`
+			Selector  string   `yaml:"selector"`
 			Relative  bool     `yaml:"relative"`
 			OnSubpage []string `yaml:"on_subpage"`
 			Attr      string   `yaml:"attr"`
@@ -531,7 +532,7 @@ type Crawler struct {
 	} `yaml:"fields"`
 	Filters   []Filter `yaml:"filters"`
 	Paginator struct {
-		Loc       string `yaml:"loc"`
+		Selector  string `yaml:"selector"`
 		Relative  bool   `yaml:"relative"`
 		MaxPages  int    `yaml:"max_pages"`
 		NodeIndex int    `yaml:"node_index"`

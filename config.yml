@@ -671,3 +671,28 @@ crawlers:
           layout: "3.04 p.m. "
         location: "Europe/Berlin"
         language: "en_US"
+
+  - name: Walcheturm
+    type: concert
+    city: Zurich
+    url: "https://walcheturm.ch/agenda/"
+    event: "#projectlist a"
+    fields:
+      title:
+        selector: ".content h1"
+      url:
+        selector: ""
+        relative: true
+      date:
+        day_month_year:
+          selector: ".content p"
+          regex_extract:
+            exp: "([0-9]{2}\\.){2}[0-9]{4}"
+            index: 0
+          layout: "02.01.2006"
+        time:
+          selector: ".content p"
+          regex_extract:
+            exp: "[0-9]{2}:[0-9]{2}"
+            index: 0
+          layout: "15:04"

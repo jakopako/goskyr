@@ -1,13 +1,10 @@
-module github.com/jakopako/croncert
+module github.com/jakopako/event-crawler
 
 go 1.16
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/goodsign/monday v1.0.0
-	github.com/kr/text v0.2.0 // indirect
-	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
-	golang.org/x/net v0.0.0-20210916014120-12bc252f5db8
-	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
+	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
 	gopkg.in/yaml.v2 v2.4.0
 )

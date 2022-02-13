@@ -38,20 +38,100 @@ func (et EventType) IsValid() error {
 	return errors.New(errorString)
 }
 
-// TODO: it's ugly to copy paste this from the croncert-api project.
-type Event struct {
-	Title    string    `bson:"title,omitempty" json:"title,omitempty" validate:"required" example:"ExcitingTitle"`
-	Location string    `bson:"location,omitempty" json:"location,omitempty" validate:"required" example:"SuperLocation"`
-	City     string    `bson:"city,omitempty" json:"city,omitempty" validate:"required" example:"SuperCity"`
-	Date     time.Time `bson:"date,omitempty" json:"date,omitempty" validate:"required" example:"2021-10-31T19:00:00.000Z"`
-	URL      string    `bson:"url,omitempty" json:"url,omitempty" validate:"required,url" example:"http://link.to/concert/page"`
-	Comment  string    `bson:"comment,omitempty" json:"comment,omitempty" example:"Super exciting comment."`
-	Type     EventType `bson:"type,omitempty" json:"type,omitempty" validate:"required" example:"concert"`
+// // TODO: it's ugly to copy paste this from the croncert-api project.
+// type Event struct {
+// 	Title    string    `bson:"title,omitempty" json:"title,omitempty" validate:"required" example:"ExcitingTitle"`
+// 	Location string    `bson:"location,omitempty" json:"location,omitempty" validate:"required" example:"SuperLocation"`
+// 	City     string    `bson:"city,omitempty" json:"city,omitempty" validate:"required" example:"SuperCity"`
+// 	Date     time.Time `bson:"date,omitempty" json:"date,omitempty" validate:"required" example:"2021-10-31T19:00:00.000Z"`
+// 	URL      string    `bson:"url,omitempty" json:"url,omitempty" validate:"required,url" example:"http://link.to/concert/page"`
+// 	Comment  string    `bson:"comment,omitempty" json:"comment,omitempty" example:"Super exciting comment."`
+// 	Type     EventType `bson:"type,omitempty" json:"type,omitempty" validate:"required" example:"concert"`
+// }
+
+type Config struct {
+	Crawlers []Crawler `yaml:"crawlers"`
 }
 
-func (c Crawler) getEvents() ([]Event, error) {
-	dynamicFields := []string{"title", "comment", "url", "date"}
-	events := []Event{}
+type RegexConfig struct {
+	Exp   string `yaml:"exp"`
+	Index int    `yaml:"index"`
+}
+
+type DateComponent struct {
+	Selector     string      `yaml:"selector"`
+	Layout       string      `yaml:"layout"`
+	NodeIndex    int         `yaml:"node_index"`
+	ChildIndex   int         `yaml:"child_index"`
+	RegexExtract RegexConfig `yaml:"regex_extract"`
+	Attr         string      `yaml:"attr"`
+}
+
+type Field struct {
+	Name string `yaml:"name"`
+	Type string `yaml:"type"` // can currently be text, url or date
+	// If a field can be found on a subpage the following variable has to contain a field name of
+	// a field of type 'url' that is located on the main page.
+	OnSubpage    string          `yaml:"on_subpage"`    // applies to text, url, date
+	CanBeEmpty   bool            `yaml:"can_be_empty"`  // applies to text, url
+	Selector     string          `yaml:"selector"`      // applies to text, url
+	NodeIndex    int             `yaml:"node_index"`    // applies to text, url
+	ChildIndex   int             `yaml:"child_index"`   // applies to text, url
+	MaxLength    int             `yaml:"max_length"`    // applies to text
+	RegexExtract RegexConfig     `yaml:"regex_extract"` // applies to text
+	Components   []DateComponent `yaml:"components"`    // applies to date
+	Location     string          `yaml:"location"`      // applies to date
+	Language     string          `yaml:"language"`      // applies to date
+	Relative     bool            `yaml:"relative"`      // applies to url
+	Attr         string          `yaml:"attr"`          // applies to url
+}
+
+type Filter struct {
+	Field       string `yaml:"field"`
+	RegexIgnore string `yaml:"regex_ignore"`
+}
+
+type Crawler struct {
+	Name                string   `yaml:"name"`
+	Type                string   `yaml:"type"`
+	URL                 string   `yaml:"url"`
+	City                string   `yaml:"city"`
+	Event               string   `yaml:"event"`
+	ExcludeWithSelector []string `yaml:"exclude_with_selector"`
+	Fields              []Field  `yaml:"fields"`
+	// Fields              struct {
+	// 	Title   Field `yaml:"title"`
+	// 	Comment Field `yaml:"comment"`
+	// 	URL     struct {
+	// 		Selector  string   `yaml:"selector"`
+	// 		Relative  bool     `yaml:"relative"`
+	// 		OnSubpage []string `yaml:"on_subpage"`
+	// 		Attr      string   `yaml:"attr"`
+	// 	} `yaml:"url"`
+	// 	Date struct {
+	// 		Day              DateField `yaml:"day"`
+	// 		Month            DateField `yaml:"month"`
+	// 		Year             DateField `yaml:"year"`
+	// 		DayMonth         DateField `yaml:"day_month"`
+	// 		DayMonthYear     DateField `yaml:"day_month_year"`
+	// 		DayMonthYearTime DateField `yaml:"day_month_year_time"`
+	// 		Time             DateField `yaml:"time"`
+	// 		Location         string    `yaml:"location"`
+	// 		Language         string    `yaml:"language"`
+	// 	} `yaml:"date"`
+	// } `yaml:"fields"`
+	Filters   []Filter `yaml:"filters"`
+	Paginator struct {
+		Selector  string `yaml:"selector"`
+		Relative  bool   `yaml:"relative"`
+		MaxPages  int    `yaml:"max_pages"`
+		NodeIndex int    `yaml:"node_index"`
+	}
+}
+
+func (c Crawler) getEvents() ([]map[string]string, error) {
+	// dynamicFields := []string{"title", "comment", "url", "date"}
+	var events []map[string]string
 	eventType := EventType(c.Type)
 	err := eventType.IsValid()
 	if err != nil {
@@ -65,16 +145,16 @@ func (c Crawler) getEvents() ([]Event, error) {
 	}
 
 	// time zone
-	loc, err := time.LoadLocation(c.Fields.Date.Location)
-	if err != nil {
-		return events, err
-	}
+	// loc, err := time.LoadLocation(c.Fields.Date.Location)
+	// if err != nil {
+	// 	return events, err
+	// }
 
 	// locale (language)
-	mLocale := "de_DE"
-	if c.Fields.Date.Language != "" {
-		mLocale = c.Fields.Date.Language
-	}
+	// mLocale := "de_DE"
+	// if c.Fields.Date.Language != "" {
+	// 	mLocale = c.Fields.Date.Language
+	// }
 
 	pageUrl := c.URL
 	hasNextPage := true
@@ -104,54 +184,60 @@ func (c Crawler) getEvents() ([]Event, error) {
 				}
 			}
 
-			currentEvent := Event{
-				Location: c.Name,
-				City:     c.City,
-				Type:     EventType(c.Type),
-			}
+			currentEvent := map[string]string{"location": c.Name, "city": c.City, "type": c.Type}
 
-			for _, f := range dynamicFields {
-				fOnSubpage := false
-				for _, sf := range c.Fields.URL.OnSubpage {
-					if f == sf {
-						fOnSubpage = true
-					}
-				}
-				if !fOnSubpage {
-					err := extractField(f, s, &c, &currentEvent, events, loc, mLocale, res)
+			// handle all fields on the main page
+			for _, f := range c.Fields {
+				if f.OnSubpage == "" {
 					if err != nil {
-						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %s.", c.Name, f, err, currentEvent.Title)
+						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %v.", c.Name, f, err, currentEvent)
 						return
 					}
 				}
 			}
 
-			if len(c.Fields.URL.OnSubpage) > 0 {
-				resSub, err := http.Get(currentEvent.URL)
-				if err != nil {
-					log.Printf("%s ERROR: %v. Skipping event %s.", c.Name, err, currentEvent.Title)
-					return
-				}
+			// for _, f := range dynamicFields {
+			// 	fOnSubpage := false
+			// 	for _, sf := range c.Fields.URL.OnSubpage {
+			// 		if f == sf {
+			// 			fOnSubpage = true
+			// 		}
+			// 	}
+			// 	if !fOnSubpage {
+			// 		err := extractField(f, s, &c, &currentEvent, events, loc, mLocale, res)
+			// 		if err != nil {
+			// 			log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %s.", c.Name, f, err, currentEvent.Title)
+			// 			return
+			// 		}
+			// 	}
+			// }
 
-				if resSub.StatusCode != 200 {
-					log.Printf("%s ERROR: status code error: %d %s. Skipping event %s.", c.Name, res.StatusCode, res.Status, currentEvent.Title)
-					return
-				}
+			// if len(c.Fields.URL.OnSubpage) > 0 {
+			// 	resSub, err := http.Get(currentEvent.URL)
+			// 	if err != nil {
+			// 		log.Printf("%s ERROR: %v. Skipping event %s.", c.Name, err, currentEvent.Title)
+			// 		return
+			// 	}
 
-				docSub, err := goquery.NewDocumentFromReader(resSub.Body)
-				if err != nil {
-					log.Printf("%s ERROR: error while reading document: %v. Skipping event %s", c.Name, err, currentEvent.Title)
-					return
-				}
-				for _, item := range c.Fields.URL.OnSubpage {
-					err := extractField(item, docSub.Selection, &c, &currentEvent, events, loc, mLocale, resSub)
-					if err != nil {
-						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %s.", c.Name, item, err, currentEvent.Title)
-						return
-					}
-				}
-				resSub.Body.Close()
-			}
+			// 	if resSub.StatusCode != 200 {
+			// 		log.Printf("%s ERROR: status code error: %d %s. Skipping event %s.", c.Name, res.StatusCode, res.Status, currentEvent.Title)
+			// 		return
+			// 	}
+
+			// 	docSub, err := goquery.NewDocumentFromReader(resSub.Body)
+			// 	if err != nil {
+			// 		log.Printf("%s ERROR: error while reading document: %v. Skipping event %s", c.Name, err, currentEvent.Title)
+			// 		return
+			// 	}
+			// 	for _, item := range c.Fields.URL.OnSubpage {
+			// 		err := extractField(item, docSub.Selection, &c, &currentEvent, events, loc, mLocale, resSub)
+			// 		if err != nil {
+			// 			log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %s.", c.Name, item, err, currentEvent.Title)
+			// 			return
+			// 		}
+			// 	}
+			// 	resSub.Body.Close()
+			// }
 
 			// check if event should be ignored
 			ie, err := c.ignoreEvent(&currentEvent)
@@ -216,7 +302,32 @@ func (c Crawler) ignoreEvent(event *Event) (bool, error) {
 	return false, nil
 }
 
-func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Event, events []Event, loc *time.Location, mLocale string, res *http.Response) error {
+func extractField(field *Field, event map[string]string, s *goquery.Selection, res *http.Response) error {
+	switch field.Type {
+	case "text":
+		fs, err := getTextFieldString(field, s)
+		if err != nil {
+			return err
+		}
+		if !field.CanBeEmpty {
+			if fs == "" {
+				error_msg := fmt.Sprintf("field %s cannot be empty", field.Name)
+				return errors.New(error_msg)
+			}
+		}
+		event[field.Name] = fs
+		return nil
+	case "url":
+		return errors.New("not implemented")
+	case "date":
+		return errors.New("not implemented")
+	default:
+		error_msg := fmt.Sprintf("field type %s does not exist", field.Type)
+		return errors.New(error_msg)
+	}
+}
+
+func extractFieldOld(item string, s *goquery.Selection, crawler *Crawler, event *Event, events []Event, loc *time.Location, mLocale string, res *http.Response) error {
 	switch item {
 	case "date":
 		currentYear := time.Now().Year()
@@ -284,13 +395,13 @@ func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Ev
 		}
 		event.Date = t
 	case "title":
-		title := getFieldString(&crawler.Fields.Title, s)
+		title := getTextFieldString(&crawler.Fields.Title, s)
 		if title == "" {
 			return errors.New("empty event title")
 		}
 		event.Title = title
 	case "comment":
-		event.Comment = getFieldString(&crawler.Fields.Comment, s)
+		event.Comment = getTextFieldString(&crawler.Fields.Comment, s)
 	case "url":
 		var url string
 		attr := "href"
@@ -350,7 +461,7 @@ func getDateStringAndLayout(dl *DateField, s *goquery.Selection) (string, string
 	return fieldString, fieldLayout
 }
 
-func getFieldString(f *Field, s *goquery.Selection) string {
+func getTextFieldString(f *Field, s *goquery.Selection) (string, error) {
 	var fieldString string
 	fieldSelection := s.Find(f.Selector)
 	if len(fieldSelection.Nodes) > f.NodeIndex {
@@ -366,9 +477,9 @@ func getFieldString(f *Field, s *goquery.Selection) string {
 	}
 	fieldString, err := extractStringRegex(&f.RegexExtract, fieldString)
 	if err != nil {
-		log.Fatal(err)
+		return fieldString, err
 	}
-	return fieldString
+	return fieldString, nil
 }
 
 func extractStringRegex(rc *RegexConfig, s string) (string, error) {
@@ -467,75 +578,6 @@ func prettyPrintEvents(wg *sync.WaitGroup, c Crawler) {
 	for _, event := range events {
 		fmt.Printf("Title: %v\nLocation: %v\nCity: %v\nDate: %v\nURL: %v\nComment: %v\nType: %v\n\n",
 			event.Title, event.Location, event.City, event.Date, event.URL, event.Comment, event.Type)
-	}
-}
-
-type Config struct {
-	Crawlers []Crawler `yaml:"crawlers"`
-}
-
-type RegexConfig struct {
-	Exp   string `yaml:"exp"`
-	Index int    `yaml:"index"`
-}
-
-type DateField struct {
-	Selector     string      `yaml:"selector"`
-	Layout       string      `yaml:"layout"`
-	NodeIndex    int         `yaml:"node_index"`
-	ChildIndex   int         `yaml:"child_index"`
-	RegexExtract RegexConfig `yaml:"regex_extract"`
-	Attr         string      `yaml:"attr"`
-}
-
-type Field struct {
-	Selector  string `yaml:"selector"`
-	NodeIndex int    `yaml:"node_index"`
-	// TODO: for consistency have a ChildIndex here as well, see DateField
-	MaxLength    int         `yaml:"max_length"`
-	RegexExtract RegexConfig `yaml:"regex_extract"`
-	RegexIgnore  string      `yaml:"regex_ignore"`
-}
-
-type Filter struct {
-	Field       string `yaml:"field"`
-	RegexIgnore string `yaml:"regex_ignore"`
-}
-
-type Crawler struct {
-	Name                string   `yaml:"name"`
-	Type                string   `yaml:"type"`
-	URL                 string   `yaml:"url"`
-	City                string   `yaml:"city"`
-	Event               string   `yaml:"event"`
-	ExcludeWithSelector []string `yaml:"exclude_with_selector"`
-	Fields              struct {
-		Title   Field `yaml:"title"`
-		Comment Field `yaml:"comment"`
-		URL     struct {
-			Selector  string   `yaml:"selector"`
-			Relative  bool     `yaml:"relative"`
-			OnSubpage []string `yaml:"on_subpage"`
-			Attr      string   `yaml:"attr"`
-		} `yaml:"url"`
-		Date struct {
-			Day              DateField `yaml:"day"`
-			Month            DateField `yaml:"month"`
-			Year             DateField `yaml:"year"`
-			DayMonth         DateField `yaml:"day_month"`
-			DayMonthYear     DateField `yaml:"day_month_year"`
-			DayMonthYearTime DateField `yaml:"day_month_year_time"`
-			Time             DateField `yaml:"time"`
-			Location         string    `yaml:"location"`
-			Language         string    `yaml:"language"`
-		} `yaml:"date"`
-	} `yaml:"fields"`
-	Filters   []Filter `yaml:"filters"`
-	Paginator struct {
-		Selector  string `yaml:"selector"`
-		Relative  bool   `yaml:"relative"`
-		MaxPages  int    `yaml:"max_pages"`
-		NodeIndex int    `yaml:"node_index"`
 	}
 }
 

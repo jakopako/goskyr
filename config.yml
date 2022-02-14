@@ -24,13 +24,17 @@ crawlers:
         type: "date"
         on_subpage: true
         components:
-          - part: "day_month_year"
+          - covers:
+              day: true
+              month: true
+              year: true
             selector: ".qt-eventtable tr td"
             # layout: " Data: 2 Febbraio 2022"
             layout: " Data: 2 January 2006"
             regex_extract:
               exp: "\\sData:.*"
-          - part: "time"
+          - covers:
+              time: true
             selector: ".qt-eventtable tr td"
             node_index: 2
             # layout: " Inizio concerto: 9:30 pm"

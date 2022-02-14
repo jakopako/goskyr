@@ -58,13 +58,31 @@ type RegexConfig struct {
 	Index int    `yaml:"index"`
 }
 
-type DateComponent struct {
+type ElementLocation struct {
 	Selector     string      `yaml:"selector"`
-	Layout       string      `yaml:"layout"`
 	NodeIndex    int         `yaml:"node_index"`
 	ChildIndex   int         `yaml:"child_index"`
 	RegexExtract RegexConfig `yaml:"regex_extract"`
 	Attr         string      `yaml:"attr"`
+	MaxLength    int         `yaml:"max_length"` // applies to text
+}
+
+type CoveredDateParts struct {
+	Day   bool `yaml:"day"`
+	Month bool `yaml:"month"`
+	Year  bool `yaml:"year"`
+	Time  bool `yaml:"time"`
+}
+
+type DateComponent struct {
+	Covers          CoveredDateParts `yaml:"covers"`
+	ElementLocation ElementLocation  `yaml:"location"`
+	Layout          string           `yaml:"layout"`
+	// Selector     string       `yaml:"selector"`
+	// NodeIndex    int          `yaml:"node_index"`
+	// ChildIndex   int          `yaml:"child_index"`
+	// RegexExtract RegexConfig  `yaml:"regex_extract"`
+	// Attr         string       `yaml:"attr"`
 }
 
 type Field struct {
@@ -72,18 +90,19 @@ type Field struct {
 	Type string `yaml:"type"` // can currently be text, url or date
 	// If a field can be found on a subpage the following variable has to contain a field name of
 	// a field of type 'url' that is located on the main page.
-	OnSubpage    string          `yaml:"on_subpage"`    // applies to text, url, date
-	CanBeEmpty   bool            `yaml:"can_be_empty"`  // applies to text, url
-	Selector     string          `yaml:"selector"`      // applies to text, url
-	NodeIndex    int             `yaml:"node_index"`    // applies to text, url
-	ChildIndex   int             `yaml:"child_index"`   // applies to text, url
-	MaxLength    int             `yaml:"max_length"`    // applies to text
-	RegexExtract RegexConfig     `yaml:"regex_extract"` // applies to text
-	Components   []DateComponent `yaml:"components"`    // applies to date
-	Location     string          `yaml:"location"`      // applies to date
-	Language     string          `yaml:"language"`      // applies to date
-	Relative     bool            `yaml:"relative"`      // applies to url
-	Attr         string          `yaml:"attr"`          // applies to url
+	ElementLocation ElementLocation `yaml:"location"`
+	OnSubpage       string          `yaml:"on_subpage"`   // applies to text, url, date
+	CanBeEmpty      bool            `yaml:"can_be_empty"` // applies to text, url
+	// Selector     string          `yaml:"selector"`      // applies to text, url
+	// NodeIndex    int             `yaml:"node_index"`    // applies to text, url
+	// ChildIndex   int             `yaml:"child_index"`   // applies to text, url
+	// MaxLength    int             `yaml:"max_length"`    // applies to text
+	// RegexExtract RegexConfig     `yaml:"regex_extract"` // applies to text
+	Components []DateComponent `yaml:"components"` // applies to date
+	Location   string          `yaml:"location"`   // applies to date
+	Language   string          `yaml:"language"`   // applies to date
+	Relative   bool            `yaml:"relative"`   // applies to url
+	// Attr         string          `yaml:"attr"`          // applies to url
 }
 
 type Filter struct {
@@ -144,18 +163,6 @@ func (c Crawler) getEvents() ([]map[string]string, error) {
 		return events, err
 	}
 
-	// time zone
-	// loc, err := time.LoadLocation(c.Fields.Date.Location)
-	// if err != nil {
-	// 	return events, err
-	// }
-
-	// locale (language)
-	// mLocale := "de_DE"
-	// if c.Fields.Date.Language != "" {
-	// 	mLocale = c.Fields.Date.Language
-	// }
-
 	pageUrl := c.URL
 	hasNextPage := true
 	currentPage := 0
@@ -189,6 +196,7 @@ func (c Crawler) getEvents() ([]map[string]string, error) {
 			// handle all fields on the main page
 			for _, f := range c.Fields {
 				if f.OnSubpage == "" {
+					err := extractField(&f, currentEvent, s, c.URL, res)
 					if err != nil {
 						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %v.", c.Name, f, err, currentEvent)
 						return
@@ -196,53 +204,48 @@ func (c Crawler) getEvents() ([]map[string]string, error) {
 				}
 			}
 
-			// for _, f := range dynamicFields {
-			// 	fOnSubpage := false
-			// 	for _, sf := range c.Fields.URL.OnSubpage {
-			// 		if f == sf {
-			// 			fOnSubpage = true
-			// 		}
-			// 	}
-			// 	if !fOnSubpage {
-			// 		err := extractField(f, s, &c, &currentEvent, events, loc, mLocale, res)
-			// 		if err != nil {
-			// 			log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %s.", c.Name, f, err, currentEvent.Title)
-			// 			return
-			// 		}
-			// 	}
-			// }
+			// handle all fields on subpages
 
-			// if len(c.Fields.URL.OnSubpage) > 0 {
-			// 	resSub, err := http.Get(currentEvent.URL)
-			// 	if err != nil {
-			// 		log.Printf("%s ERROR: %v. Skipping event %s.", c.Name, err, currentEvent.Title)
-			// 		return
-			// 	}
-
-			// 	if resSub.StatusCode != 200 {
-			// 		log.Printf("%s ERROR: status code error: %d %s. Skipping event %s.", c.Name, res.StatusCode, res.Status, currentEvent.Title)
-			// 		return
-			// 	}
-
-			// 	docSub, err := goquery.NewDocumentFromReader(resSub.Body)
-			// 	if err != nil {
-			// 		log.Printf("%s ERROR: error while reading document: %v. Skipping event %s", c.Name, err, currentEvent.Title)
-			// 		return
-			// 	}
-			// 	for _, item := range c.Fields.URL.OnSubpage {
-			// 		err := extractField(item, docSub.Selection, &c, &currentEvent, events, loc, mLocale, resSub)
-			// 		if err != nil {
-			// 			log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %s.", c.Name, item, err, currentEvent.Title)
-			// 			return
-			// 		}
-			// 	}
-			// 	resSub.Body.Close()
-			// }
+			// we store the *http.Response as value and not the *goquery.Selection
+			// to still be able to close all the response bodies afterwards
+			subpages := make(map[string]*http.Response)
+			for _, f := range c.Fields {
+				if f.OnSubpage != "" {
+					// check whether we fetched the page already
+					resSub, found := subpages[currentEvent[f.OnSubpage]]
+					if !found {
+						resSub, err := http.Get(currentEvent[f.OnSubpage])
+						if err != nil {
+							log.Printf("%s ERROR: %v. Skipping event %v.", c.Name, err, currentEvent)
+							return
+						}
+						if resSub.StatusCode != 200 {
+							log.Printf("%s ERROR: status code error: %d %s. Skipping event %v.", c.Name, res.StatusCode, res.Status, currentEvent)
+							return
+						}
+						subpages[currentEvent[f.OnSubpage]] = resSub
+					}
+					docSub, err := goquery.NewDocumentFromReader(resSub.Body)
+					if err != nil {
+						log.Printf("%s ERROR: error while reading document: %v. Skipping event %v", c.Name, err, currentEvent)
+						return
+					}
+					err = extractField(&f, currentEvent, docSub.Selection, c.URL, resSub)
+					if err != nil {
+						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %v.", c.Name, f, err, currentEvent)
+						return
+					}
+				}
+			}
+			//Close all the subpages
+			for _, resSub := range subpages {
+				resSub.Body.Close()
+			}
 
 			// check if event should be ignored
-			ie, err := c.ignoreEvent(&currentEvent)
+			ie, err := c.ignoreEvent(currentEvent)
 			if err != nil {
-				log.Fatalf("%s ERROR: error while applying ignore filter: %v. Not ignoring event %s.", c.Name, err, currentEvent.Title)
+				log.Fatalf("%s ERROR: error while applying ignore filter: %v. Not ignoring event %v.", c.Name, err, currentEvent)
 			}
 			if !ie {
 				events = append(events, currentEvent)
@@ -279,22 +282,24 @@ func (c Crawler) getEvents() ([]map[string]string, error) {
 		}
 		res.Body.Close()
 	}
+	// TODO: check if the dates make sense. Sometimes we have to guess the year since it
+	// does not appear on the website. In that case, eg. having a list of events around
+	// the end of one year and the beginning of the next year we might want to change the
+	// year of some events because our previous guess was rather naiv. We also might want
+	// to make this functionality optional.
+
 	return events, nil
 }
 
-func (c Crawler) ignoreEvent(event *Event) (bool, error) {
+func (c Crawler) ignoreEvent(event map[string]string) (bool, error) {
 	for _, filter := range c.Filters {
 		regex, err := regexp.Compile(filter.RegexIgnore)
 		if err != nil {
 			return false, err
 		}
-		switch filter.Field {
-		case "title":
-			if regex.MatchString(event.Title) {
-				return true, nil
-			}
-		case "comment":
-			if regex.MatchString(event.Comment) {
+
+		if fieldValue, found := event[filter.Field]; found {
+			if regex.MatchString(fieldValue) {
 				return true, nil
 			}
 		}
@@ -302,29 +307,33 @@ func (c Crawler) ignoreEvent(event *Event) (bool, error) {
 	return false, nil
 }
 
-func extractField(field *Field, event map[string]string, s *goquery.Selection, res *http.Response) error {
+func extractField(field *Field, event map[string]string, s *goquery.Selection, baseUrl string, res *http.Response) error {
 	switch field.Type {
 	case "text":
-		fs, err := getTextFieldString(field, s)
+		ts, err := getTextString(&field.ElementLocation, s)
 		if err != nil {
 			return err
 		}
 		if !field.CanBeEmpty {
-			if fs == "" {
+			if ts == "" {
 				error_msg := fmt.Sprintf("field %s cannot be empty", field.Name)
 				return errors.New(error_msg)
 			}
 		}
-		event[field.Name] = fs
-		return nil
+		event[field.Name] = ts
 	case "url":
-		return errors.New("not implemented")
+		event[field.Name] = getUrlString(field, s, baseUrl, res)
 	case "date":
-		return errors.New("not implemented")
+		ds, err := getDateString(field, s)
+		if err != nil {
+			return err
+		}
+		event[field.Name] = ds
 	default:
-		error_msg := fmt.Sprintf("field type %s does not exist", field.Type)
+		error_msg := fmt.Sprintf("field type '%s' does not exist", field.Type)
 		return errors.New(error_msg)
 	}
+	return nil
 }
 
 func extractFieldOld(item string, s *goquery.Selection, crawler *Crawler, event *Event, events []Event, loc *time.Location, mLocale string, res *http.Response) error {
@@ -395,13 +404,13 @@ func extractFieldOld(item string, s *goquery.Selection, crawler *Crawler, event 
 		}
 		event.Date = t
 	case "title":
-		title := getTextFieldString(&crawler.Fields.Title, s)
+		title := getTextString(&crawler.Fields.Title, s)
 		if title == "" {
 			return errors.New("empty event title")
 		}
 		event.Title = title
 	case "comment":
-		event.Comment = getTextFieldString(&crawler.Fields.Comment, s)
+		event.Comment = getTextString(&crawler.Fields.Comment, s)
 	case "url":
 		var url string
 		attr := "href"
@@ -426,7 +435,88 @@ func extractFieldOld(item string, s *goquery.Selection, crawler *Crawler, event 
 	return nil
 }
 
-func getDateStringAndLayout(dl *DateField, s *goquery.Selection) (string, string) {
+type DatePart struct {
+	stringPart string
+	layoutPart string
+}
+
+func getDateString(f *Field, s *goquery.Selection) (string, error) {
+	// time zone
+	loc, err := time.LoadLocation(f.Location)
+	if err != nil {
+		return "", err
+	}
+
+	// locale (language)
+	mLocale := "de_DE"
+	if f.Language != "" {
+		mLocale = f.Language
+	}
+
+	// some default values
+	currentYear := time.Now().Year()
+	yearString := strconv.Itoa(currentYear)
+	yearLayout := "2006"
+
+	timeString := "20:00"
+	timeLayout := "15:04"
+
+	// collect all the date parts
+	dateParts := []DatePart{}
+	combinedParts := CoveredDateParts{}
+	for _, c := range f.Components {
+		if !hasAllDateParts(combinedParts) {
+			if err := checkForDoubleDateParts(c.Covers, combinedParts); err != nil {
+				return "", err
+			}
+			sp, err := getTextString(&c.ElementLocation, s)
+			if err != nil {
+				return sp, err
+			}
+			if sp != "" {
+				dateParts = append(dateParts, DatePart{
+					stringPart: strings.Replace(sp, "p.m.", "pm", 1),
+					layoutPart: strings.Replace(c.Layout, "p.m.", "pm", 1),
+				})
+				combinedParts = mergeDateParts(combinedParts, c.Covers)
+			}
+		}
+	}
+	var t time.Time
+	//...
+	return t.String(), nil
+}
+
+func checkForDoubleDateParts(dpOne CoveredDateParts, dpTwo CoveredDateParts) error {
+	if dpOne.Day && dpTwo.Day {
+		return errors.New("date parsing error: 'day' covered at least twice")
+	}
+	if dpOne.Month && dpTwo.Month {
+		return errors.New("date parsing error: 'month' covered at least twice")
+	}
+	if dpOne.Year && dpTwo.Year {
+		return errors.New("date parsing error: 'year' covered at least twice")
+	}
+	if dpOne.Time && dpTwo.Time {
+		return errors.New("date parsing error: 'time' covered at least twice")
+	}
+	return nil
+}
+
+func mergeDateParts(dpOne CoveredDateParts, dpTwo CoveredDateParts) CoveredDateParts {
+	return CoveredDateParts{
+		Day:   dpOne.Day || dpTwo.Day,
+		Month: dpOne.Month || dpTwo.Month,
+		Year:  dpOne.Year || dpTwo.Year,
+		Time:  dpOne.Time || dpTwo.Time,
+	}
+}
+
+func hasAllDateParts(cdp CoveredDateParts) bool {
+	return cdp.Day && cdp.Month && cdp.Year && cdp.Time
+}
+
+func getDateStringAndLayout(dl *DateComponent, s *goquery.Selection) (string, string) {
 	var fieldString, fieldLayout string
 	fieldStringSelection := s.Find(dl.Selector)
 	if len(fieldStringSelection.Nodes) > 0 {
@@ -461,23 +551,69 @@ func getDateStringAndLayout(dl *DateField, s *goquery.Selection) (string, string
 	return fieldString, fieldLayout
 }
 
-func getTextFieldString(f *Field, s *goquery.Selection) (string, error) {
-	var fieldString string
-	fieldSelection := s.Find(f.Selector)
-	if len(fieldSelection.Nodes) > f.NodeIndex {
-		fieldNode := fieldSelection.Get(f.NodeIndex).FirstChild
-		if fieldNode != nil {
-			if fieldNode.Type == html.TextNode {
-				fieldString = strings.TrimSpace(fieldSelection.Get(f.NodeIndex).FirstChild.Data)
-				if f.MaxLength > 0 && f.MaxLength < len(fieldString) {
-					fieldString = fieldString[:f.MaxLength] + "..."
-				}
-			}
-		}
+func getUrlString(f *Field, s *goquery.Selection, crawlerURL string, res *http.Response) string {
+	var url string
+	attr := "href"
+	if f.ElementLocation.Attr != "" {
+		attr = f.ElementLocation.Attr
 	}
-	fieldString, err := extractStringRegex(&f.RegexExtract, fieldString)
-	if err != nil {
-		return fieldString, err
+	if f.ElementLocation.Selector == "" {
+		url = s.AttrOr(attr, crawlerURL)
+	} else {
+		url = s.Find(f.ElementLocation.Selector).AttrOr(attr, crawlerURL)
+	}
+
+	if f.Relative {
+		baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
+		if !strings.HasPrefix(url, "/") {
+			baseURL = baseURL + "/"
+		}
+		url = baseURL + url
+	}
+	return url
+}
+
+func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
+	var fieldString string
+	fieldSelection := s.Find(t.Selector)
+	if len(fieldSelection.Nodes) > t.NodeIndex {
+		if t.Attr == "" {
+			fieldNode := fieldSelection.Get(t.NodeIndex).FirstChild
+			currentChildIndex := 0
+			// fieldStringNode := fieldStringSelection.Get(dl.NodeIndex).FirstChild
+			for fieldNode != nil {
+				// If the cild index is 0 (default value if not explicitly defined) we loop over all the children.
+				// This makes it easier if there are many children and only one matches the regex. If only one
+				// matches the regex then the child index can even differ inbetween various events.
+				// Plus we do not need to change existing crawler configs.
+				//
+				// we change the index setting for the case where we want to find the correct string
+				// by regex (checking all the children and taking the first one that matches the regex) to -1 to
+				// distinguish from the default case 0. So when we explicitly set ChildIndex to -1 it means
+				// check _all_ of the children.
+				if currentChildIndex == t.ChildIndex || t.ChildIndex == -1 {
+					if fieldNode.Type == html.TextNode {
+						fieldString = strings.TrimSpace(fieldSelection.Get(t.NodeIndex).FirstChild.Data)
+						fieldString, err := extractStringRegex(&t.RegexExtract, fieldString)
+						if err == nil {
+							if t.MaxLength > 0 && t.MaxLength < len(fieldString) {
+								fieldString = fieldString[:t.MaxLength] + "..."
+							}
+							break
+						} else if t.ChildIndex != -1 {
+							// only in case we do not (ab)use the regex to search across all children
+							// we want to return the err. Also, we still return the fieldString as
+							// this might be useful for narrowing down the reason for the error.
+							return fieldString, err
+						}
+					}
+				}
+				fieldNode = fieldNode.NextSibling
+				currentChildIndex += 1
+			}
+		} else {
+			fieldString = fieldSelection.AttrOr(t.Attr, "")
+		}
 	}
 	return fieldString, nil
 }

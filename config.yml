@@ -224,6 +224,10 @@ crawlers:
     filters:
       - field: "title"
         regex_ignore: "CORONA TESTZENTRUM.*"
+      - field: "title"
+        regex_ignore: ".*[A|a][B|b][G|g][E|e][S|s][A|a][G|g][T|t].*"
+      - field: "title"
+        regex_ignore: ".*[V|v][E|e][R|r][L|l][E|e][G|g][T|t].*"
     paginator:
       selector: ".pagination .next"
       relative: true

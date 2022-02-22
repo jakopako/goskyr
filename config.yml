@@ -35,20 +35,20 @@ crawlers:
             location:
               selector: ".qt-eventtable tr td"
               regex_extract:
-                exp: "\\sData:.*"
+                exp: "Data:.*"
               child_index: -1
             # layout: " Data: 2 Febbraio 2022"
-            layout: " Data: 2 January 2006"
+            layout: "Data: 2 January 2006"
           - covers:
               time: true
             location:
               selector: ".qt-eventtable tr td"
               node_index: 2
               regex_extract:
-                exp: " Inizio concerto: .*"
+                exp: "Inizio concerto: .*"
               child_index: -1
             # layout: " Inizio concerto: 9:30 pm"
-            layout: " Inizio concerto: 3:04 pm"
+            layout: "Inizio concerto: 3:04 pm"
         date_location: "Europe/Berlin"
         date_language: "it_IT"
     filters:
@@ -62,3 +62,63 @@ crawlers:
       selector: ".pagination .qt-btn-primary"
       node_index: -1
       max_pages: 4
+
+  ##########
+  # Brussels
+  ##########
+  - name: Botanique
+    type: concert
+    city: Brussels
+    url: "https://botanique.be/en/concerts"
+    event: ".views-content .event-type-concert"
+    fields:
+      - name: "title"
+        type: "text"
+        location:
+          selector: ".node-type-event__title h2 a span"
+      - name: "comment"
+        type: "text"
+        can_be_empty: true
+        location:
+          selector: ".location-list li"
+      - name: "url"
+        type: "url"
+        location:
+          selector: ".node-type-event__title h2 a"
+        relative: true
+      - name: "date"
+        type: "date"
+        components:
+          - covers:
+              day: true
+            location:
+              selector: ".node-date__day"
+            layout: "02"
+          - covers:
+              month: true
+            location:
+              selector: ".node-date__month"
+            layout: "Jan"
+          - covers:
+              year: true
+            location:
+              selector: ".node-date__year"
+            layout: "2006"
+          - covers:
+              time: true
+            location:
+              selector: ".node-type-event__timing"
+              regex_extract:
+                exp: "[0-9]{2}:[0-9]{2}"
+              child_index: -1
+            layout: "15:04"
+        date_location: "Europe/Berlin"
+        date_language: "en_US"
+    paginator:
+      selector: ".pager__item a"
+      relative: true
+    filters:
+      - field: "title"
+        regex_ignore: ".*POSTPONED.*"
+      - field: "title"
+        regex_ignore: ".*CANCELLED.*"

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -206,6 +207,8 @@ func (c Crawler) getEvents() ([]map[string]string, error) {
 			// to still be able to close all the response bodies afterwards
 			// UPDATE: we also store the *goquery.Document since apparently resSub.Body
 			// can only be read once.
+			// UPDATE: the previous statement might be incorrect.
+			// UPDATE: seems to be correct after all.
 			subpagesResp := make(map[string]*http.Response)
 			subpagesBody := make(map[string]*goquery.Document)
 			for _, f := range c.Fields {
@@ -613,7 +616,8 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 				// check _all_ of the children.
 				if currentChildIndex == t.ChildIndex || t.ChildIndex == -1 {
 					if fieldNode.Type == html.TextNode {
-						fieldString = strings.TrimSpace(fieldSelection.Get(t.NodeIndex).FirstChild.Data)
+						// trimming whitespaces might be confusing in some cases...
+						fieldString = strings.TrimSpace(fieldNode.Data)
 						fieldString, err := extractStringRegex(&t.RegexExtract, fieldString)
 						if err == nil {
 							if t.MaxLength > 0 && t.MaxLength < len(fieldString) {
@@ -732,11 +736,13 @@ func prettyPrintEvents(wg *sync.WaitGroup, c Crawler) {
 		return
 	}
 
-	fmt.Println(events)
-	// for _, event := range events {
-	// 	fmt.Printf("Title: %v\nLocation: %v\nCity: %v\nDate: %v\nURL: %v\nComment: %v\nType: %v\n\n",
-	// 		event.Title, event.Location, event.City, event.Date, event.URL, event.Comment, event.Type)
-	// }
+	for _, event := range events {
+		eventJson, err := json.MarshalIndent(event, "", "  ")
+		if err != nil {
+			log.Print(err.Error())
+		}
+		fmt.Println(string(eventJson))
+	}
 }
 
 func NewConfig(configPath string) (*Config, error) {

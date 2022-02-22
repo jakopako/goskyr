@@ -12,37 +12,45 @@ crawlers:
     fields:
       - name: "title"
         type: "text"
-        selector: ".qt-text-shadow"
+        location:
+          selector: ".qt-text-shadow"
       - name: "comment"
         type: "text"
-        selector: ".qt-the-content div"
-        on_subpage: true
+        location:
+          selector: ".qt-the-content div"
+        can_be_empty: true
+        on_subpage: "url"
       - name: "url"
         type: "url"
-        selector: ".qt-text-shadow"
+        location:
+          selector: ".qt-text-shadow"
       - name: "date"
         type: "date"
-        on_subpage: true
+        on_subpage: "url"
         components:
           - covers:
               day: true
               month: true
               year: true
-            selector: ".qt-eventtable tr td"
+            location:
+              selector: ".qt-eventtable tr td"
+              regex_extract:
+                exp: "\\sData:.*"
+              child_index: -1
             # layout: " Data: 2 Febbraio 2022"
             layout: " Data: 2 January 2006"
-            regex_extract:
-              exp: "\\sData:.*"
           - covers:
               time: true
-            selector: ".qt-eventtable tr td"
-            node_index: 2
+            location:
+              selector: ".qt-eventtable tr td"
+              node_index: 2
+              regex_extract:
+                exp: " Inizio concerto: .*"
+              child_index: -1
             # layout: " Inizio concerto: 9:30 pm"
             layout: " Inizio concerto: 3:04 pm"
-            regex_extract:
-              exp: " Inizio concerto: .*"
-        location: "Europe/Berlin"
-        language: "it_IT"
+        date_location: "Europe/Berlin"
+        date_language: "it_IT"
     filters:
       - field: "title"
         regex_ignore: ".*CANCELED.*"

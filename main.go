@@ -1,17 +1,13 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -98,10 +94,10 @@ type Field struct {
 	// ChildIndex   int             `yaml:"child_index"`   // applies to text, url
 	// MaxLength    int             `yaml:"max_length"`    // applies to text
 	// RegexExtract RegexConfig     `yaml:"regex_extract"` // applies to text
-	Components []DateComponent `yaml:"components"` // applies to date
-	Location   string          `yaml:"location"`   // applies to date
-	Language   string          `yaml:"language"`   // applies to date
-	Relative   bool            `yaml:"relative"`   // applies to url
+	Components   []DateComponent `yaml:"components"`    // applies to date
+	DateLocation string          `yaml:"date_location"` // applies to date
+	DateLanguage string          `yaml:"date_language"` // applies to date
+	Relative     bool            `yaml:"relative"`      // applies to url
 	// Attr         string          `yaml:"attr"`          // applies to url
 }
 
@@ -198,7 +194,7 @@ func (c Crawler) getEvents() ([]map[string]string, error) {
 				if f.OnSubpage == "" {
 					err := extractField(&f, currentEvent, s, c.URL, res)
 					if err != nil {
-						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %v.", c.Name, f, err, currentEvent)
+						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %v.", c.Name, f.Name, err, currentEvent)
 						return
 					}
 				}
@@ -208,13 +204,16 @@ func (c Crawler) getEvents() ([]map[string]string, error) {
 
 			// we store the *http.Response as value and not the *goquery.Selection
 			// to still be able to close all the response bodies afterwards
-			subpages := make(map[string]*http.Response)
+			// UPDATE: we also store the *goquery.Document since apparently resSub.Body
+			// can only be read once.
+			subpagesResp := make(map[string]*http.Response)
+			subpagesBody := make(map[string]*goquery.Document)
 			for _, f := range c.Fields {
 				if f.OnSubpage != "" {
 					// check whether we fetched the page already
-					resSub, found := subpages[currentEvent[f.OnSubpage]]
+					resSub, found := subpagesResp[currentEvent[f.OnSubpage]]
 					if !found {
-						resSub, err := http.Get(currentEvent[f.OnSubpage])
+						resSub, err = http.Get(currentEvent[f.OnSubpage])
 						if err != nil {
 							log.Printf("%s ERROR: %v. Skipping event %v.", c.Name, err, currentEvent)
 							return
@@ -223,22 +222,24 @@ func (c Crawler) getEvents() ([]map[string]string, error) {
 							log.Printf("%s ERROR: status code error: %d %s. Skipping event %v.", c.Name, res.StatusCode, res.Status, currentEvent)
 							return
 						}
-						subpages[currentEvent[f.OnSubpage]] = resSub
+						subpagesResp[currentEvent[f.OnSubpage]] = resSub
+						docSub, err := goquery.NewDocumentFromReader(resSub.Body)
+
+						if err != nil {
+							log.Printf("%s ERROR: error while reading document: %v. Skipping event %v", c.Name, err, currentEvent)
+							return
+						}
+						subpagesBody[currentEvent[f.OnSubpage]] = docSub
 					}
-					docSub, err := goquery.NewDocumentFromReader(resSub.Body)
+					err = extractField(&f, currentEvent, subpagesBody[currentEvent[f.OnSubpage]].Selection, c.URL, resSub)
 					if err != nil {
-						log.Printf("%s ERROR: error while reading document: %v. Skipping event %v", c.Name, err, currentEvent)
-						return
-					}
-					err = extractField(&f, currentEvent, docSub.Selection, c.URL, resSub)
-					if err != nil {
-						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %v.", c.Name, f, err, currentEvent)
+						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %v.", c.Name, f.Name, err, currentEvent)
 						return
 					}
 				}
 			}
 			//Close all the subpages
-			for _, resSub := range subpages {
+			for _, resSub := range subpagesResp {
 				resSub.Body.Close()
 			}
 
@@ -336,104 +337,104 @@ func extractField(field *Field, event map[string]string, s *goquery.Selection, b
 	return nil
 }
 
-func extractFieldOld(item string, s *goquery.Selection, crawler *Crawler, event *Event, events []Event, loc *time.Location, mLocale string, res *http.Response) error {
-	switch item {
-	case "date":
-		currentYear := time.Now().Year()
-		yearString := strconv.Itoa(currentYear)
-		yearLayout := "2006"
+// func extractFieldOld(item string, s *goquery.Selection, crawler *Crawler, event *Event, events []Event, loc *time.Location, mLocale string, res *http.Response) error {
+// 	switch item {
+// 	case "date":
+// 		currentYear := time.Now().Year()
+// 		yearString := strconv.Itoa(currentYear)
+// 		yearLayout := "2006"
 
-		if crawler.Fields.Date.Year.Selector != "" {
-			yearStringTmp, yearLayoutTmp := getDateStringAndLayout(&crawler.Fields.Date.Year, s)
-			// if the found year string is empty we take the default. This might be incorrect but is preferrable to skipping the event entirely.
-			if yearStringTmp != "" {
-				yearString, yearLayout = yearStringTmp, yearLayoutTmp
-			}
-		}
+// 		if crawler.Fields.Date.Year.Selector != "" {
+// 			yearStringTmp, yearLayoutTmp := getDateStringAndLayout(&crawler.Fields.Date.Year, s)
+// 			// if the found year string is empty we take the default. This might be incorrect but is preferrable to skipping the event entirely.
+// 			if yearStringTmp != "" {
+// 				yearString, yearLayout = yearStringTmp, yearLayoutTmp
+// 			}
+// 		}
 
-		timeString, timeLayout := "20:00", "15:04"
-		if crawler.Fields.Date.Time.Selector != "" {
-			timeStringTmp, timeLayoutTmp := getDateStringAndLayout(&crawler.Fields.Date.Time, s)
-			// if the found time string is empty we take the default. This might be incorrect but is preferrable to skipping the event entirely.
-			if timeStringTmp != "" {
-				timeString, timeLayout = timeStringTmp, timeLayoutTmp
-			}
-		}
+// 		timeString, timeLayout := "20:00", "15:04"
+// 		if crawler.Fields.Date.Time.Selector != "" {
+// 			timeStringTmp, timeLayoutTmp := getDateStringAndLayout(&crawler.Fields.Date.Time, s)
+// 			// if the found time string is empty we take the default. This might be incorrect but is preferrable to skipping the event entirely.
+// 			if timeStringTmp != "" {
+// 				timeString, timeLayout = timeStringTmp, timeLayoutTmp
+// 			}
+// 		}
 
-		var dateTimeString, dateTimeLayout string
-		if crawler.Fields.Date.DayMonthYearTime.Selector != "" {
-			dateTimeString, dateTimeLayout = getDateStringAndLayout(&crawler.Fields.Date.DayMonthYearTime, s)
-		} else if crawler.Fields.Date.DayMonthYear.Selector != "" {
-			dayMonthYearString, dayMonthYearLayout := getDateStringAndLayout(&crawler.Fields.Date.DayMonthYear, s)
-			dateTimeString = fmt.Sprintf("%s %s", dayMonthYearString, timeString)
-			dateTimeLayout = fmt.Sprintf("%s %s", dayMonthYearLayout, timeLayout)
-		} else {
-			var dayMonthString, dayMonthLayout string
-			if crawler.Fields.Date.DayMonth.Selector != "" {
-				dayMonthString, dayMonthLayout = getDateStringAndLayout(&crawler.Fields.Date.DayMonth, s)
-			} else if crawler.Fields.Date.Day.Selector != "" && crawler.Fields.Date.Month.Selector != "" {
-				dayString, dayLayout := getDateStringAndLayout(&crawler.Fields.Date.Day, s)
-				monthString, monthLayout := getDateStringAndLayout(&crawler.Fields.Date.Month, s)
-				dayMonthString = dayString + " " + monthString
-				dayMonthLayout = dayLayout + " " + monthLayout
-			}
+// 		var dateTimeString, dateTimeLayout string
+// 		if crawler.Fields.Date.DayMonthYearTime.Selector != "" {
+// 			dateTimeString, dateTimeLayout = getDateStringAndLayout(&crawler.Fields.Date.DayMonthYearTime, s)
+// 		} else if crawler.Fields.Date.DayMonthYear.Selector != "" {
+// 			dayMonthYearString, dayMonthYearLayout := getDateStringAndLayout(&crawler.Fields.Date.DayMonthYear, s)
+// 			dateTimeString = fmt.Sprintf("%s %s", dayMonthYearString, timeString)
+// 			dateTimeLayout = fmt.Sprintf("%s %s", dayMonthYearLayout, timeLayout)
+// 		} else {
+// 			var dayMonthString, dayMonthLayout string
+// 			if crawler.Fields.Date.DayMonth.Selector != "" {
+// 				dayMonthString, dayMonthLayout = getDateStringAndLayout(&crawler.Fields.Date.DayMonth, s)
+// 			} else if crawler.Fields.Date.Day.Selector != "" && crawler.Fields.Date.Month.Selector != "" {
+// 				dayString, dayLayout := getDateStringAndLayout(&crawler.Fields.Date.Day, s)
+// 				monthString, monthLayout := getDateStringAndLayout(&crawler.Fields.Date.Month, s)
+// 				dayMonthString = dayString + " " + monthString
+// 				dayMonthLayout = dayLayout + " " + monthLayout
+// 			}
 
-			dateTimeLayout = fmt.Sprintf("%s %s %s", dayMonthLayout, yearLayout, timeLayout)
-			dateTimeString = fmt.Sprintf("%s %s %s", dayMonthString, yearString, timeString)
-			dateTimeString = strings.Replace(dateTimeString, "Mrz", "Mär", 1) // hack for issue #47
-		}
+// 			dateTimeLayout = fmt.Sprintf("%s %s %s", dayMonthLayout, yearLayout, timeLayout)
+// 			dateTimeString = fmt.Sprintf("%s %s %s", dayMonthString, yearString, timeString)
+// 			dateTimeString = strings.Replace(dateTimeString, "Mrz", "Mär", 1) // hack for issue #47
+// 		}
 
-		if dateTimeString == "" {
-			return errors.New("empty dateTimeString")
-		}
-		t, err := monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
-		if err != nil {
-			return err
-		}
-		// if the date t does not come after the previous event's date we increase the year by 1
-		// actually this is only necessary if we have to guess the date but currently for ease of implementation
-		// this check is done always.
+// 		if dateTimeString == "" {
+// 			return errors.New("empty dateTimeString")
+// 		}
+// 		t, err := monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
+// 		if err != nil {
+// 			return err
+// 		}
+// 		// if the date t does not come after the previous event's date we increase the year by 1
+// 		// actually this is only necessary if we have to guess the date but currently for ease of implementation
+// 		// this check is done always.
 
-		// We relax this condition slightly as it happens that within a day the events might not be sorted chronologically.
-		if len(events) > 0 {
-			correctYear := currentYear
-			for events[len(events)-1].Date.Round(24 * time.Hour).After(t.Round(24 * time.Hour)) {
-				correctYear += 1
-				t = time.Date(int(correctYear), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
-			}
-		}
-		event.Date = t
-	case "title":
-		title := getTextString(&crawler.Fields.Title, s)
-		if title == "" {
-			return errors.New("empty event title")
-		}
-		event.Title = title
-	case "comment":
-		event.Comment = getTextString(&crawler.Fields.Comment, s)
-	case "url":
-		var url string
-		attr := "href"
-		if crawler.Fields.URL.Attr != "" {
-			attr = crawler.Fields.URL.Attr
-		}
-		if crawler.Fields.URL.Selector == "" {
-			url = s.AttrOr(attr, crawler.URL)
-		} else {
-			url = s.Find(crawler.Fields.URL.Selector).AttrOr(attr, crawler.URL)
-		}
+// 		// We relax this condition slightly as it happens that within a day the events might not be sorted chronologically.
+// 		if len(events) > 0 {
+// 			correctYear := currentYear
+// 			for events[len(events)-1].Date.Round(24 * time.Hour).After(t.Round(24 * time.Hour)) {
+// 				correctYear += 1
+// 				t = time.Date(int(correctYear), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
+// 			}
+// 		}
+// 		event.Date = t
+// 	case "title":
+// 		title := getTextString(&crawler.Fields.Title, s)
+// 		if title == "" {
+// 			return errors.New("empty event title")
+// 		}
+// 		event.Title = title
+// 	case "comment":
+// 		event.Comment = getTextString(&crawler.Fields.Comment, s)
+// 	case "url":
+// 		var url string
+// 		attr := "href"
+// 		if crawler.Fields.URL.Attr != "" {
+// 			attr = crawler.Fields.URL.Attr
+// 		}
+// 		if crawler.Fields.URL.Selector == "" {
+// 			url = s.AttrOr(attr, crawler.URL)
+// 		} else {
+// 			url = s.Find(crawler.Fields.URL.Selector).AttrOr(attr, crawler.URL)
+// 		}
 
-		if crawler.Fields.URL.Relative {
-			baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
-			if !strings.HasPrefix(url, "/") {
-				baseURL = baseURL + "/"
-			}
-			url = baseURL + url
-		}
-		event.URL = url
-	}
-	return nil
-}
+// 		if crawler.Fields.URL.Relative {
+// 			baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
+// 			if !strings.HasPrefix(url, "/") {
+// 				baseURL = baseURL + "/"
+// 			}
+// 			url = baseURL + url
+// 		}
+// 		event.URL = url
+// 	}
+// 	return nil
+// }
 
 type DatePart struct {
 	stringPart string
@@ -442,24 +443,16 @@ type DatePart struct {
 
 func getDateString(f *Field, s *goquery.Selection) (string, error) {
 	// time zone
-	loc, err := time.LoadLocation(f.Location)
+	loc, err := time.LoadLocation(f.DateLocation)
 	if err != nil {
 		return "", err
 	}
 
 	// locale (language)
 	mLocale := "de_DE"
-	if f.Language != "" {
-		mLocale = f.Language
+	if f.DateLanguage != "" {
+		mLocale = f.DateLanguage
 	}
-
-	// some default values
-	currentYear := time.Now().Year()
-	yearString := strconv.Itoa(currentYear)
-	yearLayout := "2006"
-
-	timeString := "20:00"
-	timeLayout := "15:04"
 
 	// collect all the date parts
 	dateParts := []DatePart{}
@@ -482,8 +475,35 @@ func getDateString(f *Field, s *goquery.Selection) (string, error) {
 			}
 		}
 	}
-	var t time.Time
-	//...
+	// adding default values where necessary
+	if !combinedParts.Year {
+		currentYear := time.Now().Year()
+		dateParts = append(dateParts, DatePart{
+			stringPart: strconv.Itoa(currentYear),
+			layoutPart: "2006",
+		})
+	}
+	if !combinedParts.Time {
+		dateParts = append(dateParts, DatePart{
+			stringPart: "20:00",
+			layoutPart: "15:04",
+		})
+	}
+	// currently not all date parts have default values
+	if !combinedParts.Day || !combinedParts.Month {
+		return "", errors.New("date parsing error: to generate a date at least a day and a month is needed")
+	}
+
+	var dateTimeLayout, dateTimeString string
+	for _, dp := range dateParts {
+		dateTimeLayout += dp.layoutPart + " "
+		dateTimeString += dp.stringPart + " "
+	}
+	dateTimeString = strings.Replace(dateTimeString, "Mrz", "Mär", 1) // hack for issue #47
+	t, err := monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
+	if err != nil {
+		return "", err
+	}
 	return t.String(), nil
 }
 
@@ -516,40 +536,40 @@ func hasAllDateParts(cdp CoveredDateParts) bool {
 	return cdp.Day && cdp.Month && cdp.Year && cdp.Time
 }
 
-func getDateStringAndLayout(dl *DateComponent, s *goquery.Selection) (string, string) {
-	var fieldString, fieldLayout string
-	fieldStringSelection := s.Find(dl.Selector)
-	if len(fieldStringSelection.Nodes) > 0 {
-		if dl.Attr == "" {
-			currentChildIndex := 0
-			fieldStringNode := fieldStringSelection.Get(dl.NodeIndex).FirstChild
-			for fieldStringNode != nil {
-				// If the cild index is 0 (default value if not explicitly defined) we loop over all the children.
-				// This makes it easier if there are many children and only one matches the regex. If only one
-				// matches the regex then the child index can even differ inbetween various events.
-				// Plus we do not need to change existing crawler configs.
-				if currentChildIndex == dl.ChildIndex || dl.ChildIndex == 0 {
-					if fieldStringNode.Type == html.TextNode {
-						var err error
-						fieldString, err = extractStringRegex(&dl.RegexExtract, fieldStringNode.Data)
-						if err == nil {
-							break
-						}
-					}
-				}
-				fieldStringNode = fieldStringNode.NextSibling
-				currentChildIndex += 1
-			}
-		} else {
-			fieldString = fieldStringSelection.AttrOr(dl.Attr, "")
-		}
-	}
-	// 'p.m.' is not treated as part of the time string by the date parsing library
-	// so we have to replace it with 'pm'
-	fieldLayout = strings.Replace(dl.Layout, "p.m.", "pm", 1)
-	fieldString = strings.Replace(fieldString, "p.m.", "pm", 1)
-	return fieldString, fieldLayout
-}
+// func getDateStringAndLayout(dl *DateComponent, s *goquery.Selection) (string, string) {
+// 	var fieldString, fieldLayout string
+// 	fieldStringSelection := s.Find(dl.Selector)
+// 	if len(fieldStringSelection.Nodes) > 0 {
+// 		if dl.Attr == "" {
+// 			currentChildIndex := 0
+// 			fieldStringNode := fieldStringSelection.Get(dl.NodeIndex).FirstChild
+// 			for fieldStringNode != nil {
+// 				// If the cild index is 0 (default value if not explicitly defined) we loop over all the children.
+// 				// This makes it easier if there are many children and only one matches the regex. If only one
+// 				// matches the regex then the child index can even differ inbetween various events.
+// 				// Plus we do not need to change existing crawler configs.
+// 				if currentChildIndex == dl.ChildIndex || dl.ChildIndex == 0 {
+// 					if fieldStringNode.Type == html.TextNode {
+// 						var err error
+// 						fieldString, err = extractStringRegex(&dl.RegexExtract, fieldStringNode.Data)
+// 						if err == nil {
+// 							break
+// 						}
+// 					}
+// 				}
+// 				fieldStringNode = fieldStringNode.NextSibling
+// 				currentChildIndex += 1
+// 			}
+// 		} else {
+// 			fieldString = fieldStringSelection.AttrOr(dl.Attr, "")
+// 		}
+// 	}
+// 	// 'p.m.' is not treated as part of the time string by the date parsing library
+// 	// so we have to replace it with 'pm'
+// 	fieldLayout = strings.Replace(dl.Layout, "p.m.", "pm", 1)
+// 	fieldString = strings.Replace(fieldString, "p.m.", "pm", 1)
+// 	return fieldString, fieldLayout
+// }
 
 func getUrlString(f *Field, s *goquery.Selection, crawlerURL string, res *http.Response) string {
 	var url string
@@ -644,63 +664,64 @@ func extractStringRegex(rc *RegexConfig, s string) (string, error) {
 }
 
 func writeEventsToAPI(wg *sync.WaitGroup, c Crawler) {
-	log.Printf("crawling %s\n", c.Name)
-	defer wg.Done()
-	apiUrl := os.Getenv("EVENT_API")
-	client := &http.Client{
-		Timeout: time.Second * 10,
-	}
-	events, err := c.getEvents()
+	return
+	// log.Printf("crawling %s\n", c.Name)
+	// defer wg.Done()
+	// apiUrl := os.Getenv("EVENT_API")
+	// client := &http.Client{
+	// 	Timeout: time.Second * 10,
+	// }
+	// events, err := c.getEvents()
 
-	if err != nil {
-		log.Printf("%s ERROR: %s", c.Name, err)
-		return
-	}
+	// if err != nil {
+	// 	log.Printf("%s ERROR: %s", c.Name, err)
+	// 	return
+	// }
 
-	if len(events) == 0 {
-		log.Printf("location %s has no events. Skipping.", c.Name)
-		return
-	}
-	log.Printf("fetched %d %s events\n", len(events), c.Name)
-	// sort events by date asc
-	sort.Slice(events, func(i, j int) bool {
-		return events[i].Date.Before(events[j].Date)
-	})
+	// if len(events) == 0 {
+	// 	log.Printf("location %s has no events. Skipping.", c.Name)
+	// 	return
+	// }
+	// log.Printf("fetched %d %s events\n", len(events), c.Name)
+	// // sort events by date asc
+	// sort.Slice(events, func(i, j int) bool {
+	// 	return events[i].Date.Before(events[j].Date)
+	// })
 
-	// delete events of this crawler from first date on
-	firstDate := events[0].Date.UTC().Format("2006-01-02 15:04")
-	deleteUrl := fmt.Sprintf("%s?location=%s&datetime=%s", apiUrl, url.QueryEscape(c.Name), url.QueryEscape(firstDate))
-	req, _ := http.NewRequest("DELETE", deleteUrl, nil)
-	req.SetBasicAuth(os.Getenv("API_USER"), os.Getenv("API_PASSWORD"))
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if resp.StatusCode != 200 {
-		log.Fatalf("Something went wrong while deleting events. Status Code: %d\nUrl: %s", resp.StatusCode, deleteUrl)
-	}
+	// // delete events of this crawler from first date on
+	// firstDate := events[0].Date.UTC().Format("2006-01-02 15:04")
+	// deleteUrl := fmt.Sprintf("%s?location=%s&datetime=%s", apiUrl, url.QueryEscape(c.Name), url.QueryEscape(firstDate))
+	// req, _ := http.NewRequest("DELETE", deleteUrl, nil)
+	// req.SetBasicAuth(os.Getenv("API_USER"), os.Getenv("API_PASSWORD"))
+	// resp, err := client.Do(req)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// if resp.StatusCode != 200 {
+	// 	log.Fatalf("Something went wrong while deleting events. Status Code: %d\nUrl: %s", resp.StatusCode, deleteUrl)
+	// }
 
-	// add new events
-	for _, event := range events {
-		concertJSON, err := json.Marshal(event)
-		if err != nil {
-			log.Fatal(err)
-		}
-		req, _ := http.NewRequest("POST", apiUrl, bytes.NewBuffer(concertJSON))
-		req.Header = map[string][]string{
-			"Content-Type": {"application/json"},
-		}
-		req.SetBasicAuth(os.Getenv("API_USER"), os.Getenv("API_PASSWORD"))
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if resp.StatusCode != 201 {
-			log.Fatalf("something went wrong while adding a new event. Status Code: %d", resp.StatusCode)
+	// // add new events
+	// for _, event := range events {
+	// 	concertJSON, err := json.Marshal(event)
+	// 	if err != nil {
+	// 		log.Fatal(err)
+	// 	}
+	// 	req, _ := http.NewRequest("POST", apiUrl, bytes.NewBuffer(concertJSON))
+	// 	req.Header = map[string][]string{
+	// 		"Content-Type": {"application/json"},
+	// 	}
+	// 	req.SetBasicAuth(os.Getenv("API_USER"), os.Getenv("API_PASSWORD"))
+	// 	resp, err := client.Do(req)
+	// 	if err != nil {
+	// 		log.Fatal(err)
+	// 	}
+	// 	if resp.StatusCode != 201 {
+	// 		log.Fatalf("something went wrong while adding a new event. Status Code: %d", resp.StatusCode)
 
-		}
-	}
-	log.Printf("done crawling and writing %s data to API.\n", c.Name)
+	// 	}
+	// }
+	// log.Printf("done crawling and writing %s data to API.\n", c.Name)
 }
 
 func prettyPrintEvents(wg *sync.WaitGroup, c Crawler) {
@@ -711,10 +732,11 @@ func prettyPrintEvents(wg *sync.WaitGroup, c Crawler) {
 		return
 	}
 
-	for _, event := range events {
-		fmt.Printf("Title: %v\nLocation: %v\nCity: %v\nDate: %v\nURL: %v\nComment: %v\nType: %v\n\n",
-			event.Title, event.Location, event.City, event.Date, event.URL, event.Comment, event.Type)
-	}
+	fmt.Println(events)
+	// for _, event := range events {
+	// 	fmt.Printf("Title: %v\nLocation: %v\nCity: %v\nDate: %v\nURL: %v\nComment: %v\nType: %v\n\n",
+	// 		event.Title, event.Location, event.City, event.Date, event.URL, event.Comment, event.Type)
+	// }
 }
 
 func NewConfig(configPath string) (*Config, error) {

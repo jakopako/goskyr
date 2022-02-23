@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -34,17 +37,6 @@ func (et EventType) IsValid() error {
 	errorString := fmt.Sprintf("invalid event type: %s", et)
 	return errors.New(errorString)
 }
-
-// // TODO: it's ugly to copy paste this from the croncert-api project.
-// type Event struct {
-// 	Title    string    `bson:"title,omitempty" json:"title,omitempty" validate:"required" example:"ExcitingTitle"`
-// 	Location string    `bson:"location,omitempty" json:"location,omitempty" validate:"required" example:"SuperLocation"`
-// 	City     string    `bson:"city,omitempty" json:"city,omitempty" validate:"required" example:"SuperCity"`
-// 	Date     time.Time `bson:"date,omitempty" json:"date,omitempty" validate:"required" example:"2021-10-31T19:00:00.000Z"`
-// 	URL      string    `bson:"url,omitempty" json:"url,omitempty" validate:"required,url" example:"http://link.to/concert/page"`
-// 	Comment  string    `bson:"comment,omitempty" json:"comment,omitempty" example:"Super exciting comment."`
-// 	Type     EventType `bson:"type,omitempty" json:"type,omitempty" validate:"required" example:"concert"`
-// }
 
 type Config struct {
 	Crawlers []Crawler `yaml:"crawlers"`
@@ -88,18 +80,12 @@ type Field struct {
 	// If a field can be found on a subpage the following variable has to contain a field name of
 	// a field of type 'url' that is located on the main page.
 	ElementLocation ElementLocation `yaml:"location"`
-	OnSubpage       string          `yaml:"on_subpage"`   // applies to text, url, date
-	CanBeEmpty      bool            `yaml:"can_be_empty"` // applies to text, url
-	// Selector     string          `yaml:"selector"`      // applies to text, url
-	// NodeIndex    int             `yaml:"node_index"`    // applies to text, url
-	// ChildIndex   int             `yaml:"child_index"`   // applies to text, url
-	// MaxLength    int             `yaml:"max_length"`    // applies to text
-	// RegexExtract RegexConfig     `yaml:"regex_extract"` // applies to text
-	Components   []DateComponent `yaml:"components"`    // applies to date
-	DateLocation string          `yaml:"date_location"` // applies to date
-	DateLanguage string          `yaml:"date_language"` // applies to date
-	Relative     bool            `yaml:"relative"`      // applies to url
-	// Attr         string          `yaml:"attr"`          // applies to url
+	OnSubpage       string          `yaml:"on_subpage"`    // applies to text, url, date
+	CanBeEmpty      bool            `yaml:"can_be_empty"`  // applies to text, url
+	Components      []DateComponent `yaml:"components"`    // applies to date
+	DateLocation    string          `yaml:"date_location"` // applies to date
+	DateLanguage    string          `yaml:"date_language"` // applies to date
+	Relative        bool            `yaml:"relative"`      // applies to url
 }
 
 type Filter struct {
@@ -115,29 +101,8 @@ type Crawler struct {
 	Event               string   `yaml:"event"`
 	ExcludeWithSelector []string `yaml:"exclude_with_selector"`
 	Fields              []Field  `yaml:"fields"`
-	// Fields              struct {
-	// 	Title   Field `yaml:"title"`
-	// 	Comment Field `yaml:"comment"`
-	// 	URL     struct {
-	// 		Selector  string   `yaml:"selector"`
-	// 		Relative  bool     `yaml:"relative"`
-	// 		OnSubpage []string `yaml:"on_subpage"`
-	// 		Attr      string   `yaml:"attr"`
-	// 	} `yaml:"url"`
-	// 	Date struct {
-	// 		Day              DateField `yaml:"day"`
-	// 		Month            DateField `yaml:"month"`
-	// 		Year             DateField `yaml:"year"`
-	// 		DayMonth         DateField `yaml:"day_month"`
-	// 		DayMonthYear     DateField `yaml:"day_month_year"`
-	// 		DayMonthYearTime DateField `yaml:"day_month_year_time"`
-	// 		Time             DateField `yaml:"time"`
-	// 		Location         string    `yaml:"location"`
-	// 		Language         string    `yaml:"language"`
-	// 	} `yaml:"date"`
-	// } `yaml:"fields"`
-	Filters   []Filter `yaml:"filters"`
-	Paginator struct {
+	Filters             []Filter `yaml:"filters"`
+	Paginator           struct {
 		Selector  string `yaml:"selector"`
 		Relative  bool   `yaml:"relative"`
 		MaxPages  int    `yaml:"max_pages"`
@@ -340,105 +305,6 @@ func extractField(field *Field, event map[string]string, s *goquery.Selection, b
 	return nil
 }
 
-// func extractFieldOld(item string, s *goquery.Selection, crawler *Crawler, event *Event, events []Event, loc *time.Location, mLocale string, res *http.Response) error {
-// 	switch item {
-// 	case "date":
-// 		currentYear := time.Now().Year()
-// 		yearString := strconv.Itoa(currentYear)
-// 		yearLayout := "2006"
-
-// 		if crawler.Fields.Date.Year.Selector != "" {
-// 			yearStringTmp, yearLayoutTmp := getDateStringAndLayout(&crawler.Fields.Date.Year, s)
-// 			// if the found year string is empty we take the default. This might be incorrect but is preferrable to skipping the event entirely.
-// 			if yearStringTmp != "" {
-// 				yearString, yearLayout = yearStringTmp, yearLayoutTmp
-// 			}
-// 		}
-
-// 		timeString, timeLayout := "20:00", "15:04"
-// 		if crawler.Fields.Date.Time.Selector != "" {
-// 			timeStringTmp, timeLayoutTmp := getDateStringAndLayout(&crawler.Fields.Date.Time, s)
-// 			// if the found time string is empty we take the default. This might be incorrect but is preferrable to skipping the event entirely.
-// 			if timeStringTmp != "" {
-// 				timeString, timeLayout = timeStringTmp, timeLayoutTmp
-// 			}
-// 		}
-
-// 		var dateTimeString, dateTimeLayout string
-// 		if crawler.Fields.Date.DayMonthYearTime.Selector != "" {
-// 			dateTimeString, dateTimeLayout = getDateStringAndLayout(&crawler.Fields.Date.DayMonthYearTime, s)
-// 		} else if crawler.Fields.Date.DayMonthYear.Selector != "" {
-// 			dayMonthYearString, dayMonthYearLayout := getDateStringAndLayout(&crawler.Fields.Date.DayMonthYear, s)
-// 			dateTimeString = fmt.Sprintf("%s %s", dayMonthYearString, timeString)
-// 			dateTimeLayout = fmt.Sprintf("%s %s", dayMonthYearLayout, timeLayout)
-// 		} else {
-// 			var dayMonthString, dayMonthLayout string
-// 			if crawler.Fields.Date.DayMonth.Selector != "" {
-// 				dayMonthString, dayMonthLayout = getDateStringAndLayout(&crawler.Fields.Date.DayMonth, s)
-// 			} else if crawler.Fields.Date.Day.Selector != "" && crawler.Fields.Date.Month.Selector != "" {
-// 				dayString, dayLayout := getDateStringAndLayout(&crawler.Fields.Date.Day, s)
-// 				monthString, monthLayout := getDateStringAndLayout(&crawler.Fields.Date.Month, s)
-// 				dayMonthString = dayString + " " + monthString
-// 				dayMonthLayout = dayLayout + " " + monthLayout
-// 			}
-
-// 			dateTimeLayout = fmt.Sprintf("%s %s %s", dayMonthLayout, yearLayout, timeLayout)
-// 			dateTimeString = fmt.Sprintf("%s %s %s", dayMonthString, yearString, timeString)
-// 			dateTimeString = strings.Replace(dateTimeString, "Mrz", "Mär", 1) // hack for issue #47
-// 		}
-
-// 		if dateTimeString == "" {
-// 			return errors.New("empty dateTimeString")
-// 		}
-// 		t, err := monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
-// 		if err != nil {
-// 			return err
-// 		}
-// 		// if the date t does not come after the previous event's date we increase the year by 1
-// 		// actually this is only necessary if we have to guess the date but currently for ease of implementation
-// 		// this check is done always.
-
-// 		// We relax this condition slightly as it happens that within a day the events might not be sorted chronologically.
-// 		if len(events) > 0 {
-// 			correctYear := currentYear
-// 			for events[len(events)-1].Date.Round(24 * time.Hour).After(t.Round(24 * time.Hour)) {
-// 				correctYear += 1
-// 				t = time.Date(int(correctYear), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
-// 			}
-// 		}
-// 		event.Date = t
-// 	case "title":
-// 		title := getTextString(&crawler.Fields.Title, s)
-// 		if title == "" {
-// 			return errors.New("empty event title")
-// 		}
-// 		event.Title = title
-// 	case "comment":
-// 		event.Comment = getTextString(&crawler.Fields.Comment, s)
-// 	case "url":
-// 		var url string
-// 		attr := "href"
-// 		if crawler.Fields.URL.Attr != "" {
-// 			attr = crawler.Fields.URL.Attr
-// 		}
-// 		if crawler.Fields.URL.Selector == "" {
-// 			url = s.AttrOr(attr, crawler.URL)
-// 		} else {
-// 			url = s.Find(crawler.Fields.URL.Selector).AttrOr(attr, crawler.URL)
-// 		}
-
-// 		if crawler.Fields.URL.Relative {
-// 			baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
-// 			if !strings.HasPrefix(url, "/") {
-// 				baseURL = baseURL + "/"
-// 			}
-// 			url = baseURL + url
-// 		}
-// 		event.URL = url
-// 	}
-// 	return nil
-// }
-
 type DatePart struct {
 	stringPart string
 	layoutPart string
@@ -507,7 +373,7 @@ func getDateString(f *Field, s *goquery.Selection) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return t.String(), nil
+	return t.Format(time.RFC3339), nil
 }
 
 func checkForDoubleDateParts(dpOne CoveredDateParts, dpTwo CoveredDateParts) error {
@@ -538,41 +404,6 @@ func mergeDateParts(dpOne CoveredDateParts, dpTwo CoveredDateParts) CoveredDateP
 func hasAllDateParts(cdp CoveredDateParts) bool {
 	return cdp.Day && cdp.Month && cdp.Year && cdp.Time
 }
-
-// func getDateStringAndLayout(dl *DateComponent, s *goquery.Selection) (string, string) {
-// 	var fieldString, fieldLayout string
-// 	fieldStringSelection := s.Find(dl.Selector)
-// 	if len(fieldStringSelection.Nodes) > 0 {
-// 		if dl.Attr == "" {
-// 			currentChildIndex := 0
-// 			fieldStringNode := fieldStringSelection.Get(dl.NodeIndex).FirstChild
-// 			for fieldStringNode != nil {
-// 				// If the cild index is 0 (default value if not explicitly defined) we loop over all the children.
-// 				// This makes it easier if there are many children and only one matches the regex. If only one
-// 				// matches the regex then the child index can even differ inbetween various events.
-// 				// Plus we do not need to change existing crawler configs.
-// 				if currentChildIndex == dl.ChildIndex || dl.ChildIndex == 0 {
-// 					if fieldStringNode.Type == html.TextNode {
-// 						var err error
-// 						fieldString, err = extractStringRegex(&dl.RegexExtract, fieldStringNode.Data)
-// 						if err == nil {
-// 							break
-// 						}
-// 					}
-// 				}
-// 				fieldStringNode = fieldStringNode.NextSibling
-// 				currentChildIndex += 1
-// 			}
-// 		} else {
-// 			fieldString = fieldStringSelection.AttrOr(dl.Attr, "")
-// 		}
-// 	}
-// 	// 'p.m.' is not treated as part of the time string by the date parsing library
-// 	// so we have to replace it with 'pm'
-// 	fieldLayout = strings.Replace(dl.Layout, "p.m.", "pm", 1)
-// 	fieldString = strings.Replace(fieldString, "p.m.", "pm", 1)
-// 	return fieldString, fieldLayout
-// }
 
 func getUrlString(f *Field, s *goquery.Selection, crawlerURL string, res *http.Response) string {
 	var url string
@@ -668,64 +499,71 @@ func extractStringRegex(rc *RegexConfig, s string) (string, error) {
 }
 
 func writeEventsToAPI(wg *sync.WaitGroup, c Crawler) {
-	return
-	// log.Printf("crawling %s\n", c.Name)
-	// defer wg.Done()
-	// apiUrl := os.Getenv("EVENT_API")
-	// client := &http.Client{
-	// 	Timeout: time.Second * 10,
-	// }
-	// events, err := c.getEvents()
+	log.Printf("crawling %s\n", c.Name)
+	defer wg.Done()
+	apiUrl := os.Getenv("EVENT_API")
+	client := &http.Client{
+		Timeout: time.Second * 10,
+	}
+	events, err := c.getEvents()
 
-	// if err != nil {
-	// 	log.Printf("%s ERROR: %s", c.Name, err)
-	// 	return
-	// }
+	if err != nil {
+		log.Printf("%s ERROR: %s", c.Name, err)
+		return
+	}
 
-	// if len(events) == 0 {
-	// 	log.Printf("location %s has no events. Skipping.", c.Name)
-	// 	return
-	// }
-	// log.Printf("fetched %d %s events\n", len(events), c.Name)
+	if len(events) == 0 {
+		log.Printf("location %s has no events. Skipping.", c.Name)
+		return
+	}
+	log.Printf("fetched %d %s events\n", len(events), c.Name)
 	// // sort events by date asc
 	// sort.Slice(events, func(i, j int) bool {
 	// 	return events[i].Date.Before(events[j].Date)
 	// })
 
-	// // delete events of this crawler from first date on
+	// delete events of this crawler from first date on
+
 	// firstDate := events[0].Date.UTC().Format("2006-01-02 15:04")
-	// deleteUrl := fmt.Sprintf("%s?location=%s&datetime=%s", apiUrl, url.QueryEscape(c.Name), url.QueryEscape(firstDate))
-	// req, _ := http.NewRequest("DELETE", deleteUrl, nil)
-	// req.SetBasicAuth(os.Getenv("API_USER"), os.Getenv("API_PASSWORD"))
-	// resp, err := client.Do(req)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// if resp.StatusCode != 200 {
-	// 	log.Fatalf("Something went wrong while deleting events. Status Code: %d\nUrl: %s", resp.StatusCode, deleteUrl)
-	// }
+	firstDateObject, _ := time.Parse(time.RFC3339, events[0]["date"])
+	firstDate := firstDateObject.UTC().Format("2006-01-02 15:04")
+	deleteUrl := fmt.Sprintf("%s?location=%s&datetime=%s", apiUrl, url.QueryEscape(c.Name), url.QueryEscape(firstDate))
+	req, _ := http.NewRequest("DELETE", deleteUrl, nil)
+	req.SetBasicAuth(os.Getenv("API_USER"), os.Getenv("API_PASSWORD"))
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Fatalf("Something went wrong while deleting events. Status Code: %d\nUrl: %s Response: %s", resp.StatusCode, deleteUrl, body)
+	}
 
-	// // add new events
-	// for _, event := range events {
-	// 	concertJSON, err := json.Marshal(event)
-	// 	if err != nil {
-	// 		log.Fatal(err)
-	// 	}
-	// 	req, _ := http.NewRequest("POST", apiUrl, bytes.NewBuffer(concertJSON))
-	// 	req.Header = map[string][]string{
-	// 		"Content-Type": {"application/json"},
-	// 	}
-	// 	req.SetBasicAuth(os.Getenv("API_USER"), os.Getenv("API_PASSWORD"))
-	// 	resp, err := client.Do(req)
-	// 	if err != nil {
-	// 		log.Fatal(err)
-	// 	}
-	// 	if resp.StatusCode != 201 {
-	// 		log.Fatalf("something went wrong while adding a new event. Status Code: %d", resp.StatusCode)
+	// add new events
+	for _, event := range events {
+		concertJSON, err := json.Marshal(event)
+		if err != nil {
+			log.Fatal(err)
+		}
+		req, _ := http.NewRequest("POST", apiUrl, bytes.NewBuffer(concertJSON))
+		req.Header = map[string][]string{
+			"Content-Type": {"application/json"},
+		}
+		req.SetBasicAuth(os.Getenv("API_USER"), os.Getenv("API_PASSWORD"))
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if resp.StatusCode != 201 {
+			log.Fatalf("something went wrong while adding a new event. Status Code: %d", resp.StatusCode)
 
-	// 	}
-	// }
-	// log.Printf("done crawling and writing %s data to API.\n", c.Name)
+		}
+	}
+	log.Printf("done crawling and writing %s data to API.\n", c.Name)
 }
 
 func prettyPrintEvents(wg *sync.WaitGroup, c Crawler) {
@@ -736,13 +574,11 @@ func prettyPrintEvents(wg *sync.WaitGroup, c Crawler) {
 		return
 	}
 
-	for _, event := range events {
-		eventJson, err := json.MarshalIndent(event, "", "  ")
-		if err != nil {
-			log.Print(err.Error())
-		}
-		fmt.Println(string(eventJson))
+	eventsJson, err := json.MarshalIndent(events, "", "  ")
+	if err != nil {
+		log.Print(err.Error())
 	}
+	fmt.Print(string(eventsJson))
 }
 
 func NewConfig(configPath string) (*Config, error) {
@@ -760,7 +596,6 @@ func NewConfig(configPath string) (*Config, error) {
 }
 
 func main() {
-	//everyCrawler := flag.Bool("all", false, "Use this flag to indicate that all crawlers should be run.")
 	singleCrawler := flag.String("single", "", "The name of the crawler to be run.")
 	storeData := flag.Bool("store", false, "If set to true the crawled data will be written to the API.")
 	configFile := flag.String("config", "./config.yml", "The location of the configuration file.")

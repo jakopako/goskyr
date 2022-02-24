@@ -53,7 +53,7 @@ type ElementLocation struct {
 	ChildIndex   int         `yaml:"child_index"`
 	RegexExtract RegexConfig `yaml:"regex_extract"`
 	Attr         string      `yaml:"attr"`
-	MaxLength    int         `yaml:"max_length"` // applies to text
+	MaxLength    int         `yaml:"max_length"`
 }
 
 type CoveredDateParts struct {
@@ -67,11 +67,6 @@ type DateComponent struct {
 	Covers          CoveredDateParts `yaml:"covers"`
 	ElementLocation ElementLocation  `yaml:"location"`
 	Layout          string           `yaml:"layout"`
-	// Selector     string       `yaml:"selector"`
-	// NodeIndex    int          `yaml:"node_index"`
-	// ChildIndex   int          `yaml:"child_index"`
-	// RegexExtract RegexConfig  `yaml:"regex_extract"`
-	// Attr         string       `yaml:"attr"`
 }
 
 type Field struct {
@@ -429,6 +424,7 @@ func getUrlString(f *Field, s *goquery.Selection, crawlerURL string, res *http.R
 
 func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 	var fieldString string
+	var err error
 	fieldSelection := s.Find(t.Selector)
 	if len(fieldSelection.Nodes) > t.NodeIndex {
 		if t.Attr == "" {
@@ -449,7 +445,7 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 					if fieldNode.Type == html.TextNode {
 						// trimming whitespaces might be confusing in some cases...
 						fieldString = strings.TrimSpace(fieldNode.Data)
-						fieldString, err := extractStringRegex(&t.RegexExtract, fieldString)
+						fieldString, err = extractStringRegex(&t.RegexExtract, fieldString)
 						if err == nil {
 							if t.MaxLength > 0 && t.MaxLength < len(fieldString) {
 								fieldString = fieldString[:t.MaxLength] + "..."

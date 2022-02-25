@@ -424,179 +424,280 @@ crawlers:
             layout: "15:04"
         date_location: "Europe/Berlin"
 
-  # ##########
-  # # Paris
-  # ##########
-  # - name: LaCigale
-  #   type: concert
-  #   url: "http://www.lacigale.fr/en/"
-  #   city: "Paris"
-  #   event: ".spectacle-infos"
-  #   fields:
-  #     title:
-  #       selector: ".title .text-white"
-  #     url:
-  #       selector: ".mobile a"
-  #       on_subpage: ["comment", "date"]
-  #     comment:
-  #       selector: ".c-m-7 .infos-wrapper .text-grey"
-  #     date:
-  #       day_month_year:
-  #         selector: ".c-m-7 .date-wrapper .text-grey"
-  #         layout: "02 January 2006"
-  #       time:
-  #         selector: ".c-m-6 .hour"
-  #         layout: "15 H 04"
-  #         regex_extract:
-  #           exp: "[0-9]{2}\\sH\\s[0-9]{2}"
-  #       location: "Europe/Paris"
-  #       language: en_US
+  ##########
+  # Paris
+  ##########
+  - name: LaCigale
+    type: concert
+    url: "http://www.lacigale.fr/en/"
+    city: "Paris"
+    event: ".spectacle-infos"
+    fields:
+      - name: "title"
+        type: "text"
+        location:
+          selector: ".title .text-white"
+      - name: "url"
+        type: "url"
+        location:
+          selector: ".mobile a"
+      - name: "comment"
+        type: "text"
+        location:
+          selector: ".c-m-7 .infos-wrapper .text-grey"
+        on_subpage: "url"
+        can_be_empty: true
+      - name: "date"
+        type: "date"
+        on_subpage: "url"
+        components:
+          - covers:
+              day: true
+              month: true
+              year: true
+            location:
+              selector: ".c-m-7 .date-wrapper .text-grey"
+            layout: "02 January 2006"
+          - covers:
+              time: true
+            location:
+              selector: ".c-m-6 .hour"
+              regex_extract:
+                exp: "[0-9]{2}\\sH\\s[0-9]{2}"
+            layout: "15 H 04"
+        date_location: "Europe/Paris"
+        date_language: en_US
 
-  # ##########
-  # # Zurich
-  # ##########
-  # - name: Helsinki
-  #   type: concert
-  #   url: https://www.helsinkiklub.ch
-  #   city: "Zurich"
-  #   event: ".event .header"
-  #   fields:
-  #     title: 
-  #       selector: ".agenda > .top,.support"
-  #         # - ".agenda .top"
-  #         # - ".agenda .support"
-  #     comment: 
-  #       selector: ".agenda > .top .addition,.support .addition"
-  #         # - ".agenda .top .addition"
-  #         # - ".agenda .support .addition"
-  #     date:
-  #       day:
-  #         selector: ".day"
-  #         layout: "2"
-  #       month:
-  #         selector: ".month"
-  #         layout: "January" # has to be in English
-  #       location: "Europe/Berlin"
-  #       language: "de_DE"
+  ##########
+  # Zurich
+  ##########
+  - name: Helsinki
+    type: concert
+    url: https://www.helsinkiklub.ch
+    city: "Zurich"
+    event: ".event .header"
+    fields:
+      - name: "title"
+        type: "text"
+        location:
+          selector: ".agenda > .top,.support"
+          # - ".agenda .top"
+          # - ".agenda .support"
+      - name: "comment"
+        type: "text"
+        location:
+          selector: ".agenda > .top .addition,.support .addition"
+        can_be_empty: true
+      - name: "url"
+        type: "url"
+        # if we don't define a location the crawler url is taken as url (in most cases)
+        # TODO: think of a better way that always works
+      - name: "date"
+        type: "date"
+        components:
+          - covers:
+              day: true
+            location:
+              selector: ".day"
+            layout: "2"
+          - covers:
+              month: true
+            location:
+              selector: ".month"
+            layout: "January" # has to be in English
+        date_location: "Europe/Berlin"
+        date_language: "de_DE"
 
-  # - name: Mehrspur
-  #   type: concert
-  #   url: "https://www.mehrspur.ch/veranstaltungen"
-  #   city: "Zurich"
-  #   event: ".post-holder"
-  #   fields:
-  #     title:
-  #       selector: ".block_under_title a"
-  #     comment:
-  #       selector: ".event-excerpt-fluid"
-  #     url:
-  #       selector: ".block_under_title a"
-  #     date:
-  #       day_month:
-  #         selector: ".event-date"
-  #         layout: "Mon 2.Jan."
-  #       time:
-  #         selector: ".event-time"
-  #         layout: "15:04"
-  #       location: "Europe/Berlin"
-  #       language: "de_DE"
+  - name: Mehrspur
+    type: concert
+    url: "https://www.mehrspur.ch/veranstaltungen"
+    city: "Zurich"
+    event: ".post-holder"
+    fields:
+      - name: "title"
+        type: "text"
+        location:
+          selector: ".block_under_title a"
+      - name: "comment"
+        type: "text"
+        location:
+          selector: ".event-excerpt-fluid"
+      - name: "url"
+        type: "url"
+        location:
+          selector: ".block_under_title a"
+      - name: "date"
+        type: "date"
+        components:
+          - covers:
+              day: true
+              month: true
+            location:
+              selector: ".event-date"
+              child_index: 1
+            layout: "Mon 2.Jan."
+          - covers:
+              time: true
+            location:
+              selector: ".event-time"
+              child_index: 1
+            layout: "15:04"
+        date_location: "Europe/Berlin"
+        date_language: "de_DE"
 
-  # - name: Umbo
-  #   type: concert
-  #   url: "https://www.umbo.wtf"
-  #   city: "Zurich"
-  #   event: ".w-dyn-item"
-  #   fields:
-  #     title:
-  #       selector: ".text-block-21"
-  #     comment:
-  #       selector: ".text-block-28"
-  #     url:
-  #       selector: ".w-inline-block"
-  #       relative: true
-  #     date:
-  #       day_month_year_time:
-  #         selector: ".text-block-26"
-  #         layout: "2.1.2006 15:04"
-  #       location: "Europe/Berlin"
+  - name: Umbo
+    type: concert
+    url: "https://www.umbo.wtf"
+    city: "Zurich"
+    event: ".w-dyn-item"
+    fields:
+      - name: "title"
+        type: "text"
+        location:
+          selector: ".text-block-21"
+      - name: "comment"
+        type: "text"
+        location:
+          selector: ".text-block-28"
+      - name: "url"
+        type: "url"
+        location:
+          selector: ".w-inline-block"
+        relative: true
+      - name: "date"
+        type: "date"
+        components:
+          - covers:
+              day: true
+              month: true
+              year: true
+              time: true
+            location:
+              selector: ".text-block-26"
+            layout: "2.1.2006 15:04"
+        date_location: "Europe/Berlin"
 
-  # - name: Sender
-  #   type: concert
-  #   url: "https://gds.fm/SENDER"
-  #   city: "Zurich"
-  #   event: ".event-list__item"
-  #   fields:
-  #     title:
-  #       selector: ".event-preview__title"
-  #     comment:
-  #       selector: ".event-detail__content div p"
-  #       max_length: 200
-  #     url:
-  #       selector: "" # An empty string means that we look in the event node itself for an href
-  #       relative: true
-  #       on_subpage: ["comment"]
-  #     date:
-  #       day_month_year_time:
-  #         selector: ".event-preview__date-long"
-  #         layout: "January 02, 2006, 03:04 PM"
-  #       location: "GMT"
-  #       language: "en_US"
+  - name: Sender
+    type: concert
+    url: "https://gds.fm/SENDER"
+    city: "Zurich"
+    event: ".event-list__item"
+    fields:
+      - name: "title"
+        type: "text"
+        location:
+          selector: ".event-preview__title"
+      - name: "comment"
+        type: "text"
+        location:
+          selector: ".event-detail__content div p"
+          max_length: 200
+        on_subpage: "url"
+        can_be_empty: true
+      - name: "url"
+        type: "url"
+        location:
+          selector: "" # An empty string means that we look in the event node itself for an href
+        relative: true
+      - name: "date"
+        type: "date"
+        components:
+          - covers:
+              day: true
+              month: true
+              year: true
+              time: true
+            location:
+              selector: ".event-preview__date-long"
+            layout: "January 02, 2006, 03:04 PM"
+        date_location: "GMT"
+        date_language: "en_US"
 
-  # - name: Moods
-  #   type: concert
-  #   url: "https://www.moods.club/en/?a=1"
-  #   city: "Zurich"
-  #   event: ".event"
-  #   fields:
-  #     url:
-  #       selector: "a"
-  #       relative: true
-  #       on_subpage: ["comment", "date"]
-  #     title:
-  #       selector: "h2"
-  #     comment:
-  #       selector: ".left .content"
-  #       max_length: 200
-  #     date:
-  #       day:
-  #         selector: ".date .day"
-  #         layout: "2"
-  #       month:
-  #         selector: ".date .month_name"
-  #         layout: "Jan"
-  #       time:
-  #         selector: ".right .time"
-  #         layout: "Start: 15:04"
-  #         node_index: -1 # -1 means the last node
-  #       location: "Europe/Berlin"
-  #       language: "en_US"
+  - name: Moods
+    type: concert
+    url: "https://www.moods.club/en/?a=1"
+    city: "Zurich"
+    event: ".event"
+    fields:
+      - name: "url"
+        type: "url"
+        location:
+          selector: "a"
+        relative: true
+      - name: "title"
+        type: "text"
+        location:
+          selector: "h2"
+      - name: "comment"
+        type: "text"
+        location:
+          selector: ".left .content"
+          max_length: 200
+        on_subpage: "url"
+        can_be_empty: true
+      - name: "date"
+        type: "date"
+        on_subpage: "url"
+        components:
+          - covers:
+              day: true
+            location:
+              selector: ".date .day"
+            layout: "2"
+          - covers:
+              month: true
+            location:
+              selector: ".date .month_name"
+            layout: "Jan"
+          - covers:
+              time: true
+            location:
+              selector: ".right .time"
+              node_index: -1 # -1 means the last node
+            layout: "Start: 15:04"
+        date_location: "Europe/Berlin"
+        date_language: "en_US"
 
-  # - name: ElLokal
-  #   type: concert
-  #   city: Zurich
-  #   url: "http://www.ellokal.ch/?lang=de&details=9"
-  #   event: "#maincontent > .commingupEventsList_0,.commingupEventsList_1"
-  #   fields:
-  #     title:
-  #       selector: ".commingupEventsList_block5 a"
-  #     comment:
-  #       selector: ".concertStyleNew .concertDetails"
-  #     url:
-  #       selector: ".commingupEventsList_block5 a"
-  #       relative: true
-  #       on_subpage: ["comment"]
-  #     date:
-  #       day:
-  #         selector: ".commingupEventsList_block2"
-  #         layout: "02. "
-  #       month:
-  #         selector: ".commingupEventsList_block3"
-  #         layout: "January"
-  #       time:
-  #         selector: ".commingupEventsList_block4"
-  #         layout: "15Uhr04"
-  #       location: "Europe/Berlin"
-  #       language: "de_DE"
+  - name: ElLokal
+    type: concert
+    city: Zurich
+    url: "http://www.ellokal.ch/?lang=de&details=9"
+    event: "#maincontent > .commingupEventsList_0,.commingupEventsList_1"
+    fields:
+      - name: "title"
+        type: "text"
+        location:
+          selector: ".commingupEventsList_block5 a"
+      - name: "comment"
+        type: "text"
+        location:
+          selector: ".concertStyleNew .concertDetails"
+        on_subpage: "url"
+      - name: "url"
+        type: "url"
+        location:
+          selector: ".commingupEventsList_block5 a"
+        relative: true
+      - name: "date"
+        type: "date"
+        components:
+          - covers:
+              day: true
+            location:
+              selector: ".commingupEventsList_block2"
+            layout: "02. "
+          - covers:
+              month: true
+            location:
+              selector: ".commingupEventsList_block3"
+            layout: "January"
+          - covers:
+              time: true
+            location:
+              selector: ".commingupEventsList_block4"
+            layout: "15Uhr04"
+        date_location: "Europe/Berlin"
+        date_language: "de_DE"
         
   # - name: Mascotte
   #   type: concert

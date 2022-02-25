@@ -105,9 +105,9 @@ type Crawler struct {
 	}
 }
 
-func (c Crawler) getEvents() ([]map[string]string, error) {
+func (c Crawler) getEvents() ([]map[string]interface{}, error) {
 	// dynamicFields := []string{"title", "comment", "url", "date"}
-	var events []map[string]string
+	var events []map[string]interface{}
 	eventType := EventType(c.Type)
 	err := eventType.IsValid()
 	if err != nil {
@@ -148,7 +148,7 @@ func (c Crawler) getEvents() ([]map[string]string, error) {
 				}
 			}
 
-			currentEvent := map[string]string{"location": c.Name, "city": c.City, "type": c.Type}
+			currentEvent := map[string]interface{}{"location": c.Name, "city": c.City, "type": c.Type}
 
 			// handle all fields on the main page
 			for _, f := range c.Fields {
@@ -174,9 +174,10 @@ func (c Crawler) getEvents() ([]map[string]string, error) {
 			for _, f := range c.Fields {
 				if f.OnSubpage != "" {
 					// check whether we fetched the page already
-					resSub, found := subpagesResp[currentEvent[f.OnSubpage]]
+					subpageUrl := fmt.Sprint(currentEvent[f.OnSubpage])
+					resSub, found := subpagesResp[subpageUrl]
 					if !found {
-						resSub, err = http.Get(currentEvent[f.OnSubpage])
+						resSub, err = http.Get(subpageUrl)
 						if err != nil {
 							log.Printf("%s ERROR: %v. Skipping event %v.", c.Name, err, currentEvent)
 							return
@@ -185,16 +186,16 @@ func (c Crawler) getEvents() ([]map[string]string, error) {
 							log.Printf("%s ERROR: status code error: %d %s. Skipping event %v.", c.Name, res.StatusCode, res.Status, currentEvent)
 							return
 						}
-						subpagesResp[currentEvent[f.OnSubpage]] = resSub
+						subpagesResp[subpageUrl] = resSub
 						docSub, err := goquery.NewDocumentFromReader(resSub.Body)
 
 						if err != nil {
 							log.Printf("%s ERROR: error while reading document: %v. Skipping event %v", c.Name, err, currentEvent)
 							return
 						}
-						subpagesBody[currentEvent[f.OnSubpage]] = docSub
+						subpagesBody[subpageUrl] = docSub
 					}
-					err = extractField(&f, currentEvent, subpagesBody[currentEvent[f.OnSubpage]].Selection, c.URL, resSub)
+					err = extractField(&f, currentEvent, subpagesBody[subpageUrl].Selection, c.URL, resSub)
 					if err != nil {
 						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %v.", c.Name, f.Name, err, currentEvent)
 						return
@@ -255,7 +256,7 @@ func (c Crawler) getEvents() ([]map[string]string, error) {
 	return events, nil
 }
 
-func (c Crawler) ignoreEvent(event map[string]string) (bool, error) {
+func (c Crawler) ignoreEvent(event map[string]interface{}) (bool, error) {
 	for _, filter := range c.Filters {
 		regex, err := regexp.Compile(filter.RegexIgnore)
 		if err != nil {
@@ -263,7 +264,8 @@ func (c Crawler) ignoreEvent(event map[string]string) (bool, error) {
 		}
 
 		if fieldValue, found := event[filter.Field]; found {
-			if regex.MatchString(fieldValue) {
+			fieldValueString := fmt.Sprint(fieldValue)
+			if regex.MatchString(fieldValueString) {
 				return true, nil
 			}
 		}
@@ -271,7 +273,7 @@ func (c Crawler) ignoreEvent(event map[string]string) (bool, error) {
 	return false, nil
 }
 
-func extractField(field *Field, event map[string]string, s *goquery.Selection, baseUrl string, res *http.Response) error {
+func extractField(field *Field, event map[string]interface{}, s *goquery.Selection, baseUrl string, res *http.Response) error {
 	switch field.Type {
 	case "text":
 		ts, err := getTextString(&field.ElementLocation, s)
@@ -288,11 +290,11 @@ func extractField(field *Field, event map[string]string, s *goquery.Selection, b
 	case "url":
 		event[field.Name] = getUrlString(field, s, baseUrl, res)
 	case "date":
-		ds, err := getDateString(field, s)
+		d, err := getDate(field, s)
 		if err != nil {
 			return err
 		}
-		event[field.Name] = ds
+		event[field.Name] = d
 	default:
 		error_msg := fmt.Sprintf("field type '%s' does not exist", field.Type)
 		return errors.New(error_msg)
@@ -305,11 +307,12 @@ type DatePart struct {
 	layoutPart string
 }
 
-func getDateString(f *Field, s *goquery.Selection) (string, error) {
+func getDate(f *Field, s *goquery.Selection) (time.Time, error) {
 	// time zone
+	var t time.Time
 	loc, err := time.LoadLocation(f.DateLocation)
 	if err != nil {
-		return "", err
+		return t, err
 	}
 
 	// locale (language)
@@ -324,11 +327,11 @@ func getDateString(f *Field, s *goquery.Selection) (string, error) {
 	for _, c := range f.Components {
 		if !hasAllDateParts(combinedParts) {
 			if err := checkForDoubleDateParts(c.Covers, combinedParts); err != nil {
-				return "", err
+				return t, err
 			}
 			sp, err := getTextString(&c.ElementLocation, s)
 			if err != nil {
-				return sp, err
+				return t, err
 			}
 			if sp != "" {
 				dateParts = append(dateParts, DatePart{
@@ -355,7 +358,7 @@ func getDateString(f *Field, s *goquery.Selection) (string, error) {
 	}
 	// currently not all date parts have default values
 	if !combinedParts.Day || !combinedParts.Month {
-		return "", errors.New("date parsing error: to generate a date at least a day and a month is needed")
+		return t, errors.New("date parsing error: to generate a date at least a day and a month is needed")
 	}
 
 	var dateTimeLayout, dateTimeString string
@@ -364,11 +367,11 @@ func getDateString(f *Field, s *goquery.Selection) (string, error) {
 		dateTimeString += dp.stringPart + " "
 	}
 	dateTimeString = strings.Replace(dateTimeString, "Mrz", "Mär", 1) // hack for issue #47
-	t, err := monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
+	t, err = monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
 	if err != nil {
-		return "", err
+		return t, err
 	}
-	return t.Format(time.RFC3339), nil
+	return t, nil
 }
 
 func checkForDoubleDateParts(dpOne CoveredDateParts, dpTwo CoveredDateParts) error {
@@ -520,9 +523,9 @@ func writeEventsToAPI(wg *sync.WaitGroup, c Crawler) {
 
 	// delete events of this crawler from first date on
 
-	// firstDate := events[0].Date.UTC().Format("2006-01-02 15:04")
-	firstDateObject, _ := time.Parse(time.RFC3339, events[0]["date"])
-	firstDate := firstDateObject.UTC().Format("2006-01-02 15:04")
+	firstDate := events[0]["date"].(time.Time).UTC().Format("2006-01-02 15:04")
+	// firstDateObject, _ := time.Parse(time.RFC3339, events[0]["date"])
+	// firstDate := firstDateObject.UTC().Format("2006-01-02 15:04")
 	deleteUrl := fmt.Sprintf("%s?location=%s&datetime=%s", apiUrl, url.QueryEscape(c.Name), url.QueryEscape(firstDate))
 	req, _ := http.NewRequest("DELETE", deleteUrl, nil)
 	req.SetBasicAuth(os.Getenv("API_USER"), os.Getenv("API_PASSWORD"))
@@ -574,6 +577,9 @@ func prettyPrintEvents(wg *sync.WaitGroup, c Crawler) {
 	if err != nil {
 		log.Print(err.Error())
 	}
+	// TODO: fix encoding
+	// https://stackoverflow.com/questions/28595664/how-to-stop-json-marshal-from-escaping-and
+	// https://developpaper.com/the-solution-of-escaping-special-html-characters-in-golang-json-marshal/
 	fmt.Print(string(eventsJson))
 }
 

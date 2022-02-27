@@ -4,51 +4,56 @@ crawlers:
   ##########
   # Bologna
   ##########
-  - name: LocomotivClub
-    type: concert
-    city: Bologna
-    url: "https://www.locomotivclub.it/eventtype/calendario/"
-    event: ".qt-item-event"
+  - url: "https://www.locomotivclub.it/eventtype/calendario/"
+    item: ".qt-item-event"
     fields:
-      - name: "title"
-        type: "text"
-        location:
-          selector: ".qt-text-shadow"
-      - name: "comment"
-        type: "text"
-        location:
-          selector: ".qt-the-content div"
-        can_be_empty: true
-        on_subpage: "url"
-      - name: "url"
-        type: "url"
-        location:
-          selector: ".qt-text-shadow"
-      - name: "date"
-        type: "date"
-        on_subpage: "url"
-        components:
-          - covers:
-              day: true
-              month: true
-              year: true
-            location:
-              selector: ".qt-eventtable tr td"
-              regex_extract:
-                exp: "Data:.*"
-              child_index: -1 # -1 means: 'apply the regex until a child matches'
-            layout: "Data: 2 January 2006"
-          - covers:
-              time: true
-            location:
-              selector: ".qt-eventtable tr td"
-              node_index: 2
-              regex_extract:
-                exp: "Inizio concerto: .*"
-              child_index: -1 # -1 means: 'apply the regex until a child matches'
-            layout: "Inizio concerto: 3:04 pm"
-        date_location: "Europe/Berlin"
-        date_language: "it_IT"
+      static:
+        - name: "type"
+          value: "concert"
+        - name: "city"
+          value: "Bologna"
+        - name: "location"
+          value: "LocomotivClub"
+      dynamic:
+        - name: "title"
+          type: "text"
+          location:
+            selector: ".qt-text-shadow"
+        - name: "comment"
+          type: "text"
+          location:
+            selector: ".qt-the-content div"
+          can_be_empty: true
+          on_subpage: "url"
+        - name: "url"
+          type: "url"
+          location:
+            selector: ".qt-text-shadow"
+        - name: "date"
+          type: "date"
+          on_subpage: "url"
+          components:
+            - covers:
+                day: true
+                month: true
+                year: true
+              location:
+                selector: ".qt-eventtable tr td"
+                regex_extract:
+                  exp: "Data:.*"
+                child_index: -1 # -1 means: 'apply the regex until a child matches'
+              layout: "Data: 2 January 2006"
+            - covers:
+                time: true
+              location:
+                selector: ".qt-eventtable tr td"
+                node_index: 2
+                regex_extract:
+                  exp: "Inizio concerto: .*"
+                child_index: -1 # -1 means: 'apply the regex until a child matches'
+              layout: "Inizio concerto: 3:04 pm"
+          date_location: "Europe/Berlin"
+          date_language: "it_IT"
     filters:
       - field: "title"
         regex_ignore: ".*CANCELED.*"
@@ -471,42 +476,50 @@ crawlers:
   ##########
   # Zurich
   ##########
-  - name: Helsinki
-    type: concert
-    url: https://www.helsinkiklub.ch
-    city: "Zurich"
+  # NOTE: latest config version
+  - url: https://www.helsinkiklub.ch
     event: ".event .header"
     fields:
-      - name: "title"
-        type: "text"
-        location:
-          selector: ".agenda > .top,.support"
-          # - ".agenda .top"
-          # - ".agenda .support"
-      - name: "comment"
-        type: "text"
-        location:
-          selector: ".agenda > .top .addition,.support .addition"
-        can_be_empty: true
-      - name: "url"
-        type: "url"
-        # if we don't define a location the crawler url is taken as url (in most cases)
-        # TODO: think of a better way that always works
-      - name: "date"
-        type: "date"
-        components:
-          - covers:
-              day: true
-            location:
-              selector: ".day"
-            layout: "2"
-          - covers:
-              month: true
-            location:
-              selector: ".month"
-            layout: "January" # has to be in English
-        date_location: "Europe/Berlin"
-        date_language: "de_DE"
+      static:
+        - name: "location"
+          value: "Helsinki"
+        - name: "city"
+          value: "Zurich"
+        - name: "type"
+          value: "concert"
+        - name: "url"
+          value: "https://www.helsinkiklub.ch"
+      dynamic:
+        - name: "title"
+          type: "text"
+          location:
+            selector: ".agenda > .top,.support"
+            # - ".agenda .top"
+            # - ".agenda .support"
+        - name: "comment"
+          type: "text"
+          location:
+            selector: ".agenda > .top .addition,.support .addition"
+          can_be_empty: true
+        # - name: "url"
+        #   type: "url"
+        #   # if we don't define a location the crawler url is taken as url (in most cases)
+        #   # TODO: think of a better way that always works
+        - name: "date"
+          type: "date"
+          components:
+            - covers:
+                day: true
+              location:
+                selector: ".day"
+              layout: "2"
+            - covers:
+                month: true
+              location:
+                selector: ".month"
+              layout: "January" # has to be in English
+          date_location: "Europe/Berlin"
+          date_language: "de_DE"
 
   - name: Mehrspur
     type: concert
@@ -831,147 +844,220 @@ crawlers:
       selector: ".MarkupPagerNavNext a"
       relative: true
 
-  # - name: Heldenbar
-  #   type: concert
-  #   city: Zurich
-  #   url: "https://www.heldenbar.ch/programm/"
-  #   event: ".page-content .vsel-upcoming"
-  #   fields:
-  #     title:
-  #       selector: ".vsel-meta-title a"
-  #     comment:
-  #       selector: ".vsel-info p"
-  #     url:
-  #       selector: ".vsel-meta-title a"
-  #       on_subpage: ["date"]
-  #     date:
-  #       day_month_year:
-  #         selector: ".vsel-meta-date span"
-  #         layout: "2/01/2006"
-  #         regex_extract:
-  #           exp: "([0-9]{2}/){2}[0-9]{4}"
-  #       time:
-  #         selector: ".vsel-meta-time span"
-  #         layout: "15:04"
-  #         regex_extract:
-  #           exp: "[0-9]{1,2}:[0-9]{2}"
-  #       location: "Europe/Berlin"
-  #       language: "de_DE"
+  - name: Heldenbar
+    type: concert
+    city: Zurich
+    url: "https://www.heldenbar.ch/programm/"
+    event: ".page-content .vsel-upcoming"
+    fields:
+      - name: "title"
+        type: "text"
+        location:
+          selector: ".vsel-meta-title a"
+      - name: "comment"
+        type: "text"
+        location:
+          selector: ".vsel-info p"
+      - name: "url"
+        type: "url"
+        location:
+          selector: ".vsel-meta-title a"
+      - name: "date"
+        type: "date"
+        on_subpage: "url"
+        components:
+          - covers:
+              day: true
+              month: true
+              year: true
+            location:
+              selector: ".vsel-meta-date span"
+              regex_extract:
+                exp: "([0-9]{2}/){2}[0-9]{4}"
+            layout: "2/01/2006"
+          - covers:
+              time: true
+            location:
+              selector: ".vsel-meta-time span"
+              regex_extract:
+                exp: "[0-9]{1,2}:[0-9]{2}"
+            layout: "15:04"
+        date_location: "Europe/Berlin"
+        date_language: "de_DE"
 
-  # - name: Exil
-  #   type: concert
-  #   city: Zurich
-  #   url: "https://exil.cl/programm"
-  #   event: "#detail-main article"
-  #   exclude_with_selector: 
-  #     - ".wct_event"
-  #   fields:
-  #     title:
-  #       selector: ".grid-event-title"
-  #     comment:
-  #       selector: ".hyphenate p"
-  #       max_length: 200
-  #     date:
-  #       day_month_year_time:
-  #         selector: ".grid-event-date"
-  #         layout: "2006-01-02T15:04"
-  #         attr: "datetime"
-  #       location: "Europe/Berlin"
-  #       language: "de_DE"
-  #   filters:
-  #     - field: "title"
-  #       regex_ignore: ".*abgesagt.*"
-  #     - field: "title"
-  #       regex_ignore: "geschlossene Gesellschaft"
+  - name: Exil
+    type: concert
+    city: Zurich
+    url: "https://exil.cl/programm"
+    event: "#detail-main article"
+    exclude_with_selector: 
+      - ".wct_event"
+    fields:
+      - name: "title"
+        type: "text"
+        location:
+          selector: ".grid-event-title"
+      - name: "comment"
+        type: "text"
+        location:
+          selector: ".hyphenate p"
+          max_length: 200
+        can_be_empty: true
+      - name: "url"
+        type: "url"
+      - name: "date"
+        type: "date"
+        components:
+          - covers:
+              day: true
+              month: true
+              year: true
+              time: true
+            location:
+              selector: ".grid-event-date"
+              attr: "datetime"
+            layout: "2006-01-02T15:04"
+        date_location: "Europe/Berlin"
+        date_language: "de_DE"
+    filters:
+      - field: "title"
+        regex_ignore: ".*abgesagt.*"
+      - field: "title"
+        regex_ignore: "geschlossene Gesellschaft"
         
-  # - name: Papiersaal
-  #   type: concert
-  #   city: Zurich
-  #   url: "https://www.papiersaal.ch/"
-  #   event: ".single-act"
-  #   fields:
-  #     title:
-  #       selector: ".col-sm-8 h2 a strong"
-  #     url:
-  #       selector: ".col-sm-8 h2 a"
-  #       relative: true
-  #       on_subpage: ["comment"]
-  #     comment:
-  #       selector: ".col-lg-12 p"
-  #       node_index: 2
-  #       max_length: 200
-  #     date:
-  #       day_month_year:
-  #         selector: ".col-sm-8 h3"
-  #         layout: "Monday, 2. Jan 2006"
-  #         regex_extract:
-  #           exp: "[A-Za-z]+,\\s[0-9]{1,2}\\.\\s[\u00e4A-Za-z]{3,4}\\s[0-9]{4}"
-  #       time:
-  #         selector: ".col-sm-8 i"
-  #         layout: "15h04"
-  #         child_index: 3 # we only need this because multiple children match the regex.
-  #         regex_extract:
-  #           exp: "[0-9]{2}h[0-9]{2}"
-  #       location: "Europe/Berlin"
-  #       language: "de_DE"
-  #   paginator:
-  #     selector: ".pull-right"
-  #     relative: true
-  #   filters:
-  #     - field: "title"
-  #       regex_ignore: ".*Abgesagt.*"
-  #     - field: "title"
-  #       regex_ignore: ".*Verschoben.*"
-  #     - field: "title"
-  #       regex_ignore: ".*VERSCHOBEN.*"
+  - name: Papiersaal
+    type: concert
+    city: Zurich
+    url: "https://www.papiersaal.ch/"
+    event: ".single-act"
+    fields:
+      - name: "title"
+        type: "text"
+        location:
+          selector: ".col-sm-8 h2 a strong"
+      - name: "url"
+        type: "url"
+        location:
+          selector: ".col-sm-8 h2 a"
+        relative: true
+      - name: "comment"
+        type: "text"
+        on_subpage: "url"
+        can_be_empty: true
+        location:
+          selector: ".col-lg-12 p"
+          node_index: 2
+          max_length: 200
+      - name: "date"
+        type: "date"
+        components:
+          - covers:
+              day: true
+              month: true
+              year: true
+            location:
+              selector: ".col-sm-8 h3"
+              regex_extract:
+                exp: "[A-Za-z]+,\\s[0-9]{1,2}\\.\\s[\u00e4A-Za-z]{3,4}\\s[0-9]{4}"
+            layout: "Monday, 2. Jan 2006"
+          - covers:
+              time: true
+            location:
+              selector: ".col-sm-8 i"
+              child_index: 3
+              regex_extract:
+                exp: "[0-9]{2}h[0-9]{2}"
+            layout: "15h04"
+        date_location: "Europe/Berlin"
+        date_language: "de_DE"
+    paginator:
+      selector: ".pull-right"
+      relative: true
+    filters:
+      - field: "title"
+        regex_ignore: ".*Abgesagt.*"
+      - field: "title"
+        regex_ignore: ".*Verschoben.*"
+      - field: "title"
+        regex_ignore: ".*VERSCHOBEN.*"
 
-  # - name: X-TRA
-  #   type: concert
-  #   city: Zurich
-  #   url: "https://www.x-tra.ch/en/agenda/concerts/"
-  #   event: ".events .tile li"
-  #   fields:
-  #     title:
-  #       selector: ".text h2"
-  #     url:
-  #       selector: "a"
-  #       relative: true
-  #       on_subpage: ["date", "comment"]
-  #     comment:
-  #       selector: ".left .content p"
-  #       max_length: 200
-  #     date:
-  #       day_month_year:
-  #         selector: ".caption .text h3"
-  #         layout: "Mon 02.01.06"
-  #       time:
-  #         selector: ".time li strong"
-  #         node_index: 1
-  #         layout: "3.04 p.m. "
-  #       location: "Europe/Berlin"
-  #       language: "en_US"
+  - name: X-TRA
+    type: concert
+    city: Zurich
+    url: "https://www.x-tra.ch/en/agenda/concerts/"
+    event: ".events .tile li"
+    fields:
+      - name: "title"
+        type: "text"
+        location:
+          selector: ".text h2"
+      - name: "url"
+        type: "url"
+        location:
+          selector: "a"
+        relative: true
+      - name: "comment"
+        type: "text"
+        can_be_empty: true
+        on_subpage: "url"
+        location:
+          selector: ".left .content p"
+          max_length: 200
+      - name: "date"
+        type: "date"
+        on_subpage: "url"
+        components:
+          - covers:
+              day: true
+              month: true
+              year: true
+            location:
+              selector: ".caption .text h3"
+            layout: "Mon 02.01.06"
+          - covers:
+              time: true
+            location:
+              selector: ".time li strong"
+              node_index: 1
+            layout: "3.04 p.m. "
+        date_location: "Europe/Berlin"
+        date_language: "en_US"
 
-  # - name: Walcheturm
-  #   type: concert
-  #   city: Zurich
-  #   url: "https://walcheturm.ch/agenda/"
-  #   event: "#projectlist a"
-  #   fields:
-  #     title:
-  #       selector: ".content h1"
-  #     url:
-  #       selector: ""
-  #       relative: true
-  #     date:
-  #       day_month_year:
-  #         selector: ".content p"
-  #         regex_extract:
-  #           exp: "([0-9]{2}\\.){2}[0-9]{4}"
-  #           index: 0
-  #         layout: "02.01.2006"
-  #       time:
-  #         selector: ".content p"
-  #         regex_extract:
-  #           exp: "[0-9]{2}:[0-9]{2}"
-  #           index: 0
-  #         layout: "15:04"
+  - name: Walcheturm
+    type: concert
+    city: Zurich
+    url: "https://walcheturm.ch/agenda/"
+    event: "#projectlist a"
+    fields:
+      - name: "title"
+        type: "text"
+        location:
+          selector: ".content h1"
+      - name: "url"
+        type: "url"
+        location:
+          selector: ""
+        relative: true
+      - name: "date"
+        type: "date"
+        components:
+          - covers:
+              day: true
+              month: true
+              year: true
+            location:
+              selector: ".content p"
+              regex_extract:
+                exp: "([0-9]{2}\\.){2}[0-9]{4}"
+                index: 0
+            layout: "02.01.2006"
+          - covers:
+              time: true
+            location:
+              selector: ".content p"
+              child_index: -1 # This setting searches for a regex match in all children of the respective node AND sets a default of 20:00 if no match is found.
+              regex_extract:
+                exp: "[0-9]{2}:[0-9]{2}"
+                index: 0
+            layout: "15:04"
+        date_location: "Europe/Berlin"

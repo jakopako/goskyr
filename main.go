@@ -69,7 +69,12 @@ type DateComponent struct {
 	Layout          string           `yaml:"layout"`
 }
 
-type Field struct {
+type StaticField struct {
+	Name  string `yaml:"name"`
+	Value string `yaml:"value"`
+}
+
+type DynamicField struct {
 	Name string `yaml:"name"`
 	Type string `yaml:"type"` // can currently be text, url or date
 	// If a field can be found on a subpage the following variable has to contain a field name of
@@ -89,15 +94,18 @@ type Filter struct {
 }
 
 type Crawler struct {
-	Name                string   `yaml:"name"`
-	Type                string   `yaml:"type"`
-	URL                 string   `yaml:"url"`
-	City                string   `yaml:"city"`
-	Event               string   `yaml:"event"`
+	// Name                string   `yaml:"name"`
+	// Type                string   `yaml:"type"`
+	URL string `yaml:"url"`
+	// City                string   `yaml:"city"`
+	Item                string   `yaml:"item"`
 	ExcludeWithSelector []string `yaml:"exclude_with_selector"`
-	Fields              []Field  `yaml:"fields"`
-	Filters             []Filter `yaml:"filters"`
-	Paginator           struct {
+	Fields              struct {
+		Static  []StaticField  `yaml:"static`
+		Dynamic []DynamicField `yaml:"dynamic"`
+	} `yaml:"fields"`
+	Filters   []Filter `yaml:"filters"`
+	Paginator struct {
 		Selector  string `yaml:"selector"`
 		Relative  bool   `yaml:"relative"`
 		MaxPages  int    `yaml:"max_pages"`
@@ -141,7 +149,7 @@ func (c Crawler) getEvents() ([]map[string]interface{}, error) {
 			return events, err
 		}
 
-		doc.Find(c.Event).Each(func(i int, s *goquery.Selection) {
+		doc.Find(c.Item).Each(func(i int, s *goquery.Selection) {
 			for _, exclude_selector := range c.ExcludeWithSelector {
 				if s.Find(exclude_selector).Length() > 0 || s.Is(exclude_selector) {
 					return
@@ -151,7 +159,7 @@ func (c Crawler) getEvents() ([]map[string]interface{}, error) {
 			currentEvent := map[string]interface{}{"location": c.Name, "city": c.City, "type": c.Type}
 
 			// handle all fields on the main page
-			for _, f := range c.Fields {
+			for _, f := range c.Fields.Dynamic {
 				if f.OnSubpage == "" {
 					err := extractField(&f, currentEvent, s, c.URL, res)
 					if err != nil {
@@ -171,7 +179,7 @@ func (c Crawler) getEvents() ([]map[string]interface{}, error) {
 			// UPDATE: seems to be correct after all.
 			subpagesResp := make(map[string]*http.Response)
 			subpagesBody := make(map[string]*goquery.Document)
-			for _, f := range c.Fields {
+			for _, f := range c.Fields.Dynamic {
 				if f.OnSubpage != "" {
 					// check whether we fetched the page already
 					subpageUrl := fmt.Sprint(currentEvent[f.OnSubpage])
@@ -273,7 +281,7 @@ func (c Crawler) ignoreEvent(event map[string]interface{}) (bool, error) {
 	return false, nil
 }
 
-func extractField(field *Field, event map[string]interface{}, s *goquery.Selection, baseUrl string, res *http.Response) error {
+func extractField(field *DynamicField, event map[string]interface{}, s *goquery.Selection, baseUrl string, res *http.Response) error {
 	switch field.Type {
 	case "text":
 		ts, err := getTextString(&field.ElementLocation, s)
@@ -307,7 +315,7 @@ type DatePart struct {
 	layoutPart string
 }
 
-func getDate(f *Field, s *goquery.Selection) (time.Time, error) {
+func getDate(f *DynamicField, s *goquery.Selection) (time.Time, error) {
 	// time zone
 	var t time.Time
 	loc, err := time.LoadLocation(f.DateLocation)
@@ -403,7 +411,7 @@ func hasAllDateParts(cdp CoveredDateParts) bool {
 	return cdp.Day && cdp.Month && cdp.Year && cdp.Time
 }
 
-func getUrlString(f *Field, s *goquery.Selection, crawlerURL string, res *http.Response) string {
+func getUrlString(f *DynamicField, s *goquery.Selection, crawlerURL string, res *http.Response) string {
 	var url string
 	attr := "href"
 	if f.ElementLocation.Attr != "" {

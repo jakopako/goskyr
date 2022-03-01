@@ -23,20 +23,20 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-type EventType string
+// type EventType string
 
-const (
-	Concert EventType = "concert"
-)
+// const (
+// 	Concert EventType = "concert"
+// )
 
-func (et EventType) IsValid() error {
-	switch et {
-	case Concert:
-		return nil
-	}
-	errorString := fmt.Sprintf("invalid event type: %s", et)
-	return errors.New(errorString)
-}
+// func (et EventType) IsValid() error {
+// 	switch et {
+// 	case Concert:
+// 		return nil
+// 	}
+// 	errorString := fmt.Sprintf("invalid event type: %s", et)
+// 	return errors.New(errorString)
+// }
 
 type Config struct {
 	Crawlers []Crawler `yaml:"crawlers"`
@@ -94,14 +94,14 @@ type Filter struct {
 }
 
 type Crawler struct {
-	// Name                string   `yaml:"name"`
+	Name string `yaml:"name"`
 	// Type                string   `yaml:"type"`
 	URL string `yaml:"url"`
 	// City                string   `yaml:"city"`
 	Item                string   `yaml:"item"`
 	ExcludeWithSelector []string `yaml:"exclude_with_selector"`
 	Fields              struct {
-		Static  []StaticField  `yaml:"static`
+		Static  []StaticField  `yaml:"static"`
 		Dynamic []DynamicField `yaml:"dynamic"`
 	} `yaml:"fields"`
 	Filters   []Filter `yaml:"filters"`
@@ -115,18 +115,19 @@ type Crawler struct {
 
 func (c Crawler) getEvents() ([]map[string]interface{}, error) {
 	// dynamicFields := []string{"title", "comment", "url", "date"}
-	var events []map[string]interface{}
-	eventType := EventType(c.Type)
-	err := eventType.IsValid()
-	if err != nil {
-		return events, err
-	}
 
-	// city
-	if c.City == "" {
-		err := errors.New("city cannot be an empty string")
-		return events, err
-	}
+	var events []map[string]interface{}
+	// eventType := EventType(c.Type)
+	// err := eventType.IsValid()
+	// if err != nil {
+	// 	return events, err
+	// }
+
+	// // city
+	// if c.City == "" {
+	// 	err := errors.New("city cannot be an empty string")
+	// 	return events, err
+	// }
 
 	pageUrl := c.URL
 	hasNextPage := true
@@ -156,7 +157,12 @@ func (c Crawler) getEvents() ([]map[string]interface{}, error) {
 				}
 			}
 
-			currentEvent := map[string]interface{}{"location": c.Name, "city": c.City, "type": c.Type}
+			// add static fields
+			currentEvent := make(map[string]interface{})
+			for _, sf := range c.Fields.Static {
+				currentEvent[sf.Name] = sf.Value
+			}
+			// currentEvent := map[string]interface{}{"location": c.Name, "city": c.City, "type": c.Type}
 
 			// handle all fields on the main page
 			for _, f := range c.Fields.Dynamic {

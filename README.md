@@ -19,7 +19,7 @@ A very simple configuration would look something like this:
 
 ```yml
 crawlers:
-  - name: LifeQuotes
+  - name: LifeQuotes # The name is only for logging and does not appear in the json output.
     url: "https://www.goodreads.com/quotes/tag/life"
     item: ".quote"
     fields:
@@ -221,7 +221,7 @@ location:
     exp: "[0-9]{2}h[0-9]{2}"
 ```
 
-Here, the selector is not enough to extract the desired string and we can't go further down the tree by using different selectors. With the `child_index` we can point to the exact string we want. A `child_index` of 0 would point to the first `<strong>` node, a `child_index` of 1 would point to the string containing "19h00", a `child_index` of 2 would point to the second `<strong>` node and finally a `child_index` of 3 points to the correct string. However, the string still contains more stuff than we need which is why we use a regular expression to extract the desired substring.
+Here, the selector is not enough to extract the desired string and we can't go further down the tree by using different selectors. With the `child_index` we can point to the exact string we want. A `child_index` of 0 would point to the first `<strong>` node, a `child_index` of 1 would point to the string containing "19h00", a `child_index` of 2 would point to the second `<strong>` node and finally a `child_index` of 3 points to the correct string. If `child_index` is set to -1 the first child that results in a regex match will be used. This can be usefull if the `child_index` varies across different items. In the current example however, the `child_index` is always the same but the string still contains more stuff than we need which is why we use a regular expression to extract the desired substring.
 
 To get an even better feeling for the location configuration check out the numerous examples in the `concerts-crawler.yml` file.
 

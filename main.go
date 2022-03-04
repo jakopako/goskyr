@@ -79,10 +79,8 @@ type Filter struct {
 }
 
 type Crawler struct {
-	Name string `yaml:"name"`
-	// Type                string   `yaml:"type"`
-	URL string `yaml:"url"`
-	// City                string   `yaml:"city"`
+	Name                string   `yaml:"name"`
+	URL                 string   `yaml:"url"`
 	Item                string   `yaml:"item"`
 	ExcludeWithSelector []string `yaml:"exclude_with_selector"`
 	Fields              struct {
@@ -153,8 +151,6 @@ func (c Crawler) getEvents() ([]map[string]interface{}, error) {
 			// to still be able to close all the response bodies afterwards
 			// UPDATE: we also store the *goquery.Document since apparently resSub.Body
 			// can only be read once.
-			// UPDATE: the previous statement might be incorrect.
-			// UPDATE: seems to be correct after all.
 			subpagesResp := make(map[string]*http.Response)
 			subpagesBody := make(map[string]*goquery.Document)
 			for _, f := range c.Fields.Dynamic {
@@ -237,7 +233,7 @@ func (c Crawler) getEvents() ([]map[string]interface{}, error) {
 	// does not appear on the website. In that case, eg. having a list of events around
 	// the end of one year and the beginning of the next year we might want to change the
 	// year of some events because our previous guess was rather naiv. We also might want
-	// to make this functionality optional.
+	// to make this functionality optional. See issue #68
 
 	return events, nil
 }
@@ -419,7 +415,6 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 		if t.Attr == "" {
 			fieldNode := fieldSelection.Get(t.NodeIndex).FirstChild
 			currentChildIndex := 0
-			// fieldStringNode := fieldStringSelection.Get(dl.NodeIndex).FirstChild
 			for fieldNode != nil {
 				// If the cild index is 0 (default value if not explicitly defined) we loop over all the children.
 				// This makes it easier if there are many children and only one matches the regex. If only one
@@ -453,7 +448,7 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 			fieldString = fieldSelection.AttrOr(t.Attr, "")
 		}
 	}
-	// trimming whitespaces might be confusing in some cases...
+	// automitcally trimming whitespaces might be confusing in some cases...
 	fieldString = strings.TrimSpace(fieldString)
 	return fieldString, nil
 }
@@ -484,6 +479,8 @@ func extractStringRegex(rc *RegexConfig, s string) (string, error) {
 }
 
 func writeEventsToAPI(wg *sync.WaitGroup, c Crawler) {
+	// This function is not yet documented in the README because it might soon change and the entire result / output handling
+	// might be refactored / improved.
 	log.Printf("crawling %s\n", c.Name)
 	defer wg.Done()
 	apiUrl := os.Getenv("EVENT_API")
@@ -502,16 +499,10 @@ func writeEventsToAPI(wg *sync.WaitGroup, c Crawler) {
 		return
 	}
 	log.Printf("fetched %d %s events\n", len(events), c.Name)
-	// // sort events by date asc
-	// sort.Slice(events, func(i, j int) bool {
-	// 	return events[i].Date.Before(events[j].Date)
-	// })
 
 	// delete events of this crawler from first date on
 
 	firstDate := events[0]["date"].(time.Time).UTC().Format("2006-01-02 15:04")
-	// firstDateObject, _ := time.Parse(time.RFC3339, events[0]["date"])
-	// firstDate := firstDateObject.UTC().Format("2006-01-02 15:04")
 	deleteUrl := fmt.Sprintf("%s?location=%s&datetime=%s", apiUrl, url.QueryEscape(c.Name), url.QueryEscape(firstDate))
 	req, _ := http.NewRequest("DELETE", deleteUrl, nil)
 	req.SetBasicAuth(os.Getenv("API_USER"), os.Getenv("API_PASSWORD"))
@@ -559,14 +550,31 @@ func prettyPrintEvents(wg *sync.WaitGroup, c Crawler) {
 		return
 	}
 
-	eventsJson, err := json.MarshalIndent(events, "", "  ")
-	if err != nil {
-		log.Print(err.Error())
-	}
-	// TODO: fix encoding
+	// We cannot use the following line of code because it automatically replaces certain html characters
+	// with the corresponding Unicode replacement rune.
+	// eventsJson, err := json.MarshalIndent(events, "", "  ")
+	// if err != nil {
+	// 	log.Print(err.Error())
+	// }
+	// See
 	// https://stackoverflow.com/questions/28595664/how-to-stop-json-marshal-from-escaping-and
 	// https://developpaper.com/the-solution-of-escaping-special-html-characters-in-golang-json-marshal/
-	fmt.Print(string(eventsJson))
+	buffer := &bytes.Buffer{}
+	encoder := json.NewEncoder(buffer)
+	encoder.SetEscapeHTML(false)
+	err = encoder.Encode(events)
+	if err != nil {
+		log.Printf("%s ERROR: %s", c.Name, err)
+		return
+	}
+
+	var indentBuffer bytes.Buffer
+	err = json.Indent(&indentBuffer, buffer.Bytes(), "", "  ")
+	if err != nil {
+		log.Printf("%s ERROR: %s", c.Name, err)
+		return
+	}
+	fmt.Print(indentBuffer.String())
 }
 
 func NewConfig(configPath string) (*Config, error) {

@@ -17,7 +17,7 @@ Similar projects:
 
 A very simple configuration would look something like this:
 
-```json
+```yml
 crawlers:
   - name: LifeQuotes
     url: "https://www.goodreads.com/quotes/tag/life"
@@ -50,7 +50,7 @@ Save this to a file, e.g. `quotes-config.yml` and run `go run main.go -config qu
 
 A more complex configuration might look like this:
 
-```json
+```yml
 crawlers:
   - name: Kaufleuten
     url: "https://kaufleuten.ch/events/kultur/konzerte/"
@@ -131,7 +131,7 @@ Basically, a config file contains a list of crawlers that each may have static a
 
 Each crawler can define a number of static fields. Those fields are the same over all returned items. For the event crawling use case this might be the location name as shown in the example above. For a static field only a name and a value need to be defined:
 
-```json
+```yml
     fields:
       static:
         - name: "location"
@@ -142,7 +142,7 @@ Each crawler can define a number of static fields. Those fields are the same ove
 
 Dynamic fields are a little more complex as their values are extracted from the webpage and can have different types. In the most trivial case it suffices to define a field name and a selector so the crawler knows where to look for the corresponding value. The quotes crawler is a good example for that:
 
-```json
+```yml
     fields:
       dynamic:
         - name: "quote"
@@ -154,7 +154,7 @@ Dynamic fields are a little more complex as their values are extracted from the 
 
 However, it might be a bit more complex to extract the desired information. Take for instance the concert crawler configuration shown above, more specifically the config snippet for the `title` field.
 
-```json
+```yml
     fields:
       dynamic:
         - name: "title"
@@ -183,7 +183,7 @@ This field is implicitly of type `text`. Other types, such as `url` or `date` wo
 
 We can do this by configuring the location like this:
 
-```json
+```yml
 location:
   selector: ".member .member-name"
   node_index: 1 # This indicates that we want the second node (indexing starts at 0)
@@ -213,7 +213,7 @@ Last but not least let's say we want to extract the time "20h00" from the follow
 
 This can be achieved with the following configuration:
 
-```json
+```yml
 location:
   selector: ".col-sm-8 i"
   child_index: 3
@@ -233,7 +233,7 @@ This key only applies to dynamic fields of type text. As the name suggests, if s
 
 This key indicates that the corresponding field value should be extracted from a subpage defined in another dynamic field of type `url`. In the following example the comment field will be extracted from the subpage who's url is the value of the dynamic field with the name "url".
 
-```json
+```yml
       dynamic:
         - name: "comment"
           location:

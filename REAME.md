@@ -248,12 +248,26 @@ This key indicates that the corresponding field value should be extracted from a
 
 **Key: `type`**
 
-A dynamic field has a field type that can either be `text`, `url` or `date`. The default is `text`. In that case the string defined by the `location` is extracted and used as is as the value for the respective field. The other types are:
+A dynamic field has a field type that can either be `text`, `url` or `date`. The default is `text`. In that case the string defined by the `location` is extracted and used 'as is' as the value for the respective field. The other types are:
 
 * `url`
 
-TODO
-
+    A url has one additional boolean option: `relative`. This option determines whether this crawler's base url will be prepended to the string that has been extracted with the given `location`
 * `date`
 
-TODO
+    A date field is different from a text field in that the result is a complete, valid date. Internally, this is a `time.Time` object but in the json output it is represented by a string. In order to be able to handle a lot of different cases where date information might be spread across different locations, might be formatted in different ways using different languages a date field has a list of components where each component looks like this:
+
+    ```yml
+    components:
+      - covers:
+          day: bool # optional
+          month: bool # optional
+          year: bool # optional
+          time: bool # optional
+        location:
+          selector: "<selector>"
+          ... # the location has the same configuration as explained above.
+        layout: "<layout>"
+    ```
+
+    As can be seen, a component has to define which part of the date it covers (at least one part has to be covered). Next, the location of this component has to be defined. This is done the same way as we defined the location for a text field string. Finally, we need to define the layout which is done the 'go-way' as this crawler is written in go. For more details check out [this](https://yourbasic.org/golang/format-parse-string-time-date-example/) link or have a look at the numerous examples in the `concerts-config.yml` file.

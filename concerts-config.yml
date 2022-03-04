@@ -444,16 +444,16 @@ crawlers:
                 selector: ".hover-in .center"
                 child_index: -1
                 regex_extract:
-                  exp: "([0-9]{2}\\.){2}\\s"
-              layout: "02.01. "
+                  exp: "([0-9]{2}\\.){2}"
+              layout: "02.01."
             - covers:
                 year: true
               location:
                 selector: ".date"
-                child_index: -1
+                child_index: 4
                 regex_extract:
-                  exp: "[0-9]{2}\\s"
-              layout: "06	" # the whitespace in this string is a tab.
+                  exp: "[0-9]{2}"
+              layout: "06" # the whitespace in this string is a tab.
             - covers:
                 time: true
               location:

@@ -6,12 +6,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,58 +23,84 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-type EventType string
-
-const (
-	Concert EventType = "concert"
-)
-
-func (et EventType) IsValid() error {
-	switch et {
-	case Concert:
-		return nil
-	}
-	errorString := fmt.Sprintf("invalid event type: %s", et)
-	return errors.New(errorString)
+type Config struct {
+	Crawlers []Crawler `yaml:"crawlers"`
 }
 
-// TODO: it's ugly to copy paste this from the croncert-api project.
-type Event struct {
-	Title    string    `bson:"title,omitempty" json:"title,omitempty" validate:"required" example:"ExcitingTitle"`
-	Location string    `bson:"location,omitempty" json:"location,omitempty" validate:"required" example:"SuperLocation"`
-	City     string    `bson:"city,omitempty" json:"city,omitempty" validate:"required" example:"SuperCity"`
-	Date     time.Time `bson:"date,omitempty" json:"date,omitempty" validate:"required" example:"2021-10-31T19:00:00.000Z"`
-	URL      string    `bson:"url,omitempty" json:"url,omitempty" validate:"required,url" example:"http://link.to/concert/page"`
-	Comment  string    `bson:"comment,omitempty" json:"comment,omitempty" example:"Super exciting comment."`
-	Type     EventType `bson:"type,omitempty" json:"type,omitempty" validate:"required" example:"concert"`
+type RegexConfig struct {
+	Exp   string `yaml:"exp"`
+	Index int    `yaml:"index"`
 }
 
-func (c Crawler) getEvents() ([]Event, error) {
-	dynamicFields := []string{"title", "comment", "url", "date"}
-	events := []Event{}
-	eventType := EventType(c.Type)
-	err := eventType.IsValid()
-	if err != nil {
-		return events, err
-	}
+type ElementLocation struct {
+	Selector     string      `yaml:"selector"`
+	NodeIndex    int         `yaml:"node_index"`
+	ChildIndex   int         `yaml:"child_index"`
+	RegexExtract RegexConfig `yaml:"regex_extract"`
+	Attr         string      `yaml:"attr"`
+	MaxLength    int         `yaml:"max_length"`
+}
 
-	// city
-	if c.City == "" {
-		err := errors.New("city cannot be an empty string")
-		return events, err
-	}
+type CoveredDateParts struct {
+	Day   bool `yaml:"day"`
+	Month bool `yaml:"month"`
+	Year  bool `yaml:"year"`
+	Time  bool `yaml:"time"`
+}
 
-	// time zone
-	loc, err := time.LoadLocation(c.Fields.Date.Location)
-	if err != nil {
-		return events, err
-	}
+type DateComponent struct {
+	Covers          CoveredDateParts `yaml:"covers"`
+	ElementLocation ElementLocation  `yaml:"location"`
+	Layout          string           `yaml:"layout"`
+}
 
-	// locale (language)
-	mLocale := "de_DE"
-	if c.Fields.Date.Language != "" {
-		mLocale = c.Fields.Date.Language
+type StaticField struct {
+	Name  string `yaml:"name"`
+	Value string `yaml:"value"`
+}
+
+type DynamicField struct {
+	Name string `yaml:"name"`
+	Type string `yaml:"type"` // can currently be text, url or date
+	// If a field can be found on a subpage the following variable has to contain a field name of
+	// a field of type 'url' that is located on the main page.
+	ElementLocation ElementLocation `yaml:"location"`
+	OnSubpage       string          `yaml:"on_subpage"`    // applies to text, url, date
+	CanBeEmpty      bool            `yaml:"can_be_empty"`  // applies to text, url
+	Components      []DateComponent `yaml:"components"`    // applies to date
+	DateLocation    string          `yaml:"date_location"` // applies to date
+	DateLanguage    string          `yaml:"date_language"` // applies to date
+	Relative        bool            `yaml:"relative"`      // applies to url
+}
+
+type Filter struct {
+	Field       string `yaml:"field"`
+	RegexIgnore string `yaml:"regex_ignore"`
+}
+
+type Crawler struct {
+	Name string `yaml:"name"`
+	// Type                string   `yaml:"type"`
+	URL string `yaml:"url"`
+	// City                string   `yaml:"city"`
+	Item                string   `yaml:"item"`
+	ExcludeWithSelector []string `yaml:"exclude_with_selector"`
+	Fields              struct {
+		Static  []StaticField  `yaml:"static"`
+		Dynamic []DynamicField `yaml:"dynamic"`
+	} `yaml:"fields"`
+	Filters   []Filter `yaml:"filters"`
+	Paginator struct {
+		Selector  string `yaml:"selector"`
+		Relative  bool   `yaml:"relative"`
+		MaxPages  int    `yaml:"max_pages"`
+		NodeIndex int    `yaml:"node_index"`
 	}
+}
+
+func (c Crawler) getEvents() ([]map[string]interface{}, error) {
+
+	var events []map[string]interface{}
 
 	pageUrl := c.URL
 	hasNextPage := true
@@ -97,66 +123,80 @@ func (c Crawler) getEvents() ([]Event, error) {
 			return events, err
 		}
 
-		doc.Find(c.Event).Each(func(i int, s *goquery.Selection) {
+		doc.Find(c.Item).Each(func(i int, s *goquery.Selection) {
 			for _, exclude_selector := range c.ExcludeWithSelector {
 				if s.Find(exclude_selector).Length() > 0 || s.Is(exclude_selector) {
 					return
 				}
 			}
 
-			currentEvent := Event{
-				Location: c.Name,
-				City:     c.City,
-				Type:     EventType(c.Type),
+			// add static fields
+			currentEvent := make(map[string]interface{})
+			for _, sf := range c.Fields.Static {
+				currentEvent[sf.Name] = sf.Value
 			}
 
-			for _, f := range dynamicFields {
-				fOnSubpage := false
-				for _, sf := range c.Fields.URL.OnSubpage {
-					if f == sf {
-						fOnSubpage = true
-					}
-				}
-				if !fOnSubpage {
-					err := extractField(f, s, &c, &currentEvent, events, loc, mLocale, res)
+			// handle all fields on the main page
+			for _, f := range c.Fields.Dynamic {
+				if f.OnSubpage == "" {
+					err := extractField(&f, currentEvent, s, c.URL, res)
 					if err != nil {
-						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %s.", c.Name, f, err, currentEvent.Title)
+						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %v.", c.Name, f.Name, err, currentEvent)
 						return
 					}
 				}
 			}
 
-			if len(c.Fields.URL.OnSubpage) > 0 {
-				resSub, err := http.Get(currentEvent.URL)
-				if err != nil {
-					log.Printf("%s ERROR: %v. Skipping event %s.", c.Name, err, currentEvent.Title)
-					return
-				}
+			// handle all fields on subpages
 
-				if resSub.StatusCode != 200 {
-					log.Printf("%s ERROR: status code error: %d %s. Skipping event %s.", c.Name, res.StatusCode, res.Status, currentEvent.Title)
-					return
-				}
+			// we store the *http.Response as value and not the *goquery.Selection
+			// to still be able to close all the response bodies afterwards
+			// UPDATE: we also store the *goquery.Document since apparently resSub.Body
+			// can only be read once.
+			// UPDATE: the previous statement might be incorrect.
+			// UPDATE: seems to be correct after all.
+			subpagesResp := make(map[string]*http.Response)
+			subpagesBody := make(map[string]*goquery.Document)
+			for _, f := range c.Fields.Dynamic {
+				if f.OnSubpage != "" {
+					// check whether we fetched the page already
+					subpageUrl := fmt.Sprint(currentEvent[f.OnSubpage])
+					resSub, found := subpagesResp[subpageUrl]
+					if !found {
+						resSub, err = http.Get(subpageUrl)
+						if err != nil {
+							log.Printf("%s ERROR: %v. Skipping event %v.", c.Name, err, currentEvent)
+							return
+						}
+						if resSub.StatusCode != 200 {
+							log.Printf("%s ERROR: status code error: %d %s. Skipping event %v.", c.Name, res.StatusCode, res.Status, currentEvent)
+							return
+						}
+						subpagesResp[subpageUrl] = resSub
+						docSub, err := goquery.NewDocumentFromReader(resSub.Body)
 
-				docSub, err := goquery.NewDocumentFromReader(resSub.Body)
-				if err != nil {
-					log.Printf("%s ERROR: error while reading document: %v. Skipping event %s", c.Name, err, currentEvent.Title)
-					return
-				}
-				for _, item := range c.Fields.URL.OnSubpage {
-					err := extractField(item, docSub.Selection, &c, &currentEvent, events, loc, mLocale, resSub)
+						if err != nil {
+							log.Printf("%s ERROR: error while reading document: %v. Skipping event %v", c.Name, err, currentEvent)
+							return
+						}
+						subpagesBody[subpageUrl] = docSub
+					}
+					err = extractField(&f, currentEvent, subpagesBody[subpageUrl].Selection, c.URL, resSub)
 					if err != nil {
-						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %s.", c.Name, item, err, currentEvent.Title)
+						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %v.", c.Name, f.Name, err, currentEvent)
 						return
 					}
 				}
+			}
+			//Close all the subpages
+			for _, resSub := range subpagesResp {
 				resSub.Body.Close()
 			}
 
 			// check if event should be ignored
-			ie, err := c.ignoreEvent(&currentEvent)
+			ie, err := c.ignoreEvent(currentEvent)
 			if err != nil {
-				log.Fatalf("%s ERROR: error while applying ignore filter: %v. Not ignoring event %s.", c.Name, err, currentEvent.Title)
+				log.Fatalf("%s ERROR: error while applying ignore filter: %v. Not ignoring event %v.", c.Name, err, currentEvent)
 			}
 			if !ie {
 				events = append(events, currentEvent)
@@ -193,22 +233,25 @@ func (c Crawler) getEvents() ([]Event, error) {
 		}
 		res.Body.Close()
 	}
+	// TODO: check if the dates make sense. Sometimes we have to guess the year since it
+	// does not appear on the website. In that case, eg. having a list of events around
+	// the end of one year and the beginning of the next year we might want to change the
+	// year of some events because our previous guess was rather naiv. We also might want
+	// to make this functionality optional.
+
 	return events, nil
 }
 
-func (c Crawler) ignoreEvent(event *Event) (bool, error) {
+func (c Crawler) ignoreEvent(event map[string]interface{}) (bool, error) {
 	for _, filter := range c.Filters {
 		regex, err := regexp.Compile(filter.RegexIgnore)
 		if err != nil {
 			return false, err
 		}
-		switch filter.Field {
-		case "title":
-			if regex.MatchString(event.Title) {
-				return true, nil
-			}
-		case "comment":
-			if regex.MatchString(event.Comment) {
+
+		if fieldValue, found := event[filter.Field]; found {
+			fieldValueString := fmt.Sprint(fieldValue)
+			if regex.MatchString(fieldValueString) {
 				return true, nil
 			}
 		}
@@ -216,159 +259,203 @@ func (c Crawler) ignoreEvent(event *Event) (bool, error) {
 	return false, nil
 }
 
-func extractField(item string, s *goquery.Selection, crawler *Crawler, event *Event, events []Event, loc *time.Location, mLocale string, res *http.Response) error {
-	switch item {
-	case "date":
-		currentYear := time.Now().Year()
-		yearString := strconv.Itoa(currentYear)
-		yearLayout := "2006"
-
-		if crawler.Fields.Date.Year.Selector != "" {
-			yearStringTmp, yearLayoutTmp := getDateStringAndLayout(&crawler.Fields.Date.Year, s)
-			// if the found year string is empty we take the default. This might be incorrect but is preferrable to skipping the event entirely.
-			if yearStringTmp != "" {
-				yearString, yearLayout = yearStringTmp, yearLayoutTmp
-			}
-		}
-
-		timeString, timeLayout := "20:00", "15:04"
-		if crawler.Fields.Date.Time.Selector != "" {
-			timeStringTmp, timeLayoutTmp := getDateStringAndLayout(&crawler.Fields.Date.Time, s)
-			// if the found time string is empty we take the default. This might be incorrect but is preferrable to skipping the event entirely.
-			if timeStringTmp != "" {
-				timeString, timeLayout = timeStringTmp, timeLayoutTmp
-			}
-		}
-
-		var dateTimeString, dateTimeLayout string
-		if crawler.Fields.Date.DayMonthYearTime.Selector != "" {
-			dateTimeString, dateTimeLayout = getDateStringAndLayout(&crawler.Fields.Date.DayMonthYearTime, s)
-		} else if crawler.Fields.Date.DayMonthYear.Selector != "" {
-			dayMonthYearString, dayMonthYearLayout := getDateStringAndLayout(&crawler.Fields.Date.DayMonthYear, s)
-			dateTimeString = fmt.Sprintf("%s %s", dayMonthYearString, timeString)
-			dateTimeLayout = fmt.Sprintf("%s %s", dayMonthYearLayout, timeLayout)
-		} else {
-			var dayMonthString, dayMonthLayout string
-			if crawler.Fields.Date.DayMonth.Selector != "" {
-				dayMonthString, dayMonthLayout = getDateStringAndLayout(&crawler.Fields.Date.DayMonth, s)
-			} else if crawler.Fields.Date.Day.Selector != "" && crawler.Fields.Date.Month.Selector != "" {
-				dayString, dayLayout := getDateStringAndLayout(&crawler.Fields.Date.Day, s)
-				monthString, monthLayout := getDateStringAndLayout(&crawler.Fields.Date.Month, s)
-				dayMonthString = dayString + " " + monthString
-				dayMonthLayout = dayLayout + " " + monthLayout
-			}
-
-			dateTimeLayout = fmt.Sprintf("%s %s %s", dayMonthLayout, yearLayout, timeLayout)
-			dateTimeString = fmt.Sprintf("%s %s %s", dayMonthString, yearString, timeString)
-			dateTimeString = strings.Replace(dateTimeString, "Mrz", "Mär", 1) // hack for issue #47
-		}
-
-		if dateTimeString == "" {
-			return errors.New("empty dateTimeString")
-		}
-		t, err := monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
+func extractField(field *DynamicField, event map[string]interface{}, s *goquery.Selection, baseUrl string, res *http.Response) error {
+	switch field.Type {
+	case "text", "": // the default, ie when type is not configured, is 'text'
+		ts, err := getTextString(&field.ElementLocation, s)
 		if err != nil {
 			return err
 		}
-		// if the date t does not come after the previous event's date we increase the year by 1
-		// actually this is only necessary if we have to guess the date but currently for ease of implementation
-		// this check is done always.
-
-		// We relax this condition slightly as it happens that within a day the events might not be sorted chronologically.
-		if len(events) > 0 {
-			correctYear := currentYear
-			for events[len(events)-1].Date.Round(24 * time.Hour).After(t.Round(24 * time.Hour)) {
-				correctYear += 1
-				t = time.Date(int(correctYear), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
+		if !field.CanBeEmpty {
+			if ts == "" {
+				error_msg := fmt.Sprintf("field %s cannot be empty", field.Name)
+				return errors.New(error_msg)
 			}
 		}
-		event.Date = t
-	case "title":
-		title := getFieldString(&crawler.Fields.Title, s)
-		if title == "" {
-			return errors.New("empty event title")
-		}
-		event.Title = title
-	case "comment":
-		event.Comment = getFieldString(&crawler.Fields.Comment, s)
+		event[field.Name] = ts
 	case "url":
-		var url string
-		attr := "href"
-		if crawler.Fields.URL.Attr != "" {
-			attr = crawler.Fields.URL.Attr
+		event[field.Name] = getUrlString(field, s, baseUrl, res)
+	case "date":
+		d, err := getDate(field, s)
+		if err != nil {
+			return err
 		}
-		if crawler.Fields.URL.Selector == "" {
-			url = s.AttrOr(attr, crawler.URL)
-		} else {
-			url = s.Find(crawler.Fields.URL.Selector).AttrOr(attr, crawler.URL)
-		}
-
-		if crawler.Fields.URL.Relative {
-			baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
-			if !strings.HasPrefix(url, "/") {
-				baseURL = baseURL + "/"
-			}
-			url = baseURL + url
-		}
-		event.URL = url
+		event[field.Name] = d
+	default:
+		error_msg := fmt.Sprintf("field type '%s' does not exist", field.Type)
+		return errors.New(error_msg)
 	}
 	return nil
 }
 
-func getDateStringAndLayout(dl *DateField, s *goquery.Selection) (string, string) {
-	var fieldString, fieldLayout string
-	fieldStringSelection := s.Find(dl.Selector)
-	if len(fieldStringSelection.Nodes) > 0 {
-		if dl.Attr == "" {
+type DatePart struct {
+	stringPart string
+	layoutPart string
+}
+
+func getDate(f *DynamicField, s *goquery.Selection) (time.Time, error) {
+	// time zone
+	var t time.Time
+	loc, err := time.LoadLocation(f.DateLocation)
+	if err != nil {
+		return t, err
+	}
+
+	// locale (language)
+	mLocale := "de_DE"
+	if f.DateLanguage != "" {
+		mLocale = f.DateLanguage
+	}
+
+	// collect all the date parts
+	dateParts := []DatePart{}
+	combinedParts := CoveredDateParts{}
+	for _, c := range f.Components {
+		if !hasAllDateParts(combinedParts) {
+			if err := checkForDoubleDateParts(c.Covers, combinedParts); err != nil {
+				return t, err
+			}
+			sp, err := getTextString(&c.ElementLocation, s)
+			if err != nil {
+				return t, err
+			}
+			if sp != "" {
+				dateParts = append(dateParts, DatePart{
+					stringPart: strings.Replace(sp, "p.m.", "pm", 1),
+					layoutPart: strings.Replace(c.Layout, "p.m.", "pm", 1),
+				})
+				combinedParts = mergeDateParts(combinedParts, c.Covers)
+			}
+		}
+	}
+	// adding default values where necessary
+	if !combinedParts.Year {
+		currentYear := time.Now().Year()
+		dateParts = append(dateParts, DatePart{
+			stringPart: strconv.Itoa(currentYear),
+			layoutPart: "2006",
+		})
+	}
+	if !combinedParts.Time {
+		dateParts = append(dateParts, DatePart{
+			stringPart: "20:00",
+			layoutPart: "15:04",
+		})
+	}
+	// currently not all date parts have default values
+	if !combinedParts.Day || !combinedParts.Month {
+		return t, errors.New("date parsing error: to generate a date at least a day and a month is needed")
+	}
+
+	var dateTimeLayout, dateTimeString string
+	for _, dp := range dateParts {
+		dateTimeLayout += dp.layoutPart + " "
+		dateTimeString += dp.stringPart + " "
+	}
+	dateTimeString = strings.Replace(dateTimeString, "Mrz", "Mär", 1) // hack for issue #47
+	t, err = monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
+	if err != nil {
+		return t, err
+	}
+	return t, nil
+}
+
+func checkForDoubleDateParts(dpOne CoveredDateParts, dpTwo CoveredDateParts) error {
+	if dpOne.Day && dpTwo.Day {
+		return errors.New("date parsing error: 'day' covered at least twice")
+	}
+	if dpOne.Month && dpTwo.Month {
+		return errors.New("date parsing error: 'month' covered at least twice")
+	}
+	if dpOne.Year && dpTwo.Year {
+		return errors.New("date parsing error: 'year' covered at least twice")
+	}
+	if dpOne.Time && dpTwo.Time {
+		return errors.New("date parsing error: 'time' covered at least twice")
+	}
+	return nil
+}
+
+func mergeDateParts(dpOne CoveredDateParts, dpTwo CoveredDateParts) CoveredDateParts {
+	return CoveredDateParts{
+		Day:   dpOne.Day || dpTwo.Day,
+		Month: dpOne.Month || dpTwo.Month,
+		Year:  dpOne.Year || dpTwo.Year,
+		Time:  dpOne.Time || dpTwo.Time,
+	}
+}
+
+func hasAllDateParts(cdp CoveredDateParts) bool {
+	return cdp.Day && cdp.Month && cdp.Year && cdp.Time
+}
+
+func getUrlString(f *DynamicField, s *goquery.Selection, crawlerURL string, res *http.Response) string {
+	var url string
+	attr := "href"
+	if f.ElementLocation.Attr != "" {
+		attr = f.ElementLocation.Attr
+	}
+	if f.ElementLocation.Selector == "" {
+		url = s.AttrOr(attr, crawlerURL)
+	} else {
+		url = s.Find(f.ElementLocation.Selector).AttrOr(attr, crawlerURL)
+	}
+
+	if f.Relative {
+		baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
+		if !strings.HasPrefix(url, "/") {
+			baseURL = baseURL + "/"
+		}
+		url = baseURL + url
+	}
+	return url
+}
+
+func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
+	var fieldString string
+	var err error
+	fieldSelection := s.Find(t.Selector)
+	if len(fieldSelection.Nodes) > t.NodeIndex {
+		if t.Attr == "" {
+			fieldNode := fieldSelection.Get(t.NodeIndex).FirstChild
 			currentChildIndex := 0
-			fieldStringNode := fieldStringSelection.Get(dl.NodeIndex).FirstChild
-			for fieldStringNode != nil {
+			// fieldStringNode := fieldStringSelection.Get(dl.NodeIndex).FirstChild
+			for fieldNode != nil {
 				// If the cild index is 0 (default value if not explicitly defined) we loop over all the children.
 				// This makes it easier if there are many children and only one matches the regex. If only one
 				// matches the regex then the child index can even differ inbetween various events.
 				// Plus we do not need to change existing crawler configs.
-				if currentChildIndex == dl.ChildIndex || dl.ChildIndex == 0 {
-					if fieldStringNode.Type == html.TextNode {
-						var err error
-						fieldString, err = extractStringRegex(&dl.RegexExtract, fieldStringNode.Data)
+				//
+				// we change the index setting for the case where we want to find the correct string
+				// by regex (checking all the children and taking the first one that matches the regex) to -1 to
+				// distinguish from the default case 0. So when we explicitly set ChildIndex to -1 it means
+				// check _all_ of the children.
+				if currentChildIndex == t.ChildIndex || t.ChildIndex == -1 {
+					if fieldNode.Type == html.TextNode {
+						fieldString, err = extractStringRegex(&t.RegexExtract, fieldNode.Data)
 						if err == nil {
+							if t.MaxLength > 0 && t.MaxLength < len(fieldString) {
+								fieldString = fieldString[:t.MaxLength] + "..."
+							}
 							break
+						} else if t.ChildIndex != -1 {
+							// only in case we do not (ab)use the regex to search across all children
+							// we want to return the err. Also, we still return the fieldString as
+							// this might be useful for narrowing down the reason for the error.
+							return fieldString, err
 						}
 					}
 				}
-				fieldStringNode = fieldStringNode.NextSibling
+				fieldNode = fieldNode.NextSibling
 				currentChildIndex += 1
 			}
 		} else {
-			fieldString = fieldStringSelection.AttrOr(dl.Attr, "")
+			fieldString = fieldSelection.AttrOr(t.Attr, "")
 		}
 	}
-	// 'p.m.' is not treated as part of the time string by the date parsing library
-	// so we have to replace it with 'pm'
-	fieldLayout = strings.Replace(dl.Layout, "p.m.", "pm", 1)
-	fieldString = strings.Replace(fieldString, "p.m.", "pm", 1)
-	return fieldString, fieldLayout
-}
-
-func getFieldString(f *Field, s *goquery.Selection) string {
-	var fieldString string
-	fieldSelection := s.Find(f.Selector)
-	if len(fieldSelection.Nodes) > f.NodeIndex {
-		fieldNode := fieldSelection.Get(f.NodeIndex).FirstChild
-		if fieldNode != nil {
-			if fieldNode.Type == html.TextNode {
-				fieldString = strings.TrimSpace(fieldSelection.Get(f.NodeIndex).FirstChild.Data)
-				if f.MaxLength > 0 && f.MaxLength < len(fieldString) {
-					fieldString = fieldString[:f.MaxLength] + "..."
-				}
-			}
-		}
-	}
-	fieldString, err := extractStringRegex(&f.RegexExtract, fieldString)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return fieldString
+	// trimming whitespaces might be confusing in some cases...
+	fieldString = strings.TrimSpace(fieldString)
+	return fieldString, nil
 }
 
 func extractStringRegex(rc *RegexConfig, s string) (string, error) {
@@ -415,13 +502,16 @@ func writeEventsToAPI(wg *sync.WaitGroup, c Crawler) {
 		return
 	}
 	log.Printf("fetched %d %s events\n", len(events), c.Name)
-	// sort events by date asc
-	sort.Slice(events, func(i, j int) bool {
-		return events[i].Date.Before(events[j].Date)
-	})
+	// // sort events by date asc
+	// sort.Slice(events, func(i, j int) bool {
+	// 	return events[i].Date.Before(events[j].Date)
+	// })
 
 	// delete events of this crawler from first date on
-	firstDate := events[0].Date.UTC().Format("2006-01-02 15:04")
+
+	firstDate := events[0]["date"].(time.Time).UTC().Format("2006-01-02 15:04")
+	// firstDateObject, _ := time.Parse(time.RFC3339, events[0]["date"])
+	// firstDate := firstDateObject.UTC().Format("2006-01-02 15:04")
 	deleteUrl := fmt.Sprintf("%s?location=%s&datetime=%s", apiUrl, url.QueryEscape(c.Name), url.QueryEscape(firstDate))
 	req, _ := http.NewRequest("DELETE", deleteUrl, nil)
 	req.SetBasicAuth(os.Getenv("API_USER"), os.Getenv("API_PASSWORD"))
@@ -429,8 +519,13 @@ func writeEventsToAPI(wg *sync.WaitGroup, c Crawler) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		log.Fatalf("Something went wrong while deleting events. Status Code: %d\nUrl: %s", resp.StatusCode, deleteUrl)
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Fatalf("Something went wrong while deleting events. Status Code: %d\nUrl: %s Response: %s", resp.StatusCode, deleteUrl, body)
 	}
 
 	// add new events
@@ -464,79 +559,14 @@ func prettyPrintEvents(wg *sync.WaitGroup, c Crawler) {
 		return
 	}
 
-	for _, event := range events {
-		fmt.Printf("Title: %v\nLocation: %v\nCity: %v\nDate: %v\nURL: %v\nComment: %v\nType: %v\n\n",
-			event.Title, event.Location, event.City, event.Date, event.URL, event.Comment, event.Type)
+	eventsJson, err := json.MarshalIndent(events, "", "  ")
+	if err != nil {
+		log.Print(err.Error())
 	}
-}
-
-type Config struct {
-	Crawlers []Crawler `yaml:"crawlers"`
-}
-
-type RegexConfig struct {
-	Exp   string `yaml:"exp"`
-	Index int    `yaml:"index"`
-}
-
-type DateField struct {
-	Selector     string      `yaml:"selector"`
-	Layout       string      `yaml:"layout"`
-	NodeIndex    int         `yaml:"node_index"`
-	ChildIndex   int         `yaml:"child_index"`
-	RegexExtract RegexConfig `yaml:"regex_extract"`
-	Attr         string      `yaml:"attr"`
-}
-
-type Field struct {
-	Selector  string `yaml:"selector"`
-	NodeIndex int    `yaml:"node_index"`
-	// TODO: for consistency have a ChildIndex here as well, see DateField
-	MaxLength    int         `yaml:"max_length"`
-	RegexExtract RegexConfig `yaml:"regex_extract"`
-	RegexIgnore  string      `yaml:"regex_ignore"`
-}
-
-type Filter struct {
-	Field       string `yaml:"field"`
-	RegexIgnore string `yaml:"regex_ignore"`
-}
-
-type Crawler struct {
-	Name                string   `yaml:"name"`
-	Type                string   `yaml:"type"`
-	URL                 string   `yaml:"url"`
-	City                string   `yaml:"city"`
-	Event               string   `yaml:"event"`
-	ExcludeWithSelector []string `yaml:"exclude_with_selector"`
-	Fields              struct {
-		Title   Field `yaml:"title"`
-		Comment Field `yaml:"comment"`
-		URL     struct {
-			Selector  string   `yaml:"selector"`
-			Relative  bool     `yaml:"relative"`
-			OnSubpage []string `yaml:"on_subpage"`
-			Attr      string   `yaml:"attr"`
-		} `yaml:"url"`
-		Date struct {
-			Day              DateField `yaml:"day"`
-			Month            DateField `yaml:"month"`
-			Year             DateField `yaml:"year"`
-			DayMonth         DateField `yaml:"day_month"`
-			DayMonthYear     DateField `yaml:"day_month_year"`
-			DayMonthYearTime DateField `yaml:"day_month_year_time"`
-			Time             DateField `yaml:"time"`
-			Location         string    `yaml:"location"`
-			Language         string    `yaml:"language"`
-		} `yaml:"date"`
-	} `yaml:"fields"`
-	Filters   []Filter `yaml:"filters"`
-	Paginator struct {
-		Selector  string `yaml:"selector"`
-		Relative  bool   `yaml:"relative"`
-		MaxPages  int    `yaml:"max_pages"`
-		NodeIndex int    `yaml:"node_index"`
-	}
+	// TODO: fix encoding
+	// https://stackoverflow.com/questions/28595664/how-to-stop-json-marshal-from-escaping-and
+	// https://developpaper.com/the-solution-of-escaping-special-html-characters-in-golang-json-marshal/
+	fmt.Print(string(eventsJson))
 }
 
 func NewConfig(configPath string) (*Config, error) {
@@ -554,7 +584,6 @@ func NewConfig(configPath string) (*Config, error) {
 }
 
 func main() {
-	//everyCrawler := flag.Bool("all", false, "Use this flag to indicate that all crawlers should be run.")
 	singleCrawler := flag.String("single", "", "The name of the crawler to be run.")
 	storeData := flag.Bool("store", false, "If set to true the crawled data will be written to the API.")
 	configFile := flag.String("config", "./config.yml", "The location of the configuration file.")

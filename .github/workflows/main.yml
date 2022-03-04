@@ -27,7 +27,7 @@ jobs:
       
       # Runs a single command using the runners shell
       - name: Run the crawler
-        run: go run main.go -store
+        run: go run main.go -config concerts-config.yml -store
         env:
           API_USER: ${{ secrets.API_USER }}
           API_PASSWORD: ${{ secrets.API_PASSWORD }}

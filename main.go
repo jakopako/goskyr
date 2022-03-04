@@ -114,20 +114,8 @@ type Crawler struct {
 }
 
 func (c Crawler) getEvents() ([]map[string]interface{}, error) {
-	// dynamicFields := []string{"title", "comment", "url", "date"}
 
 	var events []map[string]interface{}
-	// eventType := EventType(c.Type)
-	// err := eventType.IsValid()
-	// if err != nil {
-	// 	return events, err
-	// }
-
-	// // city
-	// if c.City == "" {
-	// 	err := errors.New("city cannot be an empty string")
-	// 	return events, err
-	// }
 
 	pageUrl := c.URL
 	hasNextPage := true
@@ -162,7 +150,6 @@ func (c Crawler) getEvents() ([]map[string]interface{}, error) {
 			for _, sf := range c.Fields.Static {
 				currentEvent[sf.Name] = sf.Value
 			}
-			// currentEvent := map[string]interface{}{"location": c.Name, "city": c.City, "type": c.Type}
 
 			// handle all fields on the main page
 			for _, f := range c.Fields.Dynamic {
@@ -289,7 +276,7 @@ func (c Crawler) ignoreEvent(event map[string]interface{}) (bool, error) {
 
 func extractField(field *DynamicField, event map[string]interface{}, s *goquery.Selection, baseUrl string, res *http.Response) error {
 	switch field.Type {
-	case "text":
+	case "text", "": // the default, ie when type is not configured, is 'text'
 		ts, err := getTextString(&field.ElementLocation, s)
 		if err != nil {
 			return err
@@ -460,9 +447,7 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 				// check _all_ of the children.
 				if currentChildIndex == t.ChildIndex || t.ChildIndex == -1 {
 					if fieldNode.Type == html.TextNode {
-						// trimming whitespaces might be confusing in some cases...
-						fieldString = strings.TrimSpace(fieldNode.Data)
-						fieldString, err = extractStringRegex(&t.RegexExtract, fieldString)
+						fieldString, err = extractStringRegex(&t.RegexExtract, fieldNode.Data)
 						if err == nil {
 							if t.MaxLength > 0 && t.MaxLength < len(fieldString) {
 								fieldString = fieldString[:t.MaxLength] + "..."
@@ -483,6 +468,8 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 			fieldString = fieldSelection.AttrOr(t.Attr, "")
 		}
 	}
+	// trimming whitespaces might be confusing in some cases...
+	fieldString = strings.TrimSpace(fieldString)
 	return fieldString, nil
 }
 

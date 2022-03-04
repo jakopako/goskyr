@@ -23,21 +23,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// type EventType string
-
-// const (
-// 	Concert EventType = "concert"
-// )
-
-// func (et EventType) IsValid() error {
-// 	switch et {
-// 	case Concert:
-// 		return nil
-// 	}
-// 	errorString := fmt.Sprintf("invalid event type: %s", et)
-// 	return errors.New(errorString)
-// }
-
 type Config struct {
 	Crawlers []Crawler `yaml:"crawlers"`
 }

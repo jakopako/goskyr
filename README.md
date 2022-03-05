@@ -32,7 +32,7 @@ A very simple configuration would look something like this:
 
 ```yml
 scrapers:
-  - name: LifeQuotes # The name is only for logging and does not appear in the json output.
+  - name: LifeQuotes # The name is only for logging and scraper selection (with -single) and does not appear in the json output.
     url: "https://www.goodreads.com/quotes/tag/life"
     item: ".quote"
     fields:

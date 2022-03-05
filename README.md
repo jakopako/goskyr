@@ -32,7 +32,7 @@ crawlers:
             selector: ".authorOrTitle"
 ```
 
-Save this to a file, e.g. `quotes-config.yml` and run `go run main.go -config quotes-config.yml` (or `./crawler -config quotes-config.yml`) to retreive the scraped quotes as json string. The result should look something like this:
+Save this to a file, e.g. `quotes-config.yml` and run `go run main.go -config quotes-config.yml` (or `./go-crawler -config quotes-config.yml`) to retreive the scraped quotes as json string. The result should look something like this:
 
 ```json
 [

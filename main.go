@@ -26,8 +26,8 @@ func NewConfig(configPath string) (*scraper.Config, error) {
 }
 
 func main() {
-	singleCrawler := flag.String("single", "", "The name of the crawler to be run.")
-	storeData := flag.Bool("store", false, "If set to true the crawled data will be written to the API.")
+	singleCrawler := flag.String("single", "", "The name of the scraper to be run.")
+	storeData := flag.Bool("store", false, "If set to true the scraped data will be written to the API. (NOTE: custom function that is not well documented, so don't use it.")
 	configFile := flag.String("config", "./config.yml", "The location of the configuration file.")
 
 	flag.Parse()

@@ -1,4 +1,4 @@
-module github.com/jakopako/event-crawler
+module github.com/jakopako/go-crawler
 
 go 1.17
 

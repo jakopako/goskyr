@@ -1,4 +1,4 @@
-crawlers:
+scrapers:
   - name: LifeQuotes
     url: https://www.goodreads.com/quotes/tag/life
     item: ".quote"

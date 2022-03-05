@@ -1,6 +1,6 @@
-# Crawler configs are grouped by city and cities are sorted alphabetically.
+# Scraper configs are grouped by city and cities are sorted alphabetically.
 
-crawlers:
+scrapers:
   ##########
   # Bologna
   ##########

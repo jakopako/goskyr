@@ -7,7 +7,7 @@ import (
 	"log"
 	"sync"
 
-	"github.com/jakopako/go-crawler/scraper"
+	"github.com/jakopako/goskyr/scraper"
 )
 
 func PrettyPrintEvents(wg *sync.WaitGroup, c scraper.Scraper) {

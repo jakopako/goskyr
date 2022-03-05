@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jakopako/go-crawler/scraper"
+	"github.com/jakopako/goskyr/scraper"
 )
 
 func WriteEventsToAPI(wg *sync.WaitGroup, c scraper.Scraper) {

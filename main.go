@@ -6,8 +6,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/jakopako/go-crawler/output"
-	"github.com/jakopako/go-crawler/scraper"
+	"github.com/jakopako/goskyr/output"
+	"github.com/jakopako/goskyr/scraper"
 	"gopkg.in/yaml.v2"
 )
 

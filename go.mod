@@ -1,4 +1,4 @@
-module github.com/jakopako/go-crawler
+module github.com/jakopako/goskyr
 
 go 1.17
 

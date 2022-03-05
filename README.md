@@ -1,5 +1,8 @@
 # Go crawler
 
+[![Release](https://img.shields.io/github/release/jakopako/go-crawler.svg?style=flat-square)](https://github.com/jakopako/go-crawler/releases)
+[![Go Report Card](https://goreportcard.com/badge/github.com/jakopako/event-crawler)](https://goreportcard.com/report/github.com/jakopako/event-crawler)
+
 This project's goal is to make it easier to extract structured data from web pages. Initially, the main use case was to extract event data from
 different venue websites. However, the code has been rewritten to handle a more general use case of extracting a list of items from any website.
 This could be a list of books from an online book store, a list of plays in a public theater, a list of newspaper articles, etc. Currently, information can only be extracted from static websites.
@@ -12,6 +15,16 @@ Similar projects:
 * [MontFerret/ferret](https://github.com/MontFerret/ferret)
 * [slotix/dataflowkit](https://github.com/slotix/dataflowkit)
 * [andrewstuart/goq](https://github.com/andrewstuart/goq)
+
+## Installation
+
+Download the go-crawler by running
+
+```bash
+go install github.com/jakopako/go-crawler@latest
+```
+
+Or clone the repository and then run with `go run main.go ...` or build it yourself.
 
 ## Configuration & Usage
 
@@ -32,7 +45,7 @@ crawlers:
             selector: ".authorOrTitle"
 ```
 
-Save this to a file, e.g. `quotes-config.yml` and run `go run main.go -config quotes-config.yml` (or `./go-crawler -config quotes-config.yml`) to retreive the scraped quotes as json string. The result should look something like this:
+Save this to a file, e.g. `quotes-config.yml` and run `go-crawler -config quotes-config.yml` (or `go run main.go -config quotes-config.yml`) to retreive the scraped quotes as json string. The result should look something like this:
 
 ```json
 [

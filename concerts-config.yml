@@ -4,7 +4,7 @@ scrapers:
   ##########
   # Bologna
   ##########
-  - name: LocomotivClub # this field is used for logging and does not appear in the output of the crawler
+  - name: LocomotivClub # this field is used for logging and does not appear in the output of the scraper
     url: "https://www.locomotivclub.it/eventtype/calendario/"
     item: ".qt-item-event"
     fields:
@@ -365,7 +365,7 @@ scrapers:
     paginator:
       selector: ".pagination .next"
       relative: true
-      max_pages: 2 # otherwise this crawler takes ages.
+      max_pages: 2 # otherwise this scraper takes ages.
 
   - name: Strom
     url: "https://strom-muc.de/"

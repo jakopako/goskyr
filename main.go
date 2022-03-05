@@ -26,7 +26,7 @@ func NewConfig(configPath string) (*scraper.Config, error) {
 }
 
 func main() {
-	singleCrawler := flag.String("single", "", "The name of the scraper to be run.")
+	singleScraper := flag.String("single", "", "The name of the scraper to be run.")
 	storeData := flag.Bool("store", false, "If set to true the scraped data will be written to the API. (NOTE: custom function that is not well documented, so don't use it.")
 	configFile := flag.String("config", "./config.yml", "The location of the configuration file.")
 
@@ -40,8 +40,8 @@ func main() {
 	var wg sync.WaitGroup
 
 	for _, s := range config.Scrapers {
-		if *singleCrawler != "" {
-			if *singleCrawler == s.Name {
+		if *singleScraper != "" {
+			if *singleScraper == s.Name {
 				wg.Add(1)
 				if *storeData {
 					output.WriteEventsToAPI(&wg, s)

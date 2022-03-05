@@ -37,7 +37,7 @@ func WriteEventsToAPI(wg *sync.WaitGroup, c scraper.Scraper) {
 	}
 	log.Printf("fetched %d %s events\n", len(events), c.Name)
 
-	// delete events of this crawler from first date on
+	// delete events of this scraper from first date on
 
 	firstDate := events[0]["date"].(time.Time).UTC().Format("2006-01-02 15:04")
 	deleteUrl := fmt.Sprintf("%s?location=%s&datetime=%s", apiUrl, url.QueryEscape(c.Name), url.QueryEscape(firstDate))

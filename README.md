@@ -1,6 +1,6 @@
 # goskyr
 
-[![Release](https://img.shields.io/github/release/jakopako/goskyr.svg?style=flat-square)](https://github.com/jakopako/goskyr/releases)
+[![Release](https://img.shields.io/github/release/jakopako/goskyr.svg)](https://github.com/jakopako/goskyr/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/jakopako/goskyr)](https://goreportcard.com/report/github.com/jakopako/goskyr)
 
 This project's goal is to make it easier to scrape structured data from web pages. Initially, the main use case was to extract event data from

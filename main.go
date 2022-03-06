@@ -11,7 +11,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func NewConfig(configPath string) (*scraper.Config, error) {
+func newConfig(configPath string) (*scraper.Config, error) {
 	config := &scraper.Config{}
 	file, err := os.Open(configPath)
 	if err != nil {
@@ -32,7 +32,7 @@ func main() {
 
 	flag.Parse()
 
-	config, err := NewConfig(*configFile)
+	config, err := newConfig(*configFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -44,18 +44,18 @@ func main() {
 			if *singleScraper == s.Name {
 				wg.Add(1)
 				if *storeData {
-					output.WriteEventsToAPI(&wg, s)
+					output.WriteItemsToAPI(&wg, s)
 				} else {
-					output.PrettyPrintEvents(&wg, s)
+					output.PrettyPrintItems(&wg, s)
 				}
 				break
 			}
 		} else {
 			wg.Add(1)
 			if *storeData {
-				go output.WriteEventsToAPI(&wg, s)
+				go output.WriteItemsToAPI(&wg, s)
 			} else {
-				go output.PrettyPrintEvents(&wg, s)
+				go output.PrettyPrintItems(&wg, s)
 			}
 		}
 	}

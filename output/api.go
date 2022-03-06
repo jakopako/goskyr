@@ -15,16 +15,19 @@ import (
 	"github.com/jakopako/goskyr/scraper"
 )
 
-func WriteEventsToAPI(wg *sync.WaitGroup, c scraper.Scraper) {
+// WriteItemsToAPI writes the scraped events to an API defined through
+// env vars. This method is not really useful because it is tailored to
+// one specific API. Might change in the future.
+func WriteItemsToAPI(wg *sync.WaitGroup, c scraper.Scraper) {
 	// This function is not yet documented in the README because it might soon change and the entire result / output handling
 	// might be refactored / improved.
 	log.Printf("crawling %s\n", c.Name)
 	defer wg.Done()
-	apiUrl := os.Getenv("EVENT_API")
+	apiURL := os.Getenv("EVENT_API")
 	client := &http.Client{
 		Timeout: time.Second * 10,
 	}
-	events, err := c.GetEvents()
+	events, err := c.GetItems()
 
 	if err != nil {
 		log.Printf("%s ERROR: %s", c.Name, err)
@@ -40,8 +43,8 @@ func WriteEventsToAPI(wg *sync.WaitGroup, c scraper.Scraper) {
 	// delete events of this scraper from first date on
 
 	firstDate := events[0]["date"].(time.Time).UTC().Format("2006-01-02 15:04")
-	deleteUrl := fmt.Sprintf("%s?location=%s&datetime=%s", apiUrl, url.QueryEscape(c.Name), url.QueryEscape(firstDate))
-	req, _ := http.NewRequest("DELETE", deleteUrl, nil)
+	deleteURL := fmt.Sprintf("%s?location=%s&datetime=%s", apiURL, url.QueryEscape(c.Name), url.QueryEscape(firstDate))
+	req, _ := http.NewRequest("DELETE", deleteURL, nil)
 	req.SetBasicAuth(os.Getenv("API_USER"), os.Getenv("API_PASSWORD"))
 	resp, err := client.Do(req)
 	if err != nil {
@@ -53,7 +56,7 @@ func WriteEventsToAPI(wg *sync.WaitGroup, c scraper.Scraper) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Fatalf("Something went wrong while deleting events. Status Code: %d\nUrl: %s Response: %s", resp.StatusCode, deleteUrl, body)
+		log.Fatalf("Something went wrong while deleting events. Status Code: %d\nUrl: %s Response: %s", resp.StatusCode, deleteURL, body)
 	}
 
 	// add new events
@@ -62,7 +65,7 @@ func WriteEventsToAPI(wg *sync.WaitGroup, c scraper.Scraper) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		req, _ := http.NewRequest("POST", apiUrl, bytes.NewBuffer(concertJSON))
+		req, _ := http.NewRequest("POST", apiURL, bytes.NewBuffer(concertJSON))
 		req.Header = map[string][]string{
 			"Content-Type": {"application/json"},
 		}

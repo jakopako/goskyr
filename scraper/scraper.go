@@ -15,15 +15,20 @@ import (
 	"golang.org/x/net/html"
 )
 
+// Config defines the overall structure of a scraper which is also the structure of the
+// configuration file for the scraper.
 type Config struct {
 	Scrapers []Scraper `yaml:"scrapers"`
 }
 
+// RegexConfig is used for extracting a substring from a string based on the
+// given Exp and Index
 type RegexConfig struct {
 	Exp   string `yaml:"exp"`
 	Index int    `yaml:"index"`
 }
 
+// ElementLocation is used to find a specific string in a html document
 type ElementLocation struct {
 	Selector     string      `yaml:"selector"`
 	NodeIndex    int         `yaml:"node_index"`
@@ -33,6 +38,8 @@ type ElementLocation struct {
 	MaxLength    int         `yaml:"max_length"`
 }
 
+// CoveredDateParts is used to determine what parts of a date a
+// DateComponent covers
 type CoveredDateParts struct {
 	Day   bool `yaml:"day"`
 	Month bool `yaml:"month"`
@@ -40,17 +47,24 @@ type CoveredDateParts struct {
 	Time  bool `yaml:"time"`
 }
 
+// A DateComponent is used to find a specific part of a date within
+// a html document
 type DateComponent struct {
 	Covers          CoveredDateParts `yaml:"covers"`
 	ElementLocation ElementLocation  `yaml:"location"`
 	Layout          string           `yaml:"layout"`
 }
 
+// A StaticField defines a field that has a fixed name and value
+// across all scraped items
 type StaticField struct {
 	Name  string `yaml:"name"`
 	Value string `yaml:"value"`
 }
 
+// A DynamicField contains all the information necessary to scrape
+// a dynamic field from a website, ie a field who's value changes
+// for each item
 type DynamicField struct {
 	Name string `yaml:"name"`
 	Type string `yaml:"type"` // can currently be text, url or date
@@ -65,11 +79,14 @@ type DynamicField struct {
 	Relative        bool            `yaml:"relative"`      // applies to url
 }
 
+// A Filter is used to filter certain items from the result list
 type Filter struct {
 	Field       string `yaml:"field"`
 	RegexIgnore string `yaml:"regex_ignore"`
 }
 
+// A Scraper contains all the necessary config parameters and structs needed
+// to extract the desired information from a website
 type Scraper struct {
 	Name                string   `yaml:"name"`
 	URL                 string   `yaml:"url"`
@@ -88,29 +105,30 @@ type Scraper struct {
 	}
 }
 
-func (c Scraper) GetEvents() ([]map[string]interface{}, error) {
+// GetItems fetches and returns all items from a website according to the
+// Scraper's paramaters
+func (c Scraper) GetItems() ([]map[string]interface{}, error) {
 
-	var events []map[string]interface{}
+	var items []map[string]interface{}
 
-	pageUrl := c.URL
+	pageURL := c.URL
 	hasNextPage := true
 	currentPage := 0
 	for hasNextPage {
-		res, err := http.Get(pageUrl)
+		res, err := http.Get(pageURL)
 		if err != nil {
-			return events, err
+			return items, err
 		}
 
 		// defer res.Body.Close() // better not defer in a for loop
 
 		if res.StatusCode != 200 {
-			errMsg := fmt.Sprintf("status code error: %d %s", res.StatusCode, res.Status)
-			return events, errors.New(errMsg)
+			return items, fmt.Errorf("status code error: %d %s", res.StatusCode, res.Status)
 		}
 
 		doc, err := goquery.NewDocumentFromReader(res.Body)
 		if err != nil {
-			return events, err
+			return items, err
 		}
 
 		doc.Find(c.Item).Each(func(i int, s *goquery.Selection) {
@@ -121,17 +139,17 @@ func (c Scraper) GetEvents() ([]map[string]interface{}, error) {
 			}
 
 			// add static fields
-			currentEvent := make(map[string]interface{})
+			currentItem := make(map[string]interface{})
 			for _, sf := range c.Fields.Static {
-				currentEvent[sf.Name] = sf.Value
+				currentItem[sf.Name] = sf.Value
 			}
 
 			// handle all fields on the main page
 			for _, f := range c.Fields.Dynamic {
 				if f.OnSubpage == "" {
-					err := extractField(&f, currentEvent, s, c.URL, res)
+					err := extractField(&f, currentItem, s, c.URL, res)
 					if err != nil {
-						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %v.", c.Name, f.Name, err, currentEvent)
+						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping item %v.", c.Name, f.Name, err, currentItem)
 						return
 					}
 				}
@@ -148,30 +166,30 @@ func (c Scraper) GetEvents() ([]map[string]interface{}, error) {
 			for _, f := range c.Fields.Dynamic {
 				if f.OnSubpage != "" {
 					// check whether we fetched the page already
-					subpageUrl := fmt.Sprint(currentEvent[f.OnSubpage])
-					resSub, found := subpagesResp[subpageUrl]
+					subpageURL := fmt.Sprint(currentItem[f.OnSubpage])
+					resSub, found := subpagesResp[subpageURL]
 					if !found {
-						resSub, err = http.Get(subpageUrl)
+						resSub, err = http.Get(subpageURL)
 						if err != nil {
-							log.Printf("%s ERROR: %v. Skipping event %v.", c.Name, err, currentEvent)
+							log.Printf("%s ERROR: %v. Skipping item %v.", c.Name, err, currentItem)
 							return
 						}
 						if resSub.StatusCode != 200 {
-							log.Printf("%s ERROR: status code error: %d %s. Skipping event %v.", c.Name, res.StatusCode, res.Status, currentEvent)
+							log.Printf("%s ERROR: status code error: %d %s. Skipping item %v.", c.Name, res.StatusCode, res.Status, currentItem)
 							return
 						}
-						subpagesResp[subpageUrl] = resSub
+						subpagesResp[subpageURL] = resSub
 						docSub, err := goquery.NewDocumentFromReader(resSub.Body)
 
 						if err != nil {
-							log.Printf("%s ERROR: error while reading document: %v. Skipping event %v", c.Name, err, currentEvent)
+							log.Printf("%s ERROR: error while reading document: %v. Skipping item %v", c.Name, err, currentItem)
 							return
 						}
-						subpagesBody[subpageUrl] = docSub
+						subpagesBody[subpageURL] = docSub
 					}
-					err = extractField(&f, currentEvent, subpagesBody[subpageUrl].Selection, c.URL, resSub)
+					err = extractField(&f, currentItem, subpagesBody[subpageURL].Selection, c.URL, resSub)
 					if err != nil {
-						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping event %v.", c.Name, f.Name, err, currentEvent)
+						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping item %v.", c.Name, f.Name, err, currentItem)
 						return
 					}
 				}
@@ -182,36 +200,36 @@ func (c Scraper) GetEvents() ([]map[string]interface{}, error) {
 			}
 
 			// check if event should be ignored
-			ie, err := c.ignoreEvent(currentEvent)
+			ie, err := c.ignoreItem(currentItem)
 			if err != nil {
-				log.Fatalf("%s ERROR: error while applying ignore filter: %v. Not ignoring event %v.", c.Name, err, currentEvent)
+				log.Fatalf("%s ERROR: error while applying ignore filter: %v. Not ignoring item %v.", c.Name, err, currentItem)
 			}
 			if !ie {
-				events = append(events, currentEvent)
+				items = append(items, currentItem)
 			}
 		})
 
 		hasNextPage = false
 		if c.Paginator.Selector != "" {
-			currentPage += 1
+			currentPage++
 			if currentPage < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
 				attr := "href"
 				if len(doc.Find(c.Paginator.Selector).Nodes) > c.Paginator.NodeIndex {
 					pagNode := doc.Find(c.Paginator.Selector).Get(c.Paginator.NodeIndex)
 					for _, a := range pagNode.Attr {
 						if a.Key == attr {
-							nextUrl := a.Val
+							nextURL := a.Val
 							if c.Paginator.Relative {
 								baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
-								if strings.HasPrefix(nextUrl, "?") {
-									pageUrl = baseURL + res.Request.URL.Path + nextUrl
-								} else if !strings.HasPrefix(nextUrl, "/") {
-									pageUrl = baseURL + "/" + nextUrl
+								if strings.HasPrefix(nextURL, "?") {
+									pageURL = baseURL + res.Request.URL.Path + nextURL
+								} else if !strings.HasPrefix(nextURL, "/") {
+									pageURL = baseURL + "/" + nextURL
 								} else {
-									pageUrl = baseURL + nextUrl
+									pageURL = baseURL + nextURL
 								}
 							} else {
-								pageUrl = nextUrl
+								pageURL = nextURL
 							}
 							hasNextPage = true
 						}
@@ -227,10 +245,10 @@ func (c Scraper) GetEvents() ([]map[string]interface{}, error) {
 	// year of some events because our previous guess was rather naiv. We also might want
 	// to make this functionality optional. See issue #68
 
-	return events, nil
+	return items, nil
 }
 
-func (c Scraper) ignoreEvent(event map[string]interface{}) (bool, error) {
+func (c Scraper) ignoreItem(event map[string]interface{}) (bool, error) {
 	for _, filter := range c.Filters {
 		regex, err := regexp.Compile(filter.RegexIgnore)
 		if err != nil {
@@ -247,7 +265,7 @@ func (c Scraper) ignoreEvent(event map[string]interface{}) (bool, error) {
 	return false, nil
 }
 
-func extractField(field *DynamicField, event map[string]interface{}, s *goquery.Selection, baseUrl string, res *http.Response) error {
+func extractField(field *DynamicField, event map[string]interface{}, s *goquery.Selection, baseURL string, res *http.Response) error {
 	switch field.Type {
 	case "text", "": // the default, ie when type is not configured, is 'text'
 		ts, err := getTextString(&field.ElementLocation, s)
@@ -256,13 +274,12 @@ func extractField(field *DynamicField, event map[string]interface{}, s *goquery.
 		}
 		if !field.CanBeEmpty {
 			if ts == "" {
-				errMsg := fmt.Sprintf("field %s cannot be empty", field.Name)
-				return errors.New(errMsg)
+				return fmt.Errorf("field %s cannot be empty", field.Name)
 			}
 		}
 		event[field.Name] = ts
 	case "url":
-		event[field.Name] = getUrlString(field, s, baseUrl, res)
+		event[field.Name] = getURLString(field, s, baseURL, res)
 	case "date":
 		d, err := getDate(field, s)
 		if err != nil {
@@ -270,13 +287,12 @@ func extractField(field *DynamicField, event map[string]interface{}, s *goquery.
 		}
 		event[field.Name] = d
 	default:
-		errMsg := fmt.Sprintf("field type '%s' does not exist", field.Type)
-		return errors.New(errMsg)
+		return fmt.Errorf("field type '%s' does not exist", field.Type)
 	}
 	return nil
 }
 
-type DatePart struct {
+type datePart struct {
 	stringPart string
 	layoutPart string
 }
@@ -296,7 +312,7 @@ func getDate(f *DynamicField, s *goquery.Selection) (time.Time, error) {
 	}
 
 	// collect all the date parts
-	dateParts := []DatePart{}
+	dateParts := []datePart{}
 	combinedParts := CoveredDateParts{}
 	for _, c := range f.Components {
 		if !hasAllDateParts(combinedParts) {
@@ -308,7 +324,7 @@ func getDate(f *DynamicField, s *goquery.Selection) (time.Time, error) {
 				return t, err
 			}
 			if sp != "" {
-				dateParts = append(dateParts, DatePart{
+				dateParts = append(dateParts, datePart{
 					stringPart: strings.Replace(sp, "p.m.", "pm", 1),
 					layoutPart: strings.Replace(c.Layout, "p.m.", "pm", 1),
 				})
@@ -319,13 +335,13 @@ func getDate(f *DynamicField, s *goquery.Selection) (time.Time, error) {
 	// adding default values where necessary
 	if !combinedParts.Year {
 		currentYear := time.Now().Year()
-		dateParts = append(dateParts, DatePart{
+		dateParts = append(dateParts, datePart{
 			stringPart: strconv.Itoa(currentYear),
 			layoutPart: "2006",
 		})
 	}
 	if !combinedParts.Time {
-		dateParts = append(dateParts, DatePart{
+		dateParts = append(dateParts, datePart{
 			stringPart: "20:00",
 			layoutPart: "15:04",
 		})
@@ -377,16 +393,16 @@ func hasAllDateParts(cdp CoveredDateParts) bool {
 	return cdp.Day && cdp.Month && cdp.Year && cdp.Time
 }
 
-func getUrlString(f *DynamicField, s *goquery.Selection, scraperUrl string, res *http.Response) string {
+func getURLString(f *DynamicField, s *goquery.Selection, scraperURL string, res *http.Response) string {
 	var url string
 	attr := "href"
 	if f.ElementLocation.Attr != "" {
 		attr = f.ElementLocation.Attr
 	}
 	if f.ElementLocation.Selector == "" {
-		url = s.AttrOr(attr, scraperUrl)
+		url = s.AttrOr(attr, scraperURL)
 	} else {
-		url = s.Find(f.ElementLocation.Selector).AttrOr(attr, scraperUrl)
+		url = s.Find(f.ElementLocation.Selector).AttrOr(attr, scraperURL)
 	}
 
 	if f.Relative {
@@ -430,7 +446,7 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 					}
 				}
 				fieldNode = fieldNode.NextSibling
-				currentChildIndex += 1
+				currentChildIndex++
 			}
 		} else {
 			fieldString = fieldSelection.AttrOr(t.Attr, "")

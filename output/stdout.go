@@ -10,9 +10,10 @@ import (
 	"github.com/jakopako/goskyr/scraper"
 )
 
-func PrettyPrintEvents(wg *sync.WaitGroup, c scraper.Scraper) {
+// PrettyPrintItems pretty prints the scraped items
+func PrettyPrintItems(wg *sync.WaitGroup, c scraper.Scraper) {
 	defer wg.Done()
-	events, err := c.GetEvents()
+	events, err := c.GetItems()
 	if err != nil {
 		log.Printf("%s ERROR: %s", c.Name, err)
 		return

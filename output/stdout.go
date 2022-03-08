@@ -45,3 +45,26 @@ func PrettyPrintItems(wg *sync.WaitGroup, c scraper.Scraper) {
 	}
 	fmt.Print(indentBuffer.String())
 }
+
+type StdoutWriter struct{}
+
+func (s *StdoutWriter) Write(itemsList chan []map[string]interface{}) {
+	for items := range itemsList {
+		for _, item := range items {
+			buffer := &bytes.Buffer{}
+			encoder := json.NewEncoder(buffer)
+			encoder.SetEscapeHTML(false)
+			if err := encoder.Encode(item); err != nil {
+				log.Printf("StdoutWriter ERROR while writing item %v: %v", item, err)
+				continue
+			}
+
+			var indentBuffer bytes.Buffer
+			if err := json.Indent(&indentBuffer, buffer.Bytes(), "", "  "); err != nil {
+				log.Printf("StdoutWriter ERROR while writing item %v: %v", item, err)
+				continue
+			}
+			fmt.Print(indentBuffer.String())
+		}
+	}
+}

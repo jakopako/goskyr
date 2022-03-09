@@ -1,5 +1,7 @@
-# Scraper configs are grouped by city and cities are sorted alphabetically.
+writer:
+  type: "api"
 
+# Scraper configs are grouped by city and cities are sorted alphabetically.
 scrapers:
   ##########
   # Bologna

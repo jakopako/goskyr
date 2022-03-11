@@ -1,5 +1,6 @@
 writer:
   type: "api"
+  # The other parameters are defined as env variables.
 
 # Scraper configs are grouped by city and cities are sorted alphabetically.
 scrapers:

@@ -24,9 +24,8 @@ func runScraper(s scraper.Scraper, itemsChannel chan []map[string]interface{}, w
 
 func main() {
 	singleScraper := flag.String("single", "", "The name of the scraper to be run.")
-	// storeData := flag.Bool("store", false, "If set to true the scraped data will be written to the API. (NOTE: custom function that is not well documented, so don't use it.")
+	toStdout := flag.Bool("stdout", false, "If set to true the scraped data will be written to stdout despite any other existing writer configurations.")
 	configFile := flag.String("config", "./config.yml", "The location of the configuration file.")
-	// TODO add flag to only write to stdout despite other config in the config file.
 
 	flag.Parse()
 
@@ -39,13 +38,17 @@ func main() {
 	itemsChannel := make(chan []map[string]interface{}, len(config.Scrapers))
 
 	var writer output.Writer
-	switch config.Writer.Type {
-	case "stdout":
+	if *toStdout {
 		writer = &output.StdoutWriter{}
-	case "api":
-		writer = output.NewAPIWriter(&config.Writer)
-	default:
-		log.Fatalf("writer of type %s not implemented", config.Writer.Type)
+	} else {
+		switch config.Writer.Type {
+		case "stdout":
+			writer = &output.StdoutWriter{}
+		case "api":
+			writer = output.NewAPIWriter(&config.Writer)
+		default:
+			log.Fatalf("writer of type %s not implemented", config.Writer.Type)
+		}
 	}
 
 	for _, s := range config.Scrapers {

@@ -71,12 +71,14 @@ type DynamicField struct {
 	DateLocation    string          `yaml:"date_location"` // applies to date
 	DateLanguage    string          `yaml:"date_language"` // applies to date
 	Relative        bool            `yaml:"relative"`      // applies to url
+	Hide            bool            `yaml:"hide"`          // appliess to text, url, date
 }
 
 // A Filter is used to filter certain items from the result list
 type Filter struct {
-	Field       string `yaml:"field"`
-	RegexIgnore string `yaml:"regex_ignore"`
+	Field string `yaml:"field"`
+	Regex string `yaml:"regex"`
+	Match bool   `yaml:"match"`
 }
 
 // A Scraper contains all the necessary config parameters and structs needed
@@ -188,17 +190,18 @@ func (c Scraper) GetItems() ([]map[string]interface{}, error) {
 					}
 				}
 			}
-			//Close all the subpages
+			// close all the subpages
 			for _, resSub := range subpagesResp {
 				resSub.Body.Close()
 			}
 
-			// check if event should be ignored
-			ie, err := c.ignoreItem(currentItem)
+			// check if item should be filtered
+			filter, err := c.filterItem(currentItem)
 			if err != nil {
-				log.Fatalf("%s ERROR: error while applying ignore filter: %v. Not ignoring item %v.", c.Name, err, currentItem)
+				log.Fatalf("%s ERROR: error while applying filter: %v.", c.Name, err)
 			}
-			if !ie {
+			if filter {
+				currentItem = c.removeHiddenFields(currentItem)
 				items = append(items, currentItem)
 			}
 		})
@@ -242,22 +245,59 @@ func (c Scraper) GetItems() ([]map[string]interface{}, error) {
 	return items, nil
 }
 
-func (c Scraper) ignoreItem(event map[string]interface{}) (bool, error) {
+func (c *Scraper) filterItem(item map[string]interface{}) (bool, error) {
+	if len(c.Filters) == 0 {
+		return true, nil
+	}
+	filterBool := false
 	for _, filter := range c.Filters {
-		regex, err := regexp.Compile(filter.RegexIgnore)
+		regex, err := regexp.Compile(filter.Regex)
 		if err != nil {
 			return false, err
 		}
-
-		if fieldValue, found := event[filter.Field]; found {
-			fieldValueString := fmt.Sprint(fieldValue)
-			if regex.MatchString(fieldValueString) {
-				return true, nil
+		if fieldValue, found := item[filter.Field]; found {
+			if regex.MatchString(fmt.Sprint(fieldValue)) {
+				if !filter.Match {
+					// as soon as one filter says 'remove item' we return false
+					// and hence the item doesn't make it into the result list
+					return false, nil
+				}
+				filterBool = true
+			} else {
+				if !filter.Match {
+					filterBool = true
+				}
 			}
 		}
 	}
-	return false, nil
+	return filterBool, nil
 }
+
+func (c *Scraper) removeHiddenFields(item map[string]interface{}) map[string]interface{} {
+	for _, f := range c.Fields.Dynamic {
+		if f.Hide {
+			delete(item, f.Name)
+		}
+	}
+	return item
+}
+
+// func (c Scraper) ignoreItem(event map[string]interface{}) (bool, error) {
+// 	for _, filter := range c.Filters {
+// 		regex, err := regexp.Compile(filter.RegexIgnore)
+// 		if err != nil {
+// 			return false, err
+// 		}
+
+// 		if fieldValue, found := event[filter.Field]; found {
+// 			fieldValueString := fmt.Sprint(fieldValue)
+// 			if regex.MatchString(fieldValueString) {
+// 				return true, nil
+// 			}
+// 		}
+// 	}
+// 	return false, nil
+// }
 
 func extractField(field *DynamicField, event map[string]interface{}, s *goquery.Selection, baseURL string, res *http.Response) error {
 	switch field.Type {

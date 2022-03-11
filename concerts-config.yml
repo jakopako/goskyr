@@ -1198,7 +1198,7 @@ scrapers:
         - name: "event-type"
           location:
             selector: ".event_type"
-          # hide: true
+          hide: true
         - name: "event-status"
           location:
             selector: ".event_links span.inbetweenSpace"

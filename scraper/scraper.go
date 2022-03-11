@@ -246,24 +246,31 @@ func (c Scraper) GetItems() ([]map[string]interface{}, error) {
 }
 
 func (c *Scraper) filterItem(item map[string]interface{}) (bool, error) {
-	// if len(c.Filters) == 0 {
-	// 	return true, nil
-	// }
-	filterBool := true
+	nrMatchTrue := 0
+	filterMatchTrue := false
+	filterMatchFalse := true
 	for _, filter := range c.Filters {
 		regex, err := regexp.Compile(filter.Regex)
 		if err != nil {
 			return false, err
 		}
 		if fieldValue, found := item[filter.Field]; found {
-			if regex.MatchString(fmt.Sprint(fieldValue)) {
-				filterBool = filterBool && filter.Match
+			if filter.Match {
+				nrMatchTrue++
+				if regex.MatchString(fmt.Sprint(fieldValue)) {
+					filterMatchTrue = true
+				}
 			} else {
-				filterBool = filterBool && !filter.Match
+				if regex.MatchString(fmt.Sprint(fieldValue)) {
+					filterMatchFalse = false
+				}
 			}
 		}
 	}
-	return filterBool, nil
+	if nrMatchTrue == 0 {
+		filterMatchTrue = true
+	}
+	return filterMatchTrue && filterMatchFalse, nil
 }
 
 func (c *Scraper) removeHiddenFields(item map[string]interface{}) map[string]interface{} {
@@ -274,23 +281,6 @@ func (c *Scraper) removeHiddenFields(item map[string]interface{}) map[string]int
 	}
 	return item
 }
-
-// func (c Scraper) ignoreItem(event map[string]interface{}) (bool, error) {
-// 	for _, filter := range c.Filters {
-// 		regex, err := regexp.Compile(filter.RegexIgnore)
-// 		if err != nil {
-// 			return false, err
-// 		}
-
-// 		if fieldValue, found := event[filter.Field]; found {
-// 			fieldValueString := fmt.Sprint(fieldValue)
-// 			if regex.MatchString(fieldValueString) {
-// 				return true, nil
-// 			}
-// 		}
-// 	}
-// 	return false, nil
-// }
 
 func extractField(field *DynamicField, event map[string]interface{}, s *goquery.Selection, baseURL string, res *http.Response) error {
 	switch field.Type {

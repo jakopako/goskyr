@@ -58,11 +58,14 @@ scrapers:
           date_language: "it_IT"
     filters:
       - field: "title"
-        regex_ignore: ".*CANCELED.*"
+        regex: ".*CANCELED.*"
+        match: false
       - field: "title"
-        regex_ignore: "ANNULLATO!.*"
+        regex: "ANNULLATO!.*"
+        match: false
       - field: "title"
-        regex_ignore: ".*Postponed.*"
+        regex: ".*Postponed.*"
+        match: false
     paginator:
       selector: ".pagination .qt-btn-primary"
       node_index: -1
@@ -128,9 +131,11 @@ scrapers:
       relative: true
     filters:
       - field: "title"
-        regex_ignore: ".*POSTPONED.*"
+        regex: ".*POSTPONED.*"
+        match: false
       - field: "title"
-        regex_ignore: ".*CANCELLED.*"
+        regex: ".*CANCELLED.*"
+        match: false
 
   ##########
   # Leuven
@@ -305,11 +310,14 @@ scrapers:
           date_language: "de_DE"
     filters:
       - field: "title"
-        regex_ignore: ".*abgesagt.*"
+        regex: ".*abgesagt.*"
+        match: false
       - field: "title"
-        regex_ignore: ".*verlegt.*"
+        regex: ".*verlegt.*"
+        match: false
       - field: "title"
-        regex_ignore: ".*verschoben.*"
+        regex: ".*verschoben.*"
+        match: false
     
 
   - name: Backstage
@@ -360,11 +368,14 @@ scrapers:
           date_language: "de_DE"
     filters:
       - field: "title"
-        regex_ignore: "CORONA TESTZENTRUM.*"
+        regex: "CORONA TESTZENTRUM.*"
+        match: false
       - field: "title"
-        regex_ignore: ".*[A|a][B|b][G|g][E|e][S|s][A|a][G|g][T|t].*"
+        regex: ".*[A|a][B|b][G|g][E|e][S|s][A|a][G|g][T|t].*"
+        match: false
       - field: "title"
-        regex_ignore: ".*[V|v][E|e][R|r][L|l][E|e][G|g][T|t].*"
+        regex: ".*[V|v][E|e][R|r][L|l][E|e][G|g][T|t].*"
+        match: false
     paginator:
       selector: ".pagination .next"
       relative: true
@@ -514,6 +525,19 @@ scrapers:
               layout: "15 H 04"
           date_location: "Europe/Paris"
           date_language: en_US
+        - name: "status"
+          location:
+            selector: ".dates .text-grey span"
+          can_be_empty: true
+          hide: true
+    filters:
+      - field: "status"
+        regex: "cancelled"
+        match: false
+      - field: "status"
+        regex: "delayed"
+        match: false
+
 
   ##########
   # Zurich
@@ -740,6 +764,7 @@ scrapers:
           location:
             selector: ".concertStyleNew .concertDetails"
           on_subpage: "url"
+          can_be_empty: true
         - name: "url"
           type: "url"
           location:
@@ -855,9 +880,11 @@ scrapers:
           date_location: "Europe/Berlin"
     filters:
       - field: "title"
-        regex_ignore: "Verschoben.*"
+        regex: "Verschoben.*"
+        match: false
       - field: "title"
-        regex_ignore: "Abgesagt.*"
+        regex: "Abgesagt.*"
+        match: false
 
 
   - name: Tonhalle
@@ -994,9 +1021,11 @@ scrapers:
           date_language: "de_DE"
     filters:
       - field: "title"
-        regex_ignore: ".*abgesagt.*"
+        regex: ".*abgesagt.*"
+        match: false
       - field: "title"
-        regex_ignore: "geschlossene Gesellschaft"
+        regex: "geschlossene Gesellschaft"
+        match: false
         
   - name: Papiersaal
     url: "https://www.papiersaal.ch/"
@@ -1052,11 +1081,14 @@ scrapers:
       relative: true
     filters:
       - field: "title"
-        regex_ignore: ".*Abgesagt.*"
+        regex: ".*Abgesagt.*"
+        match: false
       - field: "title"
-        regex_ignore: ".*Verschoben.*"
+        regex: ".*Verschoben.*"
+        match: false
       - field: "title"
-        regex_ignore: ".*VERSCHOBEN.*"
+        regex: ".*VERSCHOBEN.*"
+        match: false
 
   - name: X-TRA
     url: "https://www.x-tra.ch/en/agenda/concerts/"

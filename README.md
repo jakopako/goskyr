@@ -107,9 +107,11 @@ scrapers:
           date_location: "Europe/Berlin"
     filters:
       - field: "title"
-        regex_ignore: "Verschoben.*"
+        regex: "Verschoben.*"
+        match: false
       - field: "title"
-        regex_ignore: "Abgesagt.*"
+        regex: "Abgesagt.*"
+        match: false
 ```
 
 The result should look something like this:
@@ -242,6 +244,10 @@ To get an even better feeling for the location configuration check out the numer
 
 This key only applies to dynamic fields of type text. As the name suggests, if set to `true` there won't be an error message if the value is empty.
 
+**Key: `hide`**
+
+This key determines whether a field should be exlcuded from the resulting item. This can be handy when you want to filter based on a field that you don't want to include in the actual item. For more information on filters checkout the **Filters** section below.
+
 **Key: `on_subpage`**
 
 This key indicates that the corresponding field value should be extracted from a subpage defined in another dynamic field of type `url`. In the following example the comment field will be extracted from the subpage who's url is the value of the dynamic field with the name "url".
@@ -284,3 +290,19 @@ A dynamic field has a field type that can either be `text`, `url` or `date`. The
     ```
 
     As can be seen, a component has to define which part of the date it covers (at least one part has to be covered). Next, the location of this component has to be defined. This is done the same way as we defined the location for a text field string. Finally, we need to define the layout which is done the 'go-way' as this scraper is written in go. For more details check out [this](https://yourbasic.org/golang/format-parse-string-time-date-example/) link or have a look at the numerous examples in the `concerts-config.yml` file.
+
+### Filters
+
+Filters can be used to define what items should make it into the resulting list of items. A filter configuration looks as follows:
+
+```yml
+    filters:
+      - field: "status"
+        regex: "cancelled"
+        match: false
+      - field: "status"
+        regex: "delayed"
+        match: false
+```
+
+The `field` key determines to which field the regular expression will be applied. `regex` defines the regular expression and `match` determines whether the item should be included or excluded on match. Note, that as soon as there is one match for a regular expression that has `match` set to **false** the respective field will be exlcuded from the results without looking at the other filters.

@@ -1179,3 +1179,58 @@ scrapers:
                   index: 0
               layout: "15:04"
           date_location: "Europe/Berlin"
+
+  - name: Volkshaus
+    url: https://www.volkshaus.ch/aktuell
+    item: ".event"
+    fields:
+      static:
+        - name: "location"
+          value: "Volkshaus"
+        - name: "city"
+          value: "Zurich"
+        - name: "type"
+          value: "concert"
+      dynamic:
+        - name: "title"
+          location:
+            selector: ".event__title span"
+        - name: "event-type"
+          location:
+            selector: ".event_type"
+          # hide: true
+        - name: "event-status"
+          location:
+            selector: ".event_links span.inbetweenSpace"
+          can_be_empty: true
+          hide: true
+        - name: "url"
+          type: "url"
+          location:
+            selector: ".event_links a"
+        - name: "date"
+          type: "date"
+          components:
+            - covers:
+                day: true
+                month: true
+                year: true
+                time: true
+              location:
+                selector: ".date"
+                attr: "content"
+                regex_extract:
+                  exp: "[^+]*"
+                  index: 0
+              layout: "2006-01-02T15:04:05"
+          date_location: "Europe/Berlin"
+    filters:
+      - field: "event-type"
+        regex: "(?i)konzert"
+        match: true
+      - field: "event-status"
+        regex: "VERSCHOBEN.*"
+        match: false
+      - field: "event-status"
+        regex: "ABGESAGT"
+        match: false

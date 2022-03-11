@@ -15,12 +15,6 @@ import (
 	"golang.org/x/net/html"
 )
 
-// Config defines the overall structure of a scraper which is also the structure of the
-// configuration file for the scraper.
-type Config struct {
-	Scrapers []Scraper `yaml:"scrapers"`
-}
-
 // RegexConfig is used for extracting a substring from a string based on the
 // given Exp and Index
 type RegexConfig struct {

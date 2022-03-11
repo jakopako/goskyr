@@ -3,61 +3,61 @@ package main
 import (
 	"flag"
 	"log"
-	"os"
 	"sync"
 
+	"github.com/jakopako/goskyr/config"
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/scraper"
-	"gopkg.in/yaml.v2"
 )
 
-func newConfig(configPath string) (*scraper.Config, error) {
-	config := &scraper.Config{}
-	file, err := os.Open(configPath)
+func runScraper(s scraper.Scraper, itemsChannel chan []map[string]interface{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+	log.Printf("crawling %s\n", s.Name)
+	items, err := s.GetItems()
 	if err != nil {
-		return nil, err
+		log.Printf("%s ERROR: %s", s.Name, err)
+		return
 	}
-	defer file.Close()
-	d := yaml.NewDecoder(file)
-	if err := d.Decode(&config); err != nil {
-		return nil, err
-	}
-	return config, nil
+	log.Printf("fetched %d %s events\n", len(items), s.Name)
+	itemsChannel <- items
 }
 
 func main() {
 	singleScraper := flag.String("single", "", "The name of the scraper to be run.")
-	storeData := flag.Bool("store", false, "If set to true the scraped data will be written to the API. (NOTE: custom function that is not well documented, so don't use it.")
+	toStdout := flag.Bool("stdout", false, "If set to true the scraped data will be written to stdout despite any other existing writer configurations.")
 	configFile := flag.String("config", "./config.yml", "The location of the configuration file.")
 
 	flag.Parse()
 
-	config, err := newConfig(*configFile)
+	config, err := config.NewConfig(*configFile)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	var wg sync.WaitGroup
+	itemsChannel := make(chan []map[string]interface{}, len(config.Scrapers))
+
+	var writer output.Writer
+	if *toStdout {
+		writer = &output.StdoutWriter{}
+	} else {
+		switch config.Writer.Type {
+		case "stdout":
+			writer = &output.StdoutWriter{}
+		case "api":
+			writer = output.NewAPIWriter(&config.Writer)
+		default:
+			log.Fatalf("writer of type %s not implemented", config.Writer.Type)
+		}
+	}
 
 	for _, s := range config.Scrapers {
-		if *singleScraper != "" {
-			if *singleScraper == s.Name {
-				wg.Add(1)
-				if *storeData {
-					output.WriteItemsToAPI(&wg, s)
-				} else {
-					output.PrettyPrintItems(&wg, s)
-				}
-				break
-			}
-		} else {
+		if *singleScraper == "" || *singleScraper == s.Name {
 			wg.Add(1)
-			if *storeData {
-				go output.WriteItemsToAPI(&wg, s)
-			} else {
-				go output.PrettyPrintItems(&wg, s)
-			}
+			go runScraper(s, itemsChannel, &wg)
 		}
 	}
 	wg.Wait()
+	close(itemsChannel)
+	writer.Write(itemsChannel)
 }

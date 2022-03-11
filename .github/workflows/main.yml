@@ -27,9 +27,9 @@ jobs:
       
       # Runs a single command using the runners shell
       - name: Run the scraper
-        run: go run main.go -config concerts-config.yml -store
+        run: go run main.go -config concerts-config.yml
         env:
-          API_USER: ${{ secrets.API_USER }}
-          API_PASSWORD: ${{ secrets.API_PASSWORD }}
-          EVENT_API: ${{ secrets.EVENT_API }}
+          WRITER_USER: ${{ secrets.API_USER }}
+          WRITER_PASSWORD: ${{ secrets.API_PASSWORD }}
+          WRITER_URI: ${{ secrets.EVENT_API }}
 

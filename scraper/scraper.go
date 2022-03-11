@@ -246,10 +246,10 @@ func (c Scraper) GetItems() ([]map[string]interface{}, error) {
 }
 
 func (c *Scraper) filterItem(item map[string]interface{}) (bool, error) {
-	if len(c.Filters) == 0 {
-		return true, nil
-	}
-	filterBool := false
+	// if len(c.Filters) == 0 {
+	// 	return true, nil
+	// }
+	filterBool := true
 	for _, filter := range c.Filters {
 		regex, err := regexp.Compile(filter.Regex)
 		if err != nil {
@@ -257,16 +257,9 @@ func (c *Scraper) filterItem(item map[string]interface{}) (bool, error) {
 		}
 		if fieldValue, found := item[filter.Field]; found {
 			if regex.MatchString(fmt.Sprint(fieldValue)) {
-				if !filter.Match {
-					// as soon as one filter says 'remove item' we return false
-					// and hence the item doesn't make it into the result list
-					return false, nil
-				}
-				filterBool = true
+				filterBool = filterBool && filter.Match
 			} else {
-				if !filter.Match {
-					filterBool = true
-				}
+				filterBool = filterBool && !filter.Match
 			}
 		}
 	}
@@ -484,6 +477,10 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 			}
 		} else {
 			fieldString = fieldSelection.AttrOr(t.Attr, "")
+			fieldString, err = extractStringRegex(&t.RegexExtract, fieldString)
+			if err != nil {
+				return fieldString, err
+			}
 		}
 	}
 	// automitcally trimming whitespaces might be confusing in some cases...

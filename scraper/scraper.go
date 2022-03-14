@@ -429,6 +429,7 @@ func getURLString(f *DynamicField, s *goquery.Selection, scraperURL string, res 
 		}
 		url = baseURL + url
 	}
+	url = strings.TrimSpace(url)
 	return url
 }
 

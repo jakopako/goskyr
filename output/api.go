@@ -68,7 +68,11 @@ func (f *APIWriter) Write(itemsList chan []map[string]interface{}) {
 					log.Fatal(err)
 				}
 				if resp.StatusCode != 201 {
-					log.Fatalf("something went wrong while adding a new event. Status Code: %d", resp.StatusCode)
+					body, err := ioutil.ReadAll(resp.Body)
+					if err != nil {
+						log.Fatal(err)
+					}
+					log.Fatalf("something went wrong while adding a new event. Status Code: %d Response: %s", resp.StatusCode, body)
 				}
 				resp.Body.Close()
 			}

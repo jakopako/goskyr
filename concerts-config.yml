@@ -1,3 +1,7 @@
+# This configuration has been moved to a different repository (jakopako/croncert-config) to
+# separate the concert-specific configuration from the code. However, to have some examples
+# and allow testing this file is not deleted from this repository.
+
 writer:
   type: "api"
   # The other parameters are defined as env variables.

@@ -12,9 +12,9 @@ better feeling for crawling and parsing websites.
 
 Similar projects:
 
-* [MontFerret/ferret](https://github.com/MontFerret/ferret)
-* [slotix/dataflowkit](https://github.com/slotix/dataflowkit)
-* [andrewstuart/goq](https://github.com/andrewstuart/goq)
+- [MontFerret/ferret](https://github.com/MontFerret/ferret)
+- [slotix/dataflowkit](https://github.com/slotix/dataflowkit)
+- [andrewstuart/goq](https://github.com/andrewstuart/goq)
 
 ## Installation
 
@@ -147,10 +147,10 @@ Basically, a config file contains a list of scrapers that each may have static a
 Each scraper can define a number of static fields. Those fields are the same over all returned items. For the event crawling use case this might be the location name as shown in the example above. For a static field only a name and a value need to be defined:
 
 ```yml
-    fields:
-      static:
-        - name: "location"
-          value: "Kaufleuten"
+fields:
+  static:
+    - name: "location"
+      value: "Kaufleuten"
 ```
 
 ### Dynamic fields
@@ -158,11 +158,11 @@ Each scraper can define a number of static fields. Those fields are the same ove
 Dynamic fields are a little more complex as their values are extracted from the webpage and can have different types. In the most trivial case it suffices to define a field name and a selector so the scraper knows where to look for the corresponding value. The quotes scraper is a good example for that:
 
 ```yml
-    fields:
-      dynamic:
-        - name: "quote"
-          location:
-            selector: ".quoteText"
+fields:
+  dynamic:
+    - name: "quote"
+      location:
+        selector: ".quoteText"
 ```
 
 **Key: `location`**
@@ -170,29 +170,27 @@ Dynamic fields are a little more complex as their values are extracted from the 
 However, it might be a bit more complex to extract the desired information. Take for instance the concert scraper configuration shown above, more specifically the config snippet for the `title` field.
 
 ```yml
-    fields:
-      dynamic:
-        - name: "title"
-          location:
-            selector: "h3"
-            regex_extract:
-              exp: "[^•]*"
-              index: 0
+fields:
+  dynamic:
+    - name: "title"
+      location:
+        selector: "h3"
+        regex_extract:
+          exp: "[^•]*"
+          index: 0
 ```
 
 This field is implicitly of type `text`. Other types, such as `url` or `date` would have to be configured with the keyword `type`. The `location` tells the scraper where to look for the field value and how to extract it. In this case the selector on its own would not be enough to extract the desired value as we would get something like this: `Bastian Baker • Konzert`. That's why there is an extra option to define a regular expression to extract a substring. Note that in this example our extracted string would still contain a trainling space which is automatically removed by the scraper. Let's have a look at two more examples to have a better understanding of the location configuration. Let's say we want to extract "Tonhalle-Orchester Zürich" from the following html snippet.
 
 ```html
 <div class="member">
-    <span class="member-name"></span>
-        <span class="member-name"> Tonhalle-Orchester Zürich</span><span class="member-function">, </span>
-        <span class="member-name"> Yi-Chen Lin</span><span class="member-function"> Leitung und Konzept,</span>
-        <span class="composer">
-            Der Feuervogel
-        </span>
-        <span class="veranstalter">
-            Organizer: Tonhalle-Gesellschaft Zürich AG
-        </span>
+  <span class="member-name"></span>
+  <span class="member-name"> Tonhalle-Orchester Zürich</span
+  ><span class="member-function">, </span>
+  <span class="member-name"> Yi-Chen Lin</span
+  ><span class="member-function"> Leitung und Konzept,</span>
+  <span class="composer"> Der Feuervogel </span>
+  <span class="veranstalter"> Organizer: Tonhalle-Gesellschaft Zürich AG </span>
 </div>
 ```
 
@@ -208,21 +206,22 @@ Last but not least let's say we want to extract the time "20h00" from the follow
 
 ```html
 <div class="col-sm-8 col-xs-12">
-    <h3>
-        Freitag, 25. Feb 2022
-    </h3>
+  <h3>Freitag, 25. Feb 2022</h3>
 
-    <h2><a href="/events/924"><strong>Jacob Lee (AUS) - Verschoben</strong>
-            <!--(USA)-->
-        </a></h2>
-    <q>Singer & Songwriter</q>
+  <h2>
+    <a href="/events/924"
+      ><strong>Jacob Lee (AUS) - Verschoben</strong>
+      <!--(USA)-->
+    </a>
+  </h2>
+  <q>Singer & Songwriter</q>
 
-    <p><strong>+ Support</strong></p>
-    <i><strong>Doors</strong> : 19h00
-        /
-        <strong>Show</strong>
-        : 20h00
-    </i>
+  <p><strong>+ Support</strong></p>
+  <i
+    ><strong>Doors</strong> : 19h00 /
+    <strong>Show</strong>
+    : 20h00
+  </i>
 </div>
 ```
 
@@ -253,56 +252,59 @@ This key determines whether a field should be exlcuded from the resulting item. 
 This key indicates that the corresponding field value should be extracted from a subpage defined in another dynamic field of type `url`. In the following example the comment field will be extracted from the subpage who's url is the value of the dynamic field with the name "url".
 
 ```yml
-      dynamic:
-        - name: "comment"
-          location:
-            selector: ".qt-the-content div"
-          can_be_empty: true
-          on_subpage: "url"
-        - name: "url"
-          type: "url"
-          location:
-            selector: ".qt-text-shadow"
+dynamic:
+  - name: "comment"
+    location:
+      selector: ".qt-the-content div"
+    can_be_empty: true
+    on_subpage: "url"
+  - name: "url"
+    type: "url"
+    location:
+      selector: ".qt-text-shadow"
 ```
 
 **Key: `type`**
 
 A dynamic field has a field type that can either be `text`, `url` or `date`. The default is `text`. In that case the string defined by the `location` is extracted and used 'as is' as the value for the respective field. The other types are:
 
-* `url`
+- `url`
 
-    A url has one additional boolean option: `relative`. This option determines whether this scraper's base url will be prepended to the string that has been extracted with the given `location`
-* `date`
+  A url has one additional boolean option: `relative`. This option determines whether this scraper's base url will be prepended to the string that has been extracted with the given `location`
 
-    A date field is different from a text field in that the result is a complete, valid date. Internally, this is a `time.Time` object but in the json output it is represented by a string. In order to be able to handle a lot of different cases where date information might be spread across different locations, might be formatted in different ways using different languages a date field has a list of components where each component looks like this:
+- `date`
 
-    ```yml
-    components:
-      - covers:
-          day: bool # optional
-          month: bool # optional
-          year: bool # optional
-          time: bool # optional
-        location:
-          selector: "<selector>"
-          ... # the location has the same configuration as explained above.
-        layout: "<layout>"
-    ```
+  A date field is different from a text field in that the result is a complete, valid date. Internally, this is a `time.Time` object but in the json output it is represented by a string. In order to be able to handle a lot of different cases where date information might be spread across different locations, might be formatted in different ways using different languages a date field has a list of components where each component looks like this:
 
-    As can be seen, a component has to define which part of the date it covers (at least one part has to be covered). Next, the location of this component has to be defined. This is done the same way as we defined the location for a text field string. Finally, we need to define the layout which is done the 'go-way' as this scraper is written in go. For more details check out [this](https://yourbasic.org/golang/format-parse-string-time-date-example/) link or have a look at the numerous examples in the `concerts-config.yml` file.
+  ```yml
+  components:
+    - covers:
+        day: bool # optional
+        month: bool # optional
+        year: bool # optional
+        time: bool # optional
+      location:
+        selector: "<selector>"
+        ... # the location has the same configuration as explained above.
+      layout: "<layout>"
+  date_location: "Europe/Berlin"
+  date_language: "it_IT"
+  ```
+
+  As can be seen, a component has to define which part of the date it covers (at least one part has to be covered). Next, the location of this component has to be defined. This is done the same way as we defined the location for a text field string. Finally, we need to define the layout which is done the 'go-way' as this scraper is written in go. For more details check out [this](https://yourbasic.org/golang/format-parse-string-time-date-example/) link or have a look at the numerous examples in the `concerts-config.yml` file. Note that the layout string is always in English although the date string on the scraped website might be in a different language. The `date_language` key needs to correspond to the language on the website. Currently, the default is `de_DE`. Note, that this doesn't matter for dates that only contain numbers. `date_location` sets the time zone of the respective date.
 
 ### Filters
 
 Filters can be used to define what items should make it into the resulting list of items. A filter configuration looks as follows:
 
 ```yml
-    filters:
-      - field: "status"
-        regex: "cancelled"
-        match: false
-      - field: "status"
-        regex: "delayed"
-        match: false
+filters:
+  - field: "status"
+    regex: "cancelled"
+    match: false
+  - field: "status"
+    regex: "delayed"
+    match: false
 ```
 
 The `field` key determines to which field the regular expression will be applied. `regex` defines the regular expression and `match` determines whether the item should be included or excluded on match. Note, that as soon as there is one match for a regular expression that has `match` set to **false** the respective field will be exlcuded from the results without looking at the other filters.

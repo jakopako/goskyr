@@ -234,7 +234,7 @@ scrapers:
   - name: ImportExport
     url: "https://import-export.cc/"
     item: ".events a"
-    exclude_with_selector: 
+    exclude_with_selector:
       - ".old" # events that have a node with this class will be excluded from the results.
     fields:
       static:
@@ -272,7 +272,7 @@ scrapers:
               layout: "Beginn: 15.04"
           date_location: "Europe/Berlin"
           date_language: de_DE
-      
+
   - name: Milla
     url: "https://www.milla-club.de/category/event/"
     item: ".preview-box-outline"
@@ -322,68 +322,6 @@ scrapers:
       - field: "title"
         regex: ".*verschoben.*"
         match: false
-    
-
-  - name: Backstage
-    url: "https://backstage.info/veranstaltungen-2/alle-veranstaltungen"
-    item: ".event"
-    fields:
-      static:
-        - name: "type"
-          value: "concert"
-        - name: "city"
-          value: "Munich"
-        - name: "location"
-          value: "Backstage"
-      dynamic:
-        - name: "title"
-          location:
-            selector: ".pos-title a"
-        - name: "comment"
-          location:
-            selector: ".event h3"
-          on_subpage: "url"
-          can_be_empty: true
-        - name: "url"
-          type: "url"
-          location:
-            selector: ".pos-title a"
-          relative: true
-        - name: "date"
-          type: "date"
-          on_subpage: "url"
-          components:
-            - covers:
-                day: true
-                month: true
-                year: true
-              location:
-                selector: ".pos-datum b"
-              layout: "Monday, 2. January 2006"
-            - covers:
-                time: true
-              location:
-                selector: ".pos-einlass"
-                regex_extract:
-                  exp: "Beginn: [0-9]{1,2}:[0-9]{2}"
-                  index: 0
-              layout: "Beginn: 15:04"
-          date_location: "Europe/Berlin"
-          date_language: "de_DE"
-    filters:
-      - field: "title"
-        regex: "CORONA TESTZENTRUM.*"
-        match: false
-      - field: "title"
-        regex: ".*[A|a][B|b][G|g][E|e][S|s][A|a][G|g][T|t].*"
-        match: false
-      - field: "title"
-        regex: ".*[V|v][E|e][R|r][L|l][E|e][G|g][T|t].*"
-        match: false
-    paginator:
-      selector: ".pagination .next"
-      relative: true
-      max_pages: 2 # otherwise this scraper takes ages.
 
   - name: Strom
     url: "https://strom-muc.de/"
@@ -541,7 +479,6 @@ scrapers:
       - field: "status"
         regex: "delayed"
         match: false
-
 
   ##########
   # Zurich
@@ -794,7 +731,7 @@ scrapers:
               layout: "15Uhr04"
           date_location: "Europe/Berlin"
           date_language: "de_DE"
-        
+
   - name: Mascotte
     url: "https://www.mascotte.ch/nu/events/event_list_type/2"
     item: ".nu-e-concert"
@@ -808,7 +745,7 @@ scrapers:
           value: "concert"
       dynamic:
         - name: "title"
-          location: 
+          location:
             selector: ".screen-only h2"
         - name: "comment"
           can_be_empty: true
@@ -889,7 +826,6 @@ scrapers:
       - field: "title"
         regex: "Abgesagt.*"
         match: false
-
 
   - name: Tonhalle
     url: "https://www.tonhalle-orchester.ch/en/home-tz/konzerte/kalender/"
@@ -988,7 +924,7 @@ scrapers:
   - name: Exil
     url: "https://exil.cl/programm"
     item: "#detail-main article"
-    exclude_with_selector: 
+    exclude_with_selector:
       - ".wct_event"
     fields:
       static:
@@ -1030,7 +966,7 @@ scrapers:
       - field: "title"
         regex: "geschlossene Gesellschaft"
         match: false
-        
+
   - name: Papiersaal
     url: "https://www.papiersaal.ch/"
     item: ".single-act"

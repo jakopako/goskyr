@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"sync"
 
@@ -9,6 +10,8 @@ import (
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/scraper"
 )
+
+var version = "dev"
 
 func runScraper(s scraper.Scraper, itemsChannel chan []map[string]interface{}, wg *sync.WaitGroup) {
 	defer wg.Done()
@@ -26,8 +29,14 @@ func main() {
 	singleScraper := flag.String("single", "", "The name of the scraper to be run.")
 	toStdout := flag.Bool("stdout", false, "If set to true the scraped data will be written to stdout despite any other existing writer configurations.")
 	configFile := flag.String("config", "./config.yml", "The location of the configuration file.")
+	printVersion := flag.Bool("version", false, "The version of goskyr.")
 
 	flag.Parse()
+
+	if *printVersion {
+		fmt.Println(version)
+		return
+	}
 
 	config, err := config.NewConfig(*configFile)
 	if err != nil {

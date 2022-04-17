@@ -308,3 +308,32 @@ filters:
 ```
 
 The `field` key determines to which field the regular expression will be applied. `regex` defines the regular expression and `match` determines whether the item should be included or excluded on match. Note, that as soon as there is one match for a regular expression that has `match` set to **false** the respective item will be exlcuded from the results without looking at the other filters.
+
+## Build
+
+To build and release a new version of goskyr [Goreleaser](https://goreleaser.com/) is used, also see [Quick Start](https://goreleaser.com/quick-start/).
+
+1. Run a "local-only" release to see if it works using the release command:
+
+```bash
+goreleaser release --snapshot --rm-dist
+```
+
+1. Export github token
+
+```bash
+export GITHUB_TOKEN="YOUR_GH_TOKEN"
+```
+
+1. Create a tag and push it to GitHub
+
+   ```bash
+   git tag -a v0.1.5 -m "new features"
+   git push origin v0.1.5
+   ```
+
+1. Run GoReleaser at the root of this repository:
+
+```bash
+goreleaser release
+```

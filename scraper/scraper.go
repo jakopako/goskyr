@@ -377,17 +377,11 @@ func getDate(f *DynamicField, s *goquery.Selection) (time.Time, error) {
 	for _, dp := range dateParts {
 		tmpDateTimeLayouts := dateTimeLayouts
 		dateTimeLayouts = []string{}
-		// dateTimeLayout += dp.layoutParts + " "
-		// if len(tmpDateTimeLayouts) == 0 {
-		// 	dateTimeLayouts = append(dateTimeLayouts, dp.layoutParts...)
-		// } else {
 		for _, tlp := range tmpDateTimeLayouts {
 			for _, lp := range dp.layoutParts {
 				dateTimeLayouts = append(dateTimeLayouts, tlp + lp + " ")
 			}
 		}
-		// }
-
 		dateTimeString += dp.stringPart + " "
 	}
 	dateTimeString = strings.Replace(dateTimeString, "Mrz", "Mär", 1) // hack for issue #47

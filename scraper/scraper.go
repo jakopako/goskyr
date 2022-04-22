@@ -46,7 +46,7 @@ type CoveredDateParts struct {
 type DateComponent struct {
 	Covers          CoveredDateParts `yaml:"covers"`
 	ElementLocation ElementLocation  `yaml:"location"`
-	Layout          string           `yaml:"layout"`
+	Layout          []string           `yaml:"layout"`
 }
 
 // A StaticField defines a field that has a fixed name and value
@@ -311,7 +311,7 @@ func extractField(field *DynamicField, event map[string]interface{}, s *goquery.
 
 type datePart struct {
 	stringPart string
-	layoutPart string
+	layoutParts []string
 }
 
 func getDate(f *DynamicField, s *goquery.Selection) (time.Time, error) {
@@ -341,9 +341,13 @@ func getDate(f *DynamicField, s *goquery.Selection) (time.Time, error) {
 				return t, err
 			}
 			if sp != "" {
+				var lp []string
+				for _, l := range c.Layout {
+					lp = append(lp, strings.Replace(l, "p.m.", "pm", 1))
+				}
 				dateParts = append(dateParts, datePart{
 					stringPart: strings.Replace(sp, "p.m.", "pm", 1),
-					layoutPart: strings.Replace(c.Layout, "p.m.", "pm", 1),
+					layoutParts: lp,
 				})
 				combinedParts = mergeDateParts(combinedParts, c.Covers)
 			}
@@ -354,13 +358,13 @@ func getDate(f *DynamicField, s *goquery.Selection) (time.Time, error) {
 		currentYear := time.Now().Year()
 		dateParts = append(dateParts, datePart{
 			stringPart: strconv.Itoa(currentYear),
-			layoutPart: "2006",
+			layoutParts: []string{"2006"},
 		})
 	}
 	if !combinedParts.Time {
 		dateParts = append(dateParts, datePart{
 			stringPart: "20:00",
-			layoutPart: "15:04",
+			layoutParts: []string{"15:04"},
 		})
 	}
 	// currently not all date parts have default values
@@ -368,17 +372,32 @@ func getDate(f *DynamicField, s *goquery.Selection) (time.Time, error) {
 		return t, errors.New("date parsing error: to generate a date at least a day and a month is needed")
 	}
 
-	var dateTimeLayout, dateTimeString string
+	var dateTimeString string
+	dateTimeLayouts := []string{""}
 	for _, dp := range dateParts {
-		dateTimeLayout += dp.layoutPart + " "
+		tmpDateTimeLayouts := dateTimeLayouts
+		dateTimeLayouts = []string{}
+		// dateTimeLayout += dp.layoutParts + " "
+		// if len(tmpDateTimeLayouts) == 0 {
+		// 	dateTimeLayouts = append(dateTimeLayouts, dp.layoutParts...)
+		// } else {
+		for _, tlp := range tmpDateTimeLayouts {
+			for _, lp := range dp.layoutParts {
+				dateTimeLayouts = append(dateTimeLayouts, tlp + lp + " ")
+			}
+		}
+		// }
+
 		dateTimeString += dp.stringPart + " "
 	}
 	dateTimeString = strings.Replace(dateTimeString, "Mrz", "Mär", 1) // hack for issue #47
-	t, err = monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
-	if err != nil {
-		return t, err
+	for _, dateTimeLayout := range dateTimeLayouts {
+		t, err = monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
+		if err == nil {
+			return t, nil
+		}
 	}
-	return t, nil
+	return t, err
 }
 
 func checkForDoubleDateParts(dpOne CoveredDateParts, dpTwo CoveredDateParts) error {

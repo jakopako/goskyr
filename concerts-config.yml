@@ -48,7 +48,7 @@ scrapers:
                 regex_extract:
                   exp: "Data:.*"
                 child_index: -1 # -1 means: 'apply the regex until a child matches'
-              layout: "Data: 2 January 2006"
+              layout: ["Data: 2 January 2006"]
             - covers:
                 time: true
               location:
@@ -57,7 +57,7 @@ scrapers:
                 regex_extract:
                   exp: "Inizio concerto: .*"
                 child_index: -1 # -1 means: 'apply the regex until a child matches'
-              layout: "Inizio concerto: 3:04 pm"
+              layout: ["Inizio concerto: 3:04 pm"]
           date_location: "Europe/Berlin"
           date_language: "it_IT"
     filters:
@@ -109,17 +109,17 @@ scrapers:
                 day: true
               location:
                 selector: ".node-date__day"
-              layout: "02"
+              layout: ["02"]
             - covers:
                 month: true
               location:
                 selector: ".node-date__month"
-              layout: "Jan"
+              layout: ["Jan"]
             - covers:
                 year: true
               location:
                 selector: ".node-date__year"
-              layout: "2006"
+              layout: ["2006"]
             - covers:
                 time: true
               location:
@@ -127,7 +127,7 @@ scrapers:
                 regex_extract:
                   exp: "[0-9]{2}:[0-9]{2}"
                 child_index: -1
-              layout: "15:04"
+              layout: ["15:04"]
           date_location: "Europe/Berlin"
           date_language: "en_US"
     paginator:
@@ -178,7 +178,7 @@ scrapers:
                 time: true
               location:
                 selector: ".concert__date time"
-              layout: "Monday 2 Jan 2006 - 15:04"
+              layout: ["Monday 2 Jan 2006 - 15:04"]
           date_location: "Europe/Berlin"
           date_language: "nl_BE"
     paginator:
@@ -222,12 +222,12 @@ scrapers:
                 year: true
               location:
                 selector: ".b-highlight__text-date"
-              layout: "2•1•06"
+              layout: ["2•1•06"]
             - covers:
                 time: true
               location:
                 selector: ".b-highlight__text-time"
-              layout: "15••04"
+              layout: ["15••04"]
           date_location: "Europe/Berlin"
           date_language: "de_DE"
 
@@ -263,13 +263,13 @@ scrapers:
               location:
                 selector: ".event .event-info .io-big"
                 node_index: 0
-              layout: "Mon. 2.1.06"
+              layout: ["Mon. 2.1.06"]
             - covers:
                 time: true
               location:
                 selector: ".event .event-info .io-big"
                 node_index: 3 # We need this in case there are multiple nodes that would be selected with the given selector
-              layout: "Beginn: 15.04"
+              layout: ["Beginn: 15.04"]
           date_location: "Europe/Berlin"
           date_language: de_DE
 
@@ -299,17 +299,17 @@ scrapers:
                 day: true
               location:
                 selector: ".post-date-day"
-              layout: "02"
+              layout: ["02"]
             - covers:
                 month: true
               location:
                 selector: ".post-date-month"
-              layout: "Jan"
+              layout: ["Jan"]
             - covers:
                 year: true
               location:
                 selector: ".post-date-year"
-              layout: "2006"
+              layout: ["2006"]
           date_location: "Europe/Berlin"
           date_language: "de_DE"
     filters:
@@ -358,7 +358,7 @@ scrapers:
                 child_index: 1
                 regex_extract:
                   exp: "([0-9]{2}\\.){2}[0-9]{4}"
-              layout: "02.01.2006"
+              layout: ["02.01.2006"]
             - covers:
                 time: true
               location:
@@ -367,7 +367,7 @@ scrapers:
                 regex_extract:
                   exp: "[0-9]{2}(\\.|:)[0-9]{2}"
                   index: -1
-              layout: "15.04"
+              layout: ["15.04", "15:04"]
           date_location: "Europe/Berlin"
 
   - name: Muffatwerk
@@ -401,7 +401,7 @@ scrapers:
                 child_index: -1
                 regex_extract:
                   exp: "([0-9]{2}\\.){2}"
-              layout: "02.01."
+              layout: ["02.01."]
             - covers:
                 year: true
               location:
@@ -409,7 +409,7 @@ scrapers:
                 child_index: 4
                 regex_extract:
                   exp: "[0-9]{2}"
-              layout: "06" # the whitespace in this string is a tab.
+              layout: ["06"] # the whitespace in this string is a tab.
             - covers:
                 time: true
               location:
@@ -417,7 +417,7 @@ scrapers:
                 child_index: -1
                 regex_extract:
                   exp: "[0-9]{2}:[0-9]{2}"
-              layout: "15:04"
+              layout: ["15:04"]
           date_location: "Europe/Berlin"
 
   ##########
@@ -457,14 +457,14 @@ scrapers:
                 year: true
               location:
                 selector: ".c-m-7 .date-wrapper .text-grey"
-              layout: "02 January 2006"
+              layout: ["02 January 2006"]
             - covers:
                 time: true
               location:
                 selector: ".c-m-6 .hour"
                 regex_extract:
                   exp: "[0-9]{2}\\sH\\s[0-9]{2}"
-              layout: "15 H 04"
+              layout: ["15 H 04"]
           date_location: "Europe/Paris"
           date_language: en_US
         - name: "status"
@@ -479,6 +479,51 @@ scrapers:
       - field: "status"
         regex: "delayed"
         match: false
+
+  ##############
+  # Santa Cruz
+  ##############
+  - name: TheCatalyst
+    url: "https://catalystclub.com/events/"
+    item: ".eventWrapper"
+    fields:
+      static:
+        - name: "location"
+          value: "The Catalyst"
+        - name: "city"
+          value: "Santa Cruz"
+        - name: "type"
+          value: "concert"
+      dynamic:
+        - name: "title"
+          location:
+            selector: "#eventTitle h2"
+        - name: "url"
+          type: "url"
+          location:
+            selector: "#eventTitle"
+        - name: "date"
+          type: "date"
+          on_subpage: "url"
+          components:
+            - covers:
+                day: true
+                month: true
+              location:
+                selector: ".EventsDateBox span.eventStDate"
+              # location:
+              #   selector: ".rhpEventDetails span.lineHeight15"
+              layout: ["Monday, January 02"]
+            - covers:
+                time: true
+              location:
+                selector: ".eventDoorStartDate span"
+                regex_extract:
+                  exp: "[0-9]{1}(:[0-9]{2})?pm"
+                  index: 1
+              layout: ["3pm", "3:04pm"]
+          date_location: "America/Los_Angeles"
+          date_language: "en_US"
 
   ##########
   # Zurich
@@ -511,12 +556,12 @@ scrapers:
                 day: true
               location:
                 selector: ".day"
-              layout: "2"
+              layout: ["2"]
             - covers:
                 month: true
               location:
                 selector: ".month"
-              layout: "January" # has to be in English
+              layout: ["January"] # has to be in English
           date_location: "Europe/Berlin"
           date_language: "de_DE"
 
@@ -551,13 +596,13 @@ scrapers:
               location:
                 selector: ".event-date"
                 child_index: 1
-              layout: "Mon 2.Jan."
+              layout: ["Mon 2.Jan."]
             - covers:
                 time: true
               location:
                 selector: ".event-time"
                 child_index: 1
-              layout: "15:04"
+              layout: ["15:04"]
           date_location: "Europe/Berlin"
           date_language: "de_DE"
 
@@ -594,7 +639,7 @@ scrapers:
                 time: true
               location:
                 selector: ".text-block-26"
-              layout: "2.1.2006 15:04"
+              layout: ["2.1.2006 15:04"]
           date_location: "Europe/Berlin"
 
   - name: Sender
@@ -633,7 +678,7 @@ scrapers:
                 time: true
               location:
                 selector: ".event-preview__date-long"
-              layout: "January 02, 2006, 03:04 PM"
+              layout: ["January 02, 2006, 03:04 PM"]
           date_location: "GMT"
           date_language: "en_US"
 
@@ -671,18 +716,18 @@ scrapers:
                 day: true
               location:
                 selector: ".date .day"
-              layout: "2"
+              layout: ["2"]
             - covers:
                 month: true
               location:
                 selector: ".date .month_name"
-              layout: "Jan"
+              layout: ["Jan"]
             - covers:
                 time: true
               location:
                 selector: ".right .time"
                 node_index: -1 # -1 means the last node
-              layout: "Start: 15:04"
+              layout: ["Start: 15:04"]
           date_location: "Europe/Berlin"
           date_language: "en_US"
 
@@ -718,17 +763,17 @@ scrapers:
                 day: true
               location:
                 selector: ".commingupEventsList_block2"
-              layout: "02. "
+              layout: ["02. "]
             - covers:
                 month: true
               location:
                 selector: ".commingupEventsList_block3"
-              layout: "January"
+              layout: ["January"]
             - covers:
                 time: true
               location:
                 selector: ".commingupEventsList_block4"
-              layout: "15Uhr04"
+              layout: ["15Uhr04"]
           date_location: "Europe/Berlin"
           date_language: "de_DE"
 
@@ -768,7 +813,7 @@ scrapers:
                 regex_extract:
                   exp: "([0-9]{1,2}\\.){2}[0-9]{2}"
                   index: 0
-              layout: "2.1.06"
+              layout: ["2.1.06"]
             - covers:
                 time: true
               location:
@@ -776,7 +821,7 @@ scrapers:
                 regex_extract:
                   exp: "[0-9]{2}\\.[0-9]{2}"
                   index: 1
-              layout: "15.04"
+              layout: ["15.04"]
           date_location: "Europe/Berlin"
 
   - name: Kaufleuten
@@ -817,7 +862,7 @@ scrapers:
               location:
                 selector: ".event-meta time"
                 attr: "datetime"
-              layout: "2006-01-02T15:04:05-07:00"
+              layout: ["2006-01-02T15:04:05-07:00"]
           date_location: "Europe/Berlin"
     filters:
       - field: "title"
@@ -862,14 +907,14 @@ scrapers:
                 selector: ".col-left .date"
                 regex_extract:
                   exp: "[0-9]{1,2}\\.\\s[a-zA-Z]{3}"
-              layout: "2. Jan"
+              layout: ["2. Jan"]
             - covers:
                 time: true
               location:
                 selector: ".col-left .hour"
                 regex_extract:
                   exp: "[0-9]{1,2}\\.[0-9]{2}"
-              layout: "15.04"
+              layout: ["15.04"]
           date_location: "Europe/Berlin"
           date_language: "de_DE"
     paginator:
@@ -910,14 +955,14 @@ scrapers:
                 selector: ".vsel-meta-date span"
                 regex_extract:
                   exp: "([0-9]{2}/){2}[0-9]{4}"
-              layout: "2/01/2006"
+              layout: ["2/01/2006"]
             - covers:
                 time: true
               location:
                 selector: ".vsel-meta-time span"
                 regex_extract:
                   exp: "[0-9]{1,2}:[0-9]{2}"
-              layout: "15:04"
+              layout: ["15:04"]
           date_location: "Europe/Berlin"
           date_language: "de_DE"
 
@@ -956,7 +1001,7 @@ scrapers:
               location:
                 selector: ".grid-event-date"
                 attr: "datetime"
-              layout: "2006-01-02T15:04"
+              layout: ["2006-01-02T15:04"]
           date_location: "Europe/Berlin"
           date_language: "de_DE"
     filters:
@@ -1005,7 +1050,7 @@ scrapers:
                 selector: ".col-sm-8 h3"
                 regex_extract:
                   exp: "[A-Za-z]+,\\s[0-9]{1,2}\\.\\s[\u00e4A-Za-z]{3,4}\\s[0-9]{4}"
-              layout: "Monday, 2. Jan 2006"
+              layout: ["Monday, 2. Jan 2006"]
             - covers:
                 time: true
               location:
@@ -1013,7 +1058,7 @@ scrapers:
                 child_index: 3
                 regex_extract:
                   exp: "[0-9]{2}h[0-9]{2}"
-              layout: "15h04"
+              layout: ["15h04"]
           date_location: "Europe/Berlin"
           date_language: "de_DE"
     paginator:
@@ -1066,13 +1111,13 @@ scrapers:
                 year: true
               location:
                 selector: ".caption .text h3"
-              layout: "Mon 02.01.06"
+              layout: ["Mon 02.01.06"]
             - covers:
                 time: true
               location:
                 selector: ".time li strong"
                 node_index: 1
-              layout: "3.04 p.m. "
+              layout: ["3.04 p.m. "]
           date_location: "Europe/Berlin"
           date_language: "en_US"
 
@@ -1108,7 +1153,7 @@ scrapers:
                 regex_extract:
                   exp: "([0-9]{2}\\.){2}[0-9]{4}"
                   index: 0
-              layout: "02.01.2006"
+              layout: ["02.01.2006"]
             - covers:
                 time: true
               location:
@@ -1117,7 +1162,7 @@ scrapers:
                 regex_extract:
                   exp: "[0-9]{2}:[0-9]{2}"
                   index: 0
-              layout: "15:04"
+              layout: ["15:04"]
           date_location: "Europe/Berlin"
 
   - name: Volkshaus
@@ -1162,7 +1207,7 @@ scrapers:
                 regex_extract:
                   exp: "[^+]*"
                   index: 0
-              layout: "2006-01-02T15:04:05"
+              layout: ["2006-01-02T15:04:05"]
           date_location: "Europe/Berlin"
     filters:
       - field: "event-type"

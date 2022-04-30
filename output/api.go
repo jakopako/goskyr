@@ -36,22 +36,29 @@ func (f *APIWriter) Write(itemsList chan []map[string]interface{}) {
 	for items := range itemsList {
 		if len(items) > 0 {
 			// delete events of this scraper from first date on
-			firstDate := items[0]["date"].(time.Time).UTC().Format("2006-01-02 15:04")
-			deleteURL := fmt.Sprintf("%s?location=%s&datetime=%s", apiURL, url.QueryEscape(items[0]["location"].(string)), url.QueryEscape(firstDate))
-			req, _ := http.NewRequest("DELETE", deleteURL, nil)
-			req.SetBasicAuth(apiUser, apiPassword)
-			resp, err := client.Do(req)
-			if err != nil {
-				log.Fatal(err)
+			// a list of events might contain multiple events
+			locations := map[string]bool{}
+			for _, item := range items {
+				locations[item["location"].(string)] = true
 			}
-			if resp.StatusCode != 200 {
-				body, err := ioutil.ReadAll(resp.Body)
+			firstDate := items[0]["date"].(time.Time).UTC().Format("2006-01-02 15:04")
+			for loc := range locations {
+				deleteURL := fmt.Sprintf("%s?location=%s&datetime=%s", apiURL, url.QueryEscape(loc), url.QueryEscape(firstDate))
+				req, _ := http.NewRequest("DELETE", deleteURL, nil)
+				req.SetBasicAuth(apiUser, apiPassword)
+				resp, err := client.Do(req)
 				if err != nil {
 					log.Fatal(err)
 				}
-				log.Fatalf("something went wrong while deleting events. Status Code: %d\nUrl: %s Response: %s", resp.StatusCode, deleteURL, body)
+				if resp.StatusCode != 200 {
+					body, err := ioutil.ReadAll(resp.Body)
+					if err != nil {
+						log.Fatal(err)
+					}
+					log.Fatalf("something went wrong while deleting events. Status Code: %d\nUrl: %s Response: %s", resp.StatusCode, deleteURL, body)
+				}
+				resp.Body.Close()
 			}
-			resp.Body.Close()
 			// add new events
 			for _, item := range items {
 				concertJSON, err := json.Marshal(item)

@@ -4,7 +4,9 @@
 
 writer:
   type: "api"
-  # The other parameters are defined as env variables.
+  uri: "http://localhost:5000/api/events"
+  user: "croncert"
+  password: "croncert"
 
 # Scraper configs are grouped by city and cities are sorted alphabetically.
 scrapers:
@@ -379,8 +381,6 @@ scrapers:
           value: "concert"
         - name: "city"
           value: "Munich"
-        - name: "location"
-          value: "Muffatwerk"
       dynamic:
         - name: "title"
           location:
@@ -390,6 +390,14 @@ scrapers:
           location:
             selector: ".hover-in .right a"
           relative: true
+        - name: "location"
+          on_subpage: "url"
+          location:
+            selector: ".entry-info"
+            child_index: 10
+            regex_extract:
+              exp: "[^:]+"
+              index: 1
         - name: "date"
           type: "date"
           components:
@@ -419,6 +427,19 @@ scrapers:
                   exp: "[0-9]{2}:[0-9]{2}"
               layout: ["15:04"]
           date_location: "Europe/Berlin"
+    filters:
+      - field: "location"
+        regex: "Zenith" # duplicate (also present on Motorworld website)
+        match: false
+      - field: "location"
+        regex: "Strom" # duplicate
+        match: false
+      - field: "location"
+        regex: "Tonhalle" # duplicate
+        match: false
+      - field: "location"
+        regex: "TonHalle" # duplicate
+        match: false
 
   ##########
   # Paris

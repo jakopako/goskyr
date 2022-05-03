@@ -13,16 +13,20 @@ import (
 
 var version = "dev"
 
-func runScraper(s scraper.Scraper, itemsChannel chan []map[string]interface{}, wg *sync.WaitGroup) {
+func runScraper(s scraper.Scraper, itemsChannel chan map[string]interface{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Printf("crawling %s\n", s.Name)
+	// This could probably be improved. We could pass the channel to
+	// GetItems instead of waiting for the scraper to finish.
 	items, err := s.GetItems()
 	if err != nil {
 		log.Printf("%s ERROR: %s", s.Name, err)
 		return
 	}
 	log.Printf("fetched %d %s events\n", len(items), s.Name)
-	itemsChannel <- items
+	for _, item := range items {
+		itemsChannel <- item
+	}
 }
 
 func main() {
@@ -43,8 +47,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	var wg sync.WaitGroup
-	itemsChannel := make(chan []map[string]interface{}, len(config.Scrapers))
+	var scraperWg sync.WaitGroup
+	var writerWg sync.WaitGroup
+	itemsChannel := make(chan map[string]interface{}, len(config.Scrapers))
 
 	var writer output.Writer
 	if *toStdout {
@@ -62,11 +67,13 @@ func main() {
 
 	for _, s := range config.Scrapers {
 		if *singleScraper == "" || *singleScraper == s.Name {
-			wg.Add(1)
-			go runScraper(s, itemsChannel, &wg)
+			scraperWg.Add(1)
+			go runScraper(s, itemsChannel, &scraperWg)
 		}
 	}
-	wg.Wait()
+	writerWg.Add(1)
+	go writer.Write(itemsChannel, &writerWg)
+	scraperWg.Wait()
 	close(itemsChannel)
-	writer.Write(itemsChannel)
+	writerWg.Wait()
 }

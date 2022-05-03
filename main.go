@@ -66,6 +66,7 @@ func main() {
 			go runScraper(s, itemsChannel, &wg)
 		}
 	}
+	// why do we wait here instead of in the end?
 	wg.Wait()
 	close(itemsChannel)
 	writer.Write(itemsChannel)

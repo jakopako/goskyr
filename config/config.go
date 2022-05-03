@@ -17,6 +17,7 @@ type WriterConfig struct {
 	Uri      string `yaml:"uri" env:"WRITER_URI"`
 	User     string `yaml:"user" env:"WRITER_USER"`
 	Password string `yaml:"password" env:"WRITER_PASSWORD"`
+	FilePath string `yaml:"filepath" env:"WRITER_FILEPATH"`
 }
 
 // Config defines the overall structure of the scraper configuration.

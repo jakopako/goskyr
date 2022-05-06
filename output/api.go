@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/jakopako/goskyr/config"
@@ -26,64 +27,64 @@ func NewAPIWriter(wc *config.WriterConfig) *APIWriter {
 	}
 }
 
-func (f *APIWriter) Write(itemsList chan []map[string]interface{}) {
+func (f *APIWriter) Write(items chan map[string]interface{}, wg *sync.WaitGroup) {
+	defer wg.Done()
 	client := &http.Client{
 		Timeout: time.Second * 10,
 	}
 	apiURL := f.writerConfig.Uri
 	apiUser := f.writerConfig.User
 	apiPassword := f.writerConfig.Password
-	for items := range itemsList {
-		if len(items) > 0 {
-			// delete events of this scraper from first date on
-			// a list of events might contain multiple events
-			locations := map[string]bool{}
-			for _, item := range items {
-				locations[item["location"].(string)] = true
+
+	deletedSources := map[string]bool{}
+	nrItems := 0
+
+	// This code assumes that within one source, items are ordered
+	// by date ascending.
+	for item := range items {
+		nrItems++
+		currentSrc := item["sourceUrl"].(string)
+		if _, found := deletedSources[currentSrc]; !found {
+			deletedSources[currentSrc] = true
+			// delete all events from the given source
+			firstDate := item["date"].(time.Time).UTC().Format("2006-01-02 15:04")
+			deleteURL := fmt.Sprintf("%s?sourceUrl=%s&datetime=%s", apiURL, url.QueryEscape(currentSrc), url.QueryEscape(firstDate))
+			req, _ := http.NewRequest("DELETE", deleteURL, nil)
+			req.SetBasicAuth(apiUser, apiPassword)
+			resp, err := client.Do(req)
+			if err != nil {
+				log.Fatal(err)
 			}
-			firstDate := items[0]["date"].(time.Time).UTC().Format("2006-01-02 15:04")
-			for loc := range locations {
-				deleteURL := fmt.Sprintf("%s?location=%s&datetime=%s", apiURL, url.QueryEscape(loc), url.QueryEscape(firstDate))
-				req, _ := http.NewRequest("DELETE", deleteURL, nil)
-				req.SetBasicAuth(apiUser, apiPassword)
-				resp, err := client.Do(req)
+			if resp.StatusCode != 200 {
+				body, err := ioutil.ReadAll(resp.Body)
 				if err != nil {
 					log.Fatal(err)
 				}
-				if resp.StatusCode != 200 {
-					body, err := ioutil.ReadAll(resp.Body)
-					if err != nil {
-						log.Fatal(err)
-					}
-					log.Fatalf("something went wrong while deleting events. Status Code: %d\nUrl: %s Response: %s", resp.StatusCode, deleteURL, body)
-				}
-				resp.Body.Close()
+				log.Fatalf("something went wrong while deleting events. Status Code: %d\nUrl: %s Response: %s", resp.StatusCode, deleteURL, body)
 			}
-			// add new events
-			for _, item := range items {
-				concertJSON, err := json.Marshal(item)
-				if err != nil {
-					log.Fatal(err)
-				}
-				req, _ := http.NewRequest("POST", apiURL, bytes.NewBuffer(concertJSON))
-				req.Header = map[string][]string{
-					"Content-Type": {"application/json"},
-				}
-				req.SetBasicAuth(apiUser, apiPassword)
-				resp, err := client.Do(req)
-				if err != nil {
-					log.Fatal(err)
-				}
-				if resp.StatusCode != 201 {
-					body, err := ioutil.ReadAll(resp.Body)
-					if err != nil {
-						log.Fatal(err)
-					}
-					log.Fatalf("something went wrong while adding a new event. Status Code: %d Response: %s", resp.StatusCode, body)
-				}
-				resp.Body.Close()
-			}
-			log.Printf("wrote %d %s events to api", len(items), items[0]["location"])
+			resp.Body.Close()
 		}
+		concertJSON, err := json.Marshal(item)
+		if err != nil {
+			log.Fatal(err)
+		}
+		req, _ := http.NewRequest("POST", apiURL, bytes.NewBuffer(concertJSON))
+		req.Header = map[string][]string{
+			"Content-Type": {"application/json"},
+		}
+		req.SetBasicAuth(apiUser, apiPassword)
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if resp.StatusCode != 201 {
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Fatalf("something went wrong while adding a new event. Status Code: %d Response: %s", resp.StatusCode, body)
+		}
+		resp.Body.Close()
 	}
+	log.Printf("wrote %d events from %d sources to the api", nrItems, len(deletedSources))
 }

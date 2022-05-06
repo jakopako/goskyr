@@ -60,6 +60,8 @@ func main() {
 			writer = &output.StdoutWriter{}
 		case "api":
 			writer = output.NewAPIWriter(&config.Writer)
+		case "file":
+			writer = output.NewFileWriter(&config.Writer)
 		default:
 			log.Fatalf("writer of type %s not implemented", config.Writer.Type)
 		}

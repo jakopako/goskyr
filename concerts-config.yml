@@ -3,10 +3,11 @@
 # and allow testing this file is not deleted from this repository.
 
 writer:
-  type: "api"
-  uri: "http://localhost:5000/api/events"
-  user: "croncert"
-  password: "croncert"
+  type: "file"
+  # uri: "http://localhost:5000/api/events"
+  # user: "croncert"
+  # password: "croncert"
+  filepath: "/home/dhondt/repos/goskyr/test-file.json"
 
 # Scraper configs are grouped by city and cities are sorted alphabetically.
 scrapers:
@@ -170,6 +171,7 @@ scrapers:
         - name: "comment"
           location:
             selector: ".calendar-item__intro p"
+          can_be_empty: true
         - name: "url"
           type: "url"
           location:

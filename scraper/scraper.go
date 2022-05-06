@@ -46,7 +46,7 @@ type CoveredDateParts struct {
 type DateComponent struct {
 	Covers          CoveredDateParts `yaml:"covers"`
 	ElementLocation ElementLocation  `yaml:"location"`
-	Layout          []string           `yaml:"layout"`
+	Layout          []string         `yaml:"layout"`
 }
 
 // A StaticField defines a field that has a fixed name and value
@@ -310,7 +310,7 @@ func extractField(field *DynamicField, event map[string]interface{}, s *goquery.
 }
 
 type datePart struct {
-	stringPart string
+	stringPart  string
 	layoutParts []string
 }
 
@@ -346,7 +346,7 @@ func getDate(f *DynamicField, s *goquery.Selection) (time.Time, error) {
 					lp = append(lp, strings.Replace(l, "p.m.", "pm", 1))
 				}
 				dateParts = append(dateParts, datePart{
-					stringPart: strings.Replace(sp, "p.m.", "pm", 1),
+					stringPart:  strings.Replace(sp, "p.m.", "pm", 1),
 					layoutParts: lp,
 				})
 				combinedParts = mergeDateParts(combinedParts, c.Covers)
@@ -357,13 +357,13 @@ func getDate(f *DynamicField, s *goquery.Selection) (time.Time, error) {
 	if !combinedParts.Year {
 		currentYear := time.Now().Year()
 		dateParts = append(dateParts, datePart{
-			stringPart: strconv.Itoa(currentYear),
+			stringPart:  strconv.Itoa(currentYear),
 			layoutParts: []string{"2006"},
 		})
 	}
 	if !combinedParts.Time {
 		dateParts = append(dateParts, datePart{
-			stringPart: "20:00",
+			stringPart:  "20:00",
 			layoutParts: []string{"15:04"},
 		})
 	}
@@ -379,7 +379,7 @@ func getDate(f *DynamicField, s *goquery.Selection) (time.Time, error) {
 		dateTimeLayouts = []string{}
 		for _, tlp := range tmpDateTimeLayouts {
 			for _, lp := range dp.layoutParts {
-				dateTimeLayouts = append(dateTimeLayouts, tlp + lp + " ")
+				dateTimeLayouts = append(dateTimeLayouts, tlp+lp+" ")
 			}
 		}
 		dateTimeString += dp.stringPart + " "

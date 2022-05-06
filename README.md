@@ -16,6 +16,17 @@ Similar projects:
 - [slotix/dataflowkit](https://github.com/slotix/dataflowkit)
 - [andrewstuart/goq](https://github.com/andrewstuart/goq)
 
+## Related projects
+
+The main motivation to start this project was a website idea that I wanted to implement. Currently, there are four
+repositories involved in this idea. The first one is of course this one, goskyr. The other three are:
+
+- [croncert-web](https://github.com/jakopako/croncert-web): a website that shows concerts in your area, deployed to [croncert.ch](https://croncert.ch).
+- [croncert-config](https://github.com/jakopako/croncert-config): a repository that contains a big configuration file for
+  goskyr, where all the concert venue websites that are part of [croncert.ch](https://croncert.ch) are configured. If you're interested, check out this repository to find out how to add new concert locations.
+- [event-api](https://github.com/jakopako/event-api): an API to store and fetch concert info, that serves as backend for
+  [croncert.ch](https://croncert.ch).
+
 ## Installation
 
 [Download](https://github.com/jakopako/goskyr/releases/latest) a prebuilt binary from [releases page](https://github.com/jakopako/goskyr/releases), unpack and run!

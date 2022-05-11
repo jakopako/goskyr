@@ -70,7 +70,6 @@ type DynamicField struct {
 	Components      []DateComponent `yaml:"components"`    // applies to date
 	DateLocation    string          `yaml:"date_location"` // applies to date
 	DateLanguage    string          `yaml:"date_language"` // applies to date
-	Relative        bool            `yaml:"relative"`      // applies to url
 	Hide            bool            `yaml:"hide"`          // appliess to text, url, date
 }
 
@@ -94,6 +93,7 @@ type Scraper struct {
 	} `yaml:"fields"`
 	Filters   []Filter `yaml:"filters"`
 	Paginator struct {
+		// TODO: use getUrl method and remove relative bool
 		Selector  string `yaml:"selector"`
 		Relative  bool   `yaml:"relative"`
 		MaxPages  int    `yaml:"max_pages"`
@@ -289,14 +289,16 @@ func extractField(field *DynamicField, event map[string]interface{}, s *goquery.
 		if err != nil {
 			return err
 		}
-		if !field.CanBeEmpty {
-			if ts == "" {
-				return fmt.Errorf("field %s cannot be empty", field.Name)
-			}
+		if !field.CanBeEmpty && ts == "" {
+			return fmt.Errorf("field %s cannot be empty", field.Name)
 		}
 		event[field.Name] = ts
 	case "url":
-		event[field.Name] = getURLString(field, s, baseURL, res)
+		url := getURLString(field, s, res)
+		if url == "" {
+			url = baseURL
+		}
+		event[field.Name] = url
 	case "date":
 		d, err := getDate(field, s)
 		if err != nil {
@@ -423,25 +425,41 @@ func hasAllDateParts(cdp CoveredDateParts) bool {
 	return cdp.Day && cdp.Month && cdp.Year && cdp.Time
 }
 
-func getURLString(f *DynamicField, s *goquery.Selection, scraperURL string, res *http.Response) string {
-	var url string
-	attr := "href"
-	if f.ElementLocation.Attr != "" {
-		attr = f.ElementLocation.Attr
+func getURLString(f *DynamicField, s *goquery.Selection, res *http.Response) string {
+	var urlVal, url string
+	var exists bool
+	// attr := "href"
+	if f.ElementLocation.Attr == "" {
+		// set attr to the default if not set
+		f.ElementLocation.Attr = "href"
 	}
 	if f.ElementLocation.Selector == "" {
-		url = s.AttrOr(attr, scraperURL)
+		urlVal, exists = s.Attr(f.ElementLocation.Attr)
 	} else {
-		url = s.Find(f.ElementLocation.Selector).AttrOr(attr, scraperURL)
+		urlVal, exists = s.Find(f.ElementLocation.Selector).Attr(f.ElementLocation.Attr)
 	}
-
-	if f.Relative {
+	if !exists {
+		return ""
+	}
+	if strings.HasPrefix(urlVal, "http") {
+		url = urlVal
+	} else if strings.HasPrefix(urlVal, "?") {
+		url = fmt.Sprintf("%s://%s%s%s", res.Request.URL.Scheme, res.Request.URL.Host, res.Request.URL.Path, urlVal)
+	} else {
 		baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
-		if !strings.HasPrefix(url, "/") {
+		if !strings.HasPrefix(urlVal, "/") {
 			baseURL = baseURL + "/"
 		}
-		url = baseURL + url
+		url = fmt.Sprintf("%s%s", baseURL, urlVal)
 	}
+
+	// if f.Relative {
+	// 	baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
+	// 	if !strings.HasPrefix(url, "/") {
+	// 		baseURL = baseURL + "/"
+	// 	}
+	// 	url = baseURL + url
+	// }
 	url = strings.TrimSpace(url)
 	return url
 }

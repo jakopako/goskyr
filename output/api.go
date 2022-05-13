@@ -10,18 +10,16 @@ import (
 	"net/url"
 	"sync"
 	"time"
-
-	"github.com/jakopako/goskyr/config"
 )
 
 // The APIWriter is meant to write to a custom API and assumes many things.
 // So currently, it is better not to use this APIWriter.
 type APIWriter struct {
-	writerConfig *config.WriterConfig
+	writerConfig *WriterConfig
 }
 
 // NewAPIWriter returns a new APIWriter
-func NewAPIWriter(wc *config.WriterConfig) *APIWriter {
+func NewAPIWriter(wc *WriterConfig) *APIWriter {
 	return &APIWriter{
 		writerConfig: wc,
 	}

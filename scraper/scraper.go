@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -12,8 +13,46 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/goodsign/monday"
+	"github.com/ilyakaznacheev/cleanenv"
+	"github.com/jakopako/goskyr/output"
 	"golang.org/x/net/html"
+	"gopkg.in/yaml.v2"
 )
+
+// GlobalConfig is used for storing global configuration parameters that
+// are needed across all scrapers
+type GlobalConfig struct {
+	UserAgent string `yaml:"user-agent"`
+}
+
+// Config defines the overall structure of the scraper configuration.
+// Values will be taken from a config yml file or environment variables
+// or both.
+type Config struct {
+	Writer   output.WriterConfig `yaml:"writer"`
+	Scrapers []Scraper           `yaml:"scrapers"`
+	Global   GlobalConfig        `yaml:"global"`
+}
+
+func NewConfig(configPath string) (*Config, error) {
+	var config Config
+
+	err := cleanenv.ReadConfig(configPath, &config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	file, err := os.Open(configPath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	d := yaml.NewDecoder(file)
+	if err := d.Decode(&config); err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
 
 // RegexConfig is used for extracting a substring from a string based on the
 // given Exp and Index
@@ -100,7 +139,7 @@ type Scraper struct {
 
 // GetItems fetches and returns all items from a website according to the
 // Scraper's paramaters
-func (c Scraper) GetItems() ([]map[string]interface{}, error) {
+func (c Scraper) GetItems(globalConfig *GlobalConfig) ([]map[string]interface{}, error) {
 
 	var items []map[string]interface{}
 
@@ -108,7 +147,7 @@ func (c Scraper) GetItems() ([]map[string]interface{}, error) {
 	hasNextPage := true
 	currentPage := 0
 	for hasNextPage {
-		res, err := http.Get(pageURL)
+		res, err := fetchUrl(pageURL, globalConfig)
 		if err != nil {
 			return items, err
 		}
@@ -162,7 +201,7 @@ func (c Scraper) GetItems() ([]map[string]interface{}, error) {
 					subpageURL := fmt.Sprint(currentItem[f.OnSubpage])
 					resSub, found := subpagesResp[subpageURL]
 					if !found {
-						resSub, err = http.Get(subpageURL)
+						resSub, err = fetchUrl(subpageURL, globalConfig)
 						if err != nil {
 							log.Printf("%s ERROR: %v. Skipping item %v.", c.Name, err, currentItem)
 							return
@@ -513,4 +552,22 @@ func extractStringRegex(rc *RegexConfig, s string) (string, error) {
 		}
 	}
 	return extractedString, nil
+}
+
+func fetchUrl(url string, globalConfig *GlobalConfig) (*http.Response, error) {
+	// NOTE: body has to be closed by caller
+	client := &http.Client{}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if globalConfig.UserAgent == "" {
+		req.Header.Set("User-Agent", "goskyr web scraper (github.com/jakopako/goskyr)")
+	} else {
+		req.Header.Set("User-Agent", globalConfig.UserAgent)
+	}
+	req.Header.Set("Accept", "*/*")
+	return client.Do(req)
 }

@@ -6,16 +6,14 @@ import (
 	"log"
 	"os"
 	"sync"
-
-	"github.com/jakopako/goskyr/config"
 )
 
 type FileWriter struct {
-	writerConfig *config.WriterConfig
+	writerConfig *WriterConfig
 }
 
 // NewFileWriter returns a new FileWriter
-func NewFileWriter(wc *config.WriterConfig) *FileWriter {
+func NewFileWriter(wc *WriterConfig) *FileWriter {
 	return &FileWriter{
 		writerConfig: wc,
 	}

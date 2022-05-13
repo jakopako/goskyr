@@ -2,6 +2,9 @@
 # separate the concert-specific configuration from the code. However, to have some examples
 # and allow testing this file is not deleted from this repository.
 
+global:
+  user-agent: "jakopako/goskyr scan for croncert.ch"
+
 writer:
   type: "file"
   # uri: "http://localhost:5000/api/events"
@@ -341,6 +344,28 @@ scrapers:
       - field: "location"
         regex: "TonHalle" # duplicate
         match: false
+
+  #########
+  # Vienna
+  #########
+  - name: Flex
+    url: "http://flex.at/flex_frontend/index.php?selected=programm"
+    item: "#programmWatchList .overview tr"
+    fields:
+      static:
+        - name: "location"
+          value: "Flex"
+        - name: "city"
+          value: "Vienna"
+        - name: "type"
+          value: "concert"
+        - name: "sourceUrl"
+          value: "http://flex.at/flex_frontend/index.php?selected=programm"
+      dynamic:
+        - name: "title"
+          location:
+            selector: ".watchListInfo a"
+            child_index: 2
 
   #########
   # Zurich

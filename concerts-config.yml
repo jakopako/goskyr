@@ -11,6 +11,31 @@ writer:
 
 # Scraper configs are grouped by city and cities are sorted alphabetically.
 scrapers:
+  ########
+  # Basel
+  ########
+  - name: ParterreOne
+    url: "https://www.parterre.net/de/musik-kultur/one-music/programm?category=1"
+    item: "section.oneprog .upcomingprev"
+    fields:
+      static:
+        - name: "location"
+          value: "Parterre One"
+        - name: "city"
+          value: "Basel"
+        - name: "type"
+          value: "concert"
+        - name: "sourceUrl"
+          value: "https://www.parterre.net/de/musik-kultur/one-music/programm?category=1"
+      dynamic:
+        - name: "title"
+          location:
+            selector: ".smalltext h2"
+        - name: "url"
+          type: "url"
+          location:
+            selector: ".pic a"
+
   ##########
   # Bologna
   ##########
@@ -76,8 +101,9 @@ scrapers:
         regex: ".*Postponed.*"
         match: false
     paginator:
-      selector: ".pagination .qt-btn-primary"
-      node_index: -1
+      location:
+        selector: ".pagination .qt-btn-primary"
+        node_index: -1
       max_pages: 4
 
   ##########
@@ -108,7 +134,6 @@ scrapers:
           type: "url"
           location:
             selector: ".node-type-event__title h2 a"
-          relative: true
         - name: "date"
           type: "date"
           components:
@@ -138,8 +163,8 @@ scrapers:
           date_location: "Europe/Berlin"
           date_language: "en_US"
     paginator:
-      selector: ".pager__item a"
-      relative: true
+      location:
+        selector: ".pager__item a"
     filters:
       - field: "title"
         regex: ".*POSTPONED.*"
@@ -176,7 +201,6 @@ scrapers:
           type: "url"
           location:
             selector: ".calendar-item__inner a"
-          relative: true
         - name: "date"
           type: "date"
           on_subpage: "url"
@@ -192,8 +216,8 @@ scrapers:
           date_location: "Europe/Berlin"
           date_language: "nl_BE"
     paginator:
-      selector: ".pager__item--next a"
-      relative: true
+      location:
+        selector: ".pager__item--next a"
 
   ##########
   # Munich
@@ -267,7 +291,6 @@ scrapers:
           type: "url"
           location:
             selector: ".hover-in .right a"
-          relative: true
         - name: "location"
           on_subpage: "url"
           location:
@@ -318,3 +341,95 @@ scrapers:
       - field: "location"
         regex: "TonHalle" # duplicate
         match: false
+
+  #########
+  # Zurich
+  #########
+  - name: Sender
+    url: "https://gds.fm/SENDER"
+    item: ".event-list__item"
+    fields:
+      static:
+        - name: "location"
+          value: "Sender"
+        - name: "city"
+          value: "Zurich"
+        - name: "type"
+          value: "concert"
+        - name: "sourceUrl"
+          value: "https://gds.fm/SENDER"
+      dynamic:
+        - name: "title"
+          location:
+            selector: ".event-preview__title"
+        - name: "comment"
+          location:
+            selector: ".event-detail__content div p"
+            max_length: 200
+          on_subpage: "url"
+          can_be_empty: true
+        - name: "url"
+          type: "url"
+          location:
+            selector: "" # An empty string means that we look in the event node itself for an href
+        - name: "date"
+          type: "date"
+          components:
+            - covers:
+                day: true
+                month: true
+                year: true
+                time: true
+              location:
+                selector: ".event-preview__date-long"
+              layout: ["January 02, 2006, 03:04 PM"]
+          date_location: "GMT"
+          date_language: "en_US"
+
+  - name: ElLokal
+    url: "http://www.ellokal.ch/?lang=de&details=9"
+    item: "#maincontent > .commingupEventsList_0,.commingupEventsList_1"
+    fields:
+      static:
+        - name: "location"
+          value: "ElLokal"
+        - name: "city"
+          value: "Zurich"
+        - name: "type"
+          value: "concert"
+        - name: "sourceUrl"
+          value: "http://www.ellokal.ch/?lang=de&details=9"
+      dynamic:
+        - name: "title"
+          location:
+            selector: ".commingupEventsList_block5 a"
+        - name: "comment"
+          location:
+            selector: ".concertStyleNew .concertDetails"
+          on_subpage: "url"
+          can_be_empty: true
+        - name: "url"
+          type: "url"
+          location:
+            selector: ".commingupEventsList_block5 a"
+          relative: true
+        - name: "date"
+          type: "date"
+          components:
+            - covers:
+                day: true
+              location:
+                selector: ".commingupEventsList_block2"
+              layout: ["02. "]
+            - covers:
+                month: true
+              location:
+                selector: ".commingupEventsList_block3"
+              layout: ["January"]
+            - covers:
+                time: true
+              location:
+                selector: ".commingupEventsList_block4"
+              layout: ["15Uhr04"]
+          date_location: "Europe/Berlin"
+          date_language: "de_DE"

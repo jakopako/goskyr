@@ -93,11 +93,8 @@ type Scraper struct {
 	} `yaml:"fields"`
 	Filters   []Filter `yaml:"filters"`
 	Paginator struct {
-		// TODO: use getUrl method and remove relative bool
-		Selector  string `yaml:"selector"`
-		Relative  bool   `yaml:"relative"`
-		MaxPages  int    `yaml:"max_pages"`
-		NodeIndex int    `yaml:"node_index"`
+		Location ElementLocation `yaml:"location"`
+		MaxPages int             `yaml:"max_pages"`
 	}
 }
 
@@ -207,31 +204,11 @@ func (c Scraper) GetItems() ([]map[string]interface{}, error) {
 		})
 
 		hasNextPage = false
-		if c.Paginator.Selector != "" {
+		pageURL = getURLString(&c.Paginator.Location, doc.Selection, res)
+		if pageURL != "" {
 			currentPage++
 			if currentPage < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
-				attr := "href"
-				if len(doc.Find(c.Paginator.Selector).Nodes) > c.Paginator.NodeIndex {
-					pagNode := doc.Find(c.Paginator.Selector).Get(c.Paginator.NodeIndex)
-					for _, a := range pagNode.Attr {
-						if a.Key == attr {
-							nextURL := a.Val
-							if c.Paginator.Relative {
-								baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
-								if strings.HasPrefix(nextURL, "?") {
-									pageURL = baseURL + res.Request.URL.Path + nextURL
-								} else if !strings.HasPrefix(nextURL, "/") {
-									pageURL = baseURL + "/" + nextURL
-								} else {
-									pageURL = baseURL + nextURL
-								}
-							} else {
-								pageURL = nextURL
-							}
-							hasNextPage = true
-						}
-					}
-				}
+				hasNextPage = true
 			}
 		}
 		res.Body.Close()
@@ -294,7 +271,7 @@ func extractField(field *DynamicField, event map[string]interface{}, s *goquery.
 		}
 		event[field.Name] = ts
 	case "url":
-		url := getURLString(field, s, res)
+		url := getURLString(&field.ElementLocation, s, res)
 		if url == "" {
 			url = baseURL
 		}
@@ -425,23 +402,30 @@ func hasAllDateParts(cdp CoveredDateParts) bool {
 	return cdp.Day && cdp.Month && cdp.Year && cdp.Time
 }
 
-func getURLString(f *DynamicField, s *goquery.Selection, res *http.Response) string {
+func getURLString(e *ElementLocation, s *goquery.Selection, res *http.Response) string {
 	var urlVal, url string
-	var exists bool
-	// attr := "href"
-	if f.ElementLocation.Attr == "" {
+	if e.Attr == "" {
 		// set attr to the default if not set
-		f.ElementLocation.Attr = "href"
+		e.Attr = "href"
 	}
-	if f.ElementLocation.Selector == "" {
-		urlVal, exists = s.Attr(f.ElementLocation.Attr)
+	if e.Selector == "" {
+		urlVal = s.AttrOr(e.Attr, "")
 	} else {
-		urlVal, exists = s.Find(f.ElementLocation.Selector).Attr(f.ElementLocation.Attr)
+		fieldSelection := s.Find(e.Selector)
+		if len(fieldSelection.Nodes) > e.NodeIndex {
+			fieldNode := fieldSelection.Get(e.NodeIndex)
+			for _, a := range fieldNode.Attr {
+				if a.Key == e.Attr {
+					urlVal = a.Val
+					break
+				}
+			}
+		}
 	}
-	if !exists {
+
+	if urlVal == "" {
 		return ""
-	}
-	if strings.HasPrefix(urlVal, "http") {
+	} else if strings.HasPrefix(urlVal, "http") {
 		url = urlVal
 	} else if strings.HasPrefix(urlVal, "?") {
 		url = fmt.Sprintf("%s://%s%s%s", res.Request.URL.Scheme, res.Request.URL.Host, res.Request.URL.Path, urlVal)
@@ -453,13 +437,6 @@ func getURLString(f *DynamicField, s *goquery.Selection, res *http.Response) str
 		url = fmt.Sprintf("%s%s", baseURL, urlVal)
 	}
 
-	// if f.Relative {
-	// 	baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
-	// 	if !strings.HasPrefix(url, "/") {
-	// 		baseURL = baseURL + "/"
-	// 	}
-	// 	url = baseURL + url
-	// }
 	url = strings.TrimSpace(url)
 	return url
 }
@@ -498,6 +475,9 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 				currentChildIndex++
 			}
 		} else {
+			// WRONG
+			// It could be the case that there are multiple nodes that match the selector
+			// and we don't want the attr of the first node...
 			fieldString = fieldSelection.AttrOr(t.Attr, "")
 			fieldString, err = extractStringRegex(&t.RegexExtract, fieldString)
 			if err != nil {

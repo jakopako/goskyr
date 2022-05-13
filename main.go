@@ -6,19 +6,18 @@ import (
 	"log"
 	"sync"
 
-	"github.com/jakopako/goskyr/config"
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/scraper"
 )
 
 var version = "dev"
 
-func runScraper(s scraper.Scraper, itemsChannel chan map[string]interface{}, wg *sync.WaitGroup) {
+func runScraper(s scraper.Scraper, itemsChannel chan map[string]interface{}, globalConfig *scraper.GlobalConfig, wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Printf("crawling %s\n", s.Name)
 	// This could probably be improved. We could pass the channel to
 	// GetItems instead of waiting for the scraper to finish.
-	items, err := s.GetItems()
+	items, err := s.GetItems(globalConfig)
 	if err != nil {
 		log.Printf("%s ERROR: %s", s.Name, err)
 		return
@@ -42,7 +41,7 @@ func main() {
 		return
 	}
 
-	config, err := config.NewConfig(*configFile)
+	config, err := scraper.NewConfig(*configFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -70,7 +69,7 @@ func main() {
 	for _, s := range config.Scrapers {
 		if *singleScraper == "" || *singleScraper == s.Name {
 			scraperWg.Add(1)
-			go runScraper(s, itemsChannel, &scraperWg)
+			go runScraper(s, itemsChannel, &config.Global, &scraperWg)
 		}
 	}
 	writerWg.Add(1)

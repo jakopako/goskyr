@@ -7,8 +7,7 @@ This project's goal is to make it easier to scrape structured data from web page
 different venue websites. However, the code has been rewritten to handle a more general use case of extracting a list of items from any website.
 This could be a list of books from an online book store, a list of plays in a public theater, a list of newspaper articles, etc. Currently, information can only be extracted from static websites.
 
-Note that there are already similar projects that probably do a much better job. However, this is more of an excercise to improve my go skills and get a
-better feeling for crawling and parsing websites.
+Note that there are already similar projects that might do a better job in certain cases or are more generic tools. However, on the one hand this is a personal project to make myself familiar with webscraping and Go and on the other hand goskyr supports certain features that I haven't found in any other projects. For instance, the way dates can be extracted from websites and the notion of scraping information from subpages defined by previously at runtime extracted urls.
 
 Similar projects:
 

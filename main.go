@@ -6,6 +6,7 @@ import (
 	"log"
 	"sync"
 
+	"github.com/jakopako/goskyr/automate"
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/scraper"
 )
@@ -33,6 +34,7 @@ func main() {
 	toStdout := flag.Bool("stdout", false, "If set to true the scraped data will be written to stdout despite any other existing writer configurations.")
 	configFile := flag.String("config", "./config.yml", "The location of the configuration file.")
 	printVersion := flag.Bool("version", false, "The version of goskyr.")
+	generateConfig := flag.String("generate", "", "Needs an additional argument of the url whose config needs to be generated.")
 
 	flag.Parse()
 
@@ -49,6 +51,15 @@ func main() {
 	var scraperWg sync.WaitGroup
 	var writerWg sync.WaitGroup
 	itemsChannel := make(chan map[string]interface{}, len(config.Scrapers))
+
+	if *generateConfig != "" {
+		s := &scraper.Scraper{URL: *generateConfig}
+		err := automate.GetDynamicFieldsConfig(s, &config.Global)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 
 	var writer output.Writer
 	if *toStdout {

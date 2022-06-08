@@ -15,6 +15,7 @@ import (
 	"github.com/goodsign/monday"
 	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/jakopako/goskyr/output"
+	"github.com/jakopako/goskyr/utils"
 	"golang.org/x/net/html"
 	"gopkg.in/yaml.v2"
 )
@@ -147,7 +148,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig) ([]map[string]interface{},
 	hasNextPage := true
 	currentPage := 0
 	for hasNextPage {
-		res, err := fetchUrl(pageURL, globalConfig)
+		res, err := utils.FetchUrl(pageURL, globalConfig.UserAgent)
 		if err != nil {
 			return items, err
 		}
@@ -201,7 +202,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig) ([]map[string]interface{},
 					subpageURL := fmt.Sprint(currentItem[f.OnSubpage])
 					resSub, found := subpagesResp[subpageURL]
 					if !found {
-						resSub, err = fetchUrl(subpageURL, globalConfig)
+						resSub, err = utils.FetchUrl(subpageURL, globalConfig.UserAgent)
 						if err != nil {
 							log.Printf("%s ERROR: %v. Skipping item %v.", c.Name, err, currentItem)
 							return
@@ -552,22 +553,4 @@ func extractStringRegex(rc *RegexConfig, s string) (string, error) {
 		}
 	}
 	return extractedString, nil
-}
-
-func fetchUrl(url string, globalConfig *GlobalConfig) (*http.Response, error) {
-	// NOTE: body has to be closed by caller
-	client := &http.Client{}
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if globalConfig.UserAgent == "" {
-		req.Header.Set("User-Agent", "goskyr web scraper (github.com/jakopako/goskyr)")
-	} else {
-		req.Header.Set("User-Agent", globalConfig.UserAgent)
-	}
-	req.Header.Set("Accept", "*/*")
-	return client.Do(req)
 }

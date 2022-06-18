@@ -30,6 +30,7 @@ func GetDynamicFieldsConfig(s *scraper.Scraper, g *scraper.GlobalConfig) error {
 	// body > div.content > div.mainContentContainer > div.mainContent > div.mainContentFloat > div.leftContainer > div:nth-child(2) > div.quoteDetails > div.quoteText > span
 	z := html.NewTokenizer(res.Body)
 	locOcc := map[scraper.ElementLocation]int{}
+	locExample := map[scraper.ElementLocation]string{}
 	nrChildren := map[string]int{}
 	nodePath := []string{}
 	depth := 0
@@ -44,7 +45,7 @@ parse:
 			if inBody {
 				text := string(z.Text())
 				p := getSelector(nodePath)
-				if strings.TrimSpace(text) != "" {
+				if len(strings.TrimSpace(text)) > 1 {
 					l := scraper.ElementLocation{
 						Selector:   p,
 						ChildIndex: nrChildren[p],
@@ -53,6 +54,7 @@ parse:
 						locOcc[l] = nr + 1
 					} else {
 						locOcc[l] = 1
+						locExample[l] = strings.TrimSpace(text)
 					}
 				}
 				nrChildren[p] += 1
@@ -100,6 +102,7 @@ parse:
 	for k, v := range locOcc {
 		if v > 10 {
 			fmt.Println(k, v)
+			fmt.Println(locExample[k])
 		}
 	}
 	return nil

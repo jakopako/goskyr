@@ -10,6 +10,10 @@ import (
 	"golang.org/x/net/html"
 )
 
+func getSelector(pathSlice []string) string {
+	return strings.Join(pathSlice, " > ")
+}
+
 func GetDynamicFieldsConfig(s *scraper.Scraper, g *scraper.GlobalConfig) error {
 	if s.URL == "" {
 		return errors.New("URL field cannot be empty")
@@ -25,46 +29,78 @@ func GetDynamicFieldsConfig(s *scraper.Scraper, g *scraper.GlobalConfig) error {
 	// body > div.content > div.mainContentContainer > div.mainContent > div.mainContentFloat > div.leftContainer > div:nth-child(2) > div.quoteDetails > div.quoteText
 	// body > div.content > div.mainContentContainer > div.mainContent > div.mainContentFloat > div.leftContainer > div:nth-child(2) > div.quoteDetails > div.quoteText > span
 	z := html.NewTokenizer(res.Body)
+	locOcc := map[scraper.ElementLocation]int{}
+	nrChildren := map[string]int{}
 	nodePath := []string{}
 	depth := 0
 	inBody := false
+parse:
 	for {
 		tt := z.Next()
 		switch tt {
 		case html.ErrorToken:
-			return z.Err()
+			break parse
 		case html.TextToken:
 			if inBody {
 				text := string(z.Text())
+				p := getSelector(nodePath)
 				if strings.TrimSpace(text) != "" {
-					fmt.Printf("Text at path %s with depth %d: %s\n", strings.Join(nodePath, " > "), depth, text)
+					l := scraper.ElementLocation{
+						Selector:   p,
+						ChildIndex: nrChildren[p],
+					}
+					if nr, found := locOcc[l]; found {
+						locOcc[l] = nr + 1
+					} else {
+						locOcc[l] = 1
+					}
 				}
+				nrChildren[p] += 1
 			}
 		case html.StartTagToken, html.EndTagToken:
 			tn, _ := z.TagName()
 			tnString := string(tn)
-			if tnString == "br" {
-				continue
+			if tnString == "body" {
+				inBody = !inBody
 			}
 			if inBody {
-				if tt == html.StartTagToken {
-					// fmt.Printf("<%s>\n", tnString)
-					nodePath = append(nodePath, tnString)
-					depth++
-				} else {
-					if nodePath[len(nodePath)-1] == tnString {
-						nodePath = nodePath[:len(nodePath)-1]
-					}
-					// fmt.Printf("</%s>\n", tnString)
-					depth--
+				// what type of token is <br /> ? Same as <br> ?
+				if tnString == "br" {
+					nrChildren[getSelector(nodePath)] += 1
+					continue
 				}
-			} else {
-				if tnString == "body" {
-					inBody = !inBody
+				if tt == html.StartTagToken {
+					nrChildren[getSelector(nodePath)] += 1
+					moreAttr := true
+					for moreAttr {
+						k, v, m := z.TagAttr()
+						if string(k) == "class" && string(v) != "" {
+							tnString += fmt.Sprintf(".%s", strings.Replace(strings.TrimSpace(string(v)), " ", ".", -1))
+						}
+						moreAttr = m
+					}
+					if tnString != "br" {
+						nodePath = append(nodePath, tnString)
+						nrChildren[getSelector(nodePath)] = 0
+						depth++
+					}
+				} else {
+					if strings.Split(nodePath[len(nodePath)-1], ".")[0] == tnString {
+						delete(nrChildren, getSelector(nodePath))
+						nodePath = nodePath[:len(nodePath)-1]
+						depth--
+						if tnString == "body" {
+							break parse
+						}
+					}
 				}
 			}
 		}
 	}
-
+	for k, v := range locOcc {
+		if v > 10 {
+			fmt.Println(k, v)
+		}
+	}
 	return nil
 }

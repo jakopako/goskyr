@@ -518,7 +518,10 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 						if fieldNode.Type == html.TextNode {
 							fieldString, err = extractStringRegex(&t.RegexExtract, fieldNode.Data)
 							if err == nil {
-								break
+								if t.MaxLength > 0 && t.MaxLength < len(fieldString) {
+									fieldString = fieldString[:t.MaxLength] + "..."
+								}
+								return fieldString, nil
 							} else if t.ChildIndex != -1 {
 								// only in case we do not (ab)use the regex to search across all children
 								// we want to return the err. Also, we still return the fieldString as

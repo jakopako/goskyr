@@ -518,6 +518,7 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 						if fieldNode.Type == html.TextNode {
 							fieldString, err = extractStringRegex(&t.RegexExtract, fieldNode.Data)
 							if err == nil {
+								fieldString = strings.TrimSpace(fieldString)
 								if t.MaxLength > 0 && t.MaxLength < len(fieldString) {
 									fieldString = fieldString[:t.MaxLength] + "..."
 								}

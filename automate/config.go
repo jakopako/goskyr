@@ -3,6 +3,7 @@ package automate
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/jakopako/goskyr/scraper"
@@ -10,8 +11,35 @@ import (
 	"golang.org/x/net/html"
 )
 
-func getSelector(pathSlice []string) string {
+func pathToSelector(pathSlice []string) string {
 	return strings.Join(pathSlice, " > ")
+}
+
+func selectorToPath(s string) []string {
+	return strings.Split(s, " > ")
+}
+
+func elementsToConfig(s *scraper.Scraper, l ...scraper.ElementLocation) {
+	var itemSelector string
+outer:
+	for i := 0; ; i++ {
+		var c string
+		for j, e := range l {
+			if i >= len(selectorToPath(e.Selector)) {
+				itemSelector = pathToSelector(selectorToPath(e.Selector)[:i-1])
+				break outer
+			}
+			if j == 0 {
+				c = selectorToPath(e.Selector)[i]
+			} else {
+				if selectorToPath(e.Selector)[i] != c {
+					itemSelector = pathToSelector(selectorToPath(e.Selector)[:i-1])
+					break outer
+				}
+			}
+		}
+	}
+	fmt.Println(itemSelector)
 }
 
 func GetDynamicFieldsConfig(s *scraper.Scraper, g *scraper.GlobalConfig) error {
@@ -30,7 +58,7 @@ func GetDynamicFieldsConfig(s *scraper.Scraper, g *scraper.GlobalConfig) error {
 	// body > div.content > div.mainContentContainer > div.mainContent > div.mainContentFloat > div.leftContainer > div:nth-child(2) > div.quoteDetails > div.quoteText > span
 	z := html.NewTokenizer(res.Body)
 	locOcc := map[scraper.ElementLocation]int{}
-	locExample := map[scraper.ElementLocation]string{}
+	locExamples := map[scraper.ElementLocation][]string{}
 	nrChildren := map[string]int{}
 	nodePath := []string{}
 	depth := 0
@@ -44,7 +72,7 @@ parse:
 		case html.TextToken:
 			if inBody {
 				text := string(z.Text())
-				p := getSelector(nodePath)
+				p := pathToSelector(nodePath)
 				if len(strings.TrimSpace(text)) > 1 {
 					l := scraper.ElementLocation{
 						Selector:   p,
@@ -54,7 +82,9 @@ parse:
 						locOcc[l] = nr + 1
 					} else {
 						locOcc[l] = 1
-						locExample[l] = strings.TrimSpace(text)
+					}
+					if len(locExamples[l]) < 4 {
+						locExamples[l] = append(locExamples[l], strings.TrimSpace(text))
 					}
 				}
 				nrChildren[p] += 1
@@ -68,11 +98,11 @@ parse:
 			if inBody {
 				// what type of token is <br /> ? Same as <br> ?
 				if tnString == "br" {
-					nrChildren[getSelector(nodePath)] += 1
+					nrChildren[pathToSelector(nodePath)] += 1
 					continue
 				}
 				if tt == html.StartTagToken {
-					nrChildren[getSelector(nodePath)] += 1
+					nrChildren[pathToSelector(nodePath)] += 1
 					moreAttr := true
 					for moreAttr {
 						k, v, m := z.TagAttr()
@@ -83,27 +113,54 @@ parse:
 					}
 					if tnString != "br" {
 						nodePath = append(nodePath, tnString)
-						nrChildren[getSelector(nodePath)] = 0
+						nrChildren[pathToSelector(nodePath)] = 0
 						depth++
 					}
 				} else {
-					if strings.Split(nodePath[len(nodePath)-1], ".")[0] == tnString {
-						delete(nrChildren, getSelector(nodePath))
+					n := true
+					for n && depth > 0 {
+						if strings.Split(nodePath[len(nodePath)-1], ".")[0] == tnString {
+							if tnString == "body" {
+								break parse
+							}
+							n = false
+						}
+						delete(nrChildren, pathToSelector(nodePath))
 						nodePath = nodePath[:len(nodePath)-1]
 						depth--
-						if tnString == "body" {
-							break parse
-						}
 					}
 				}
 			}
 		}
 	}
+
+	frequencyBuckets := map[int][]scraper.ElementLocation{}
 	for k, v := range locOcc {
-		if v > 10 {
-			fmt.Println(k, v)
-			fmt.Println(locExample[k])
+		frequencyBuckets[v] = append(frequencyBuckets[v], k)
+	}
+	highestOcc := 0
+	highestOccFr := 0
+	minFr := 5
+	for k, v := range frequencyBuckets {
+		n := len(v)
+		if n > highestOcc && k >= minFr {
+			highestOcc = n
+			highestOccFr = k
 		}
 	}
+
+	f := frequencyBuckets[highestOccFr]
+	sort.Slice(f, func(p, q int) bool {
+		return f[p].Selector > f[q].Selector
+	})
+	for i, e := range f {
+		fmt.Printf("field [%d] examples:\n\t%s\n\n", i, strings.Join(locExamples[e], "\n\t"))
+	}
+
+	fmt.Println("please select one or more of the suggested fields by typing the according numbers separated by spaces:")
+	fmt.Println("thanks you selected 4 & 5")
+
+	elementsToConfig(s, frequencyBuckets[highestOccFr][4], frequencyBuckets[highestOccFr][5])
+
 	return nil
 }

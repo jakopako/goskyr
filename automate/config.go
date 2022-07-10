@@ -116,7 +116,16 @@ parse:
 					for moreAttr {
 						k, v, m := z.TagAttr()
 						if string(k) == "class" && string(v) != "" {
-							tnString += fmt.Sprintf(".%s", strings.Replace(strings.TrimSpace(string(v)), " ", ".", -1))
+							cls := strings.Split(string(v), " ")
+							j := 0
+							for _, cl := range cls {
+								if cl != "" {
+									cls[j] = cl
+									j++
+								}
+							}
+							cls = cls[:j]
+							tnString += fmt.Sprintf(".%s", strings.Join(cls, "."))
 						}
 						moreAttr = m
 					}

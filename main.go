@@ -9,6 +9,7 @@ import (
 	"github.com/jakopako/goskyr/automate"
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/scraper"
+	"gopkg.in/yaml.v3"
 )
 
 var version = "dev"
@@ -44,6 +45,26 @@ func main() {
 		return
 	}
 
+	if *generateConfig != "" {
+		s := &scraper.Scraper{URL: *generateConfig}
+		err := automate.GetDynamicFieldsConfig(s)
+		if err != nil {
+			log.Fatal(err)
+		}
+		c := scraper.Config{
+			Scrapers: []scraper.Scraper{
+				*s,
+			},
+		}
+		yamlData, err := yaml.Marshal(&c)
+		if err != nil {
+			log.Fatalf("Error while Marshaling. %v", err)
+		}
+
+		fmt.Println(string(yamlData))
+		return
+	}
+
 	config, err := scraper.NewConfig(*configFile)
 	if err != nil {
 		log.Fatal(err)
@@ -52,15 +73,6 @@ func main() {
 	var scraperWg sync.WaitGroup
 	var writerWg sync.WaitGroup
 	itemsChannel := make(chan map[string]interface{}, len(config.Scrapers))
-
-	if *generateConfig != "" {
-		s := &scraper.Scraper{URL: *generateConfig}
-		err := automate.GetDynamicFieldsConfig(s, &config.Global)
-		if err != nil {
-			log.Fatal(err)
-		}
-		return
-	}
 
 	var writer output.Writer
 	if *toStdout {

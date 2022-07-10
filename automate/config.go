@@ -1,9 +1,12 @@
 package automate
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/jakopako/goskyr/scraper"
@@ -39,23 +42,29 @@ outer:
 			}
 		}
 	}
-	fmt.Println(itemSelector)
+	s.Item = itemSelector
+	for i, e := range l {
+		e.Selector = strings.TrimLeft(strings.TrimPrefix(e.Selector, itemSelector), " >")
+		d := scraper.DynamicField{
+			Name:            fmt.Sprintf("field-%d", i),
+			Type:            "text",
+			ElementLocation: e,
+		}
+		s.Fields.Dynamic = append(s.Fields.Dynamic, d)
+	}
 }
 
-func GetDynamicFieldsConfig(s *scraper.Scraper, g *scraper.GlobalConfig) error {
+func GetDynamicFieldsConfig(s *scraper.Scraper) error {
 	if s.URL == "" {
 		return errors.New("URL field cannot be empty")
 	}
-	res, err := utils.FetchUrl(s.URL, g.UserAgent)
+	res, err := utils.FetchUrl(s.URL, "")
 	if err != nil {
 		return err
 	}
 	if res.StatusCode != 200 {
 		return fmt.Errorf("status code error: %d %s", res.StatusCode, res.Status)
 	}
-	// body > div.content > div.mainContentContainer > div.mainContent > div.mainContentFloat > h1
-	// body > div.content > div.mainContentContainer > div.mainContent > div.mainContentFloat > div.leftContainer > div:nth-child(2) > div.quoteDetails > div.quoteText
-	// body > div.content > div.mainContentContainer > div.mainContent > div.mainContentFloat > div.leftContainer > div:nth-child(2) > div.quoteDetails > div.quoteText > span
 	z := html.NewTokenizer(res.Body)
 	locOcc := map[scraper.ElementLocation]int{}
 	locExamples := map[scraper.ElementLocation][]string{}
@@ -154,13 +163,28 @@ parse:
 		return f[p].Selector > f[q].Selector
 	})
 	for i, e := range f {
-		fmt.Printf("field [%d] examples:\n\t%s\n\n", i, strings.Join(locExamples[e], "\n\t"))
+		fmt.Printf("field [%d]\n  location: %v\n  examples:\n\t%s\n\n", i, e, strings.Join(locExamples[e], "\n\t"))
 	}
 
+	reader := bufio.NewReader(os.Stdin)
 	fmt.Println("please select one or more of the suggested fields by typing the according numbers separated by spaces:")
-	fmt.Println("thanks you selected 4 & 5")
+	text, _ := reader.ReadString('\n')
+	var ns []int
+	for _, n := range strings.Split(strings.TrimRight(text, "\n"), " ") {
+		ni, err := strconv.Atoi(n)
+		if err != nil {
+			return fmt.Errorf("please enter valid numbers")
+		}
+		ns = append(ns, ni)
+	}
+	var fs []scraper.ElementLocation
+	for _, n := range ns {
+		if n >= len(f) {
+			return fmt.Errorf("please enter valid numbers")
+		}
+		fs = append(fs, f[n])
+	}
 
-	elementsToConfig(s, frequencyBuckets[highestOccFr][4], frequencyBuckets[highestOccFr][5])
-
+	elementsToConfig(s, fs...)
 	return nil
 }

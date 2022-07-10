@@ -38,7 +38,110 @@ go install github.com/jakopako/goskyr@latest
 
 Or clone the repository and then run with `go run main.go ...` or build it yourself.
 
-## Configuration & Usage
+## Auto configuration (experimental)
+
+To reduce the manual effort of configuring the scraper I am currently working on a feature that automatically generates a config snippet for a given website.
+The command looks like this:
+
+```bash
+goskyr -generate "https://www.goodreads.com/quotes/tag/life"
+```
+
+which will automatically find repeating fields, will ask you to chose a subset of those fields and then return the resulting config snippet, which might look
+something like this:
+
+```yaml
+writer:
+    type: ""
+    uri: ""
+    user: ""
+    password: ""
+    filepath: ""
+scrapers:
+    - name: ""
+      url: https://www.goodreads.com/quotes/tag/life
+      item: body > div.content > div.mainContentContainer > div.mainContent > div.mainContentFloat > div.leftContainer > div.quote.mediumText > div.quoteDetails
+      exclude_with_selector: []
+      fields:
+        static: []
+        dynamic:
+            - name: field-0
+              type: text
+              location:
+                selector: div.quoteText > span.authorOrTitle
+                node_index: 0
+                child_index: 0
+                regex_extract:
+                    exp: ""
+                    index: 0
+                attr: ""
+                max_length: 0
+                entire_subtree: false
+              on_subpage: ""
+              can_be_empty: false
+              components: []
+              date_location: ""
+              date_language: ""
+              hide: false
+            - name: field-1
+              type: text
+              location:
+                selector: div.quoteText
+                node_index: 0
+                child_index: 2
+                regex_extract:
+                    exp: ""
+                    index: 0
+                attr: ""
+                max_length: 0
+                entire_subtree: false
+              on_subpage: ""
+              can_be_empty: false
+              components: []
+              date_location: ""
+              date_language: ""
+              hide: false
+      filters: []
+      paginator:
+        location:
+            selector: ""
+            node_index: 0
+            child_index: 0
+            regex_extract:
+                exp: ""
+                index: 0
+            attr: ""
+            max_length: 0
+            entire_subtree: false
+        max_pages: 0
+global:
+    user-agent: ""
+```
+
+Note that currently all fields are displayed although the majority contains default values that you normally wouldn't have to configure. As a consequence, they can
+be manually removed for better readability which in the above example results in:
+
+```yaml
+scrapers:
+    - name: ""
+      url: https://www.goodreads.com/quotes/tag/life
+      item: body > div.content > div.mainContentContainer > div.mainContent > div.mainContentFloat > div.leftContainer > div.quote.mediumText > div.quoteDetails
+      fields:
+        dynamic:
+            - name: field-0
+              type: text
+              location:
+                selector: div.quoteText > span.authorOrTitle
+            - name: field-1
+              type: text
+              location:
+                selector: div.quoteText
+```
+
+Save this to a file and run `goskyr -config <your-file>`. Since this auto config generation is an experimental feature it currently only works for `text` fields.
+Checkout the below sections for further details on manually configuring the scraper.
+
+## Manual Configuration & Usage
 
 A very simple configuration would look something like this:
 

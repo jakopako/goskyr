@@ -1,0 +1,14 @@
+scrapers:
+  - name: ""
+    url: https://www.goodreads.com/quotes/tag/life
+    item: body > div.content > div.mainContentContainer > div.mainContent > div.mainContentFloat > div.leftContainer > div.quote.mediumText > div.quoteDetails
+    fields:
+      dynamic:
+        - name: field-0
+          type: text
+          location:
+            selector: div.quoteText > span.authorOrTitle
+        - name: field-1
+          type: text
+          location:
+            selector: div.quoteText

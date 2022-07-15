@@ -1,14 +1,93 @@
 scrapers:
   - name: ""
-    url: https://www.goodreads.com/quotes/tag/life
-    item: body > div.content > div.mainContentContainer > div.mainContent > div.mainContentFloat > div.leftContainer > div.quote.mediumText > div.quoteDetails
+    url: https://www.30cc.be/nl/programma?seizoen=2022-2023&discipline=3
+    item: body.page-programma > div.page-wrap > div.page-main > div.section.section--content.js-filter > div.container > div.section__content > div.grid > div.grid__12.grid--bp-med__8 > div.block.js-load-more > div.block > div.grid.grid--flex.js-load-more-results > div.grid__12.is-view-list > div.excerpt.excerpt--event.excerpt--link.excerpt--clickable
+    exclude_with_selector: []
     fields:
+      static: []
       dynamic:
         - name: field-0
           type: text
           location:
-            selector: div.quoteText > span.authorOrTitle
+            selector: div.excerpt__main > div.excerpt__header > h3.excerpt__title > a
+            node_index: 0
+            child_index: 0
+            regex_extract:
+              exp: ""
+              index: 0
+            attr: ""
+            max_length: 0
+            entire_subtree: false
+          on_subpage: ""
+          can_be_empty: false
+          components: []
+          date_location: ""
+          date_language: ""
+          hide: false
         - name: field-1
           type: text
           location:
-            selector: div.quoteText
+            selector: div.excerpt__main > div.excerpt__header > div.excerpt__intro
+            node_index: 0
+            child_index: 0
+            regex_extract:
+              exp: ""
+              index: 0
+            attr: ""
+            max_length: 0
+            entire_subtree: false
+          on_subpage: ""
+          can_be_empty: false
+          components: []
+          date_location: ""
+          date_language: ""
+          hide: false
+        - name: field-2
+          type: text
+          location:
+            selector: div.excerpt__main > div.excerpt__ct.js-show-more > div.excerpt--eventperformance.js-show-more-child > span.excerpt__meta > span.excerpt__time
+            node_index: 0
+            child_index: 0
+            regex_extract:
+              exp: ""
+              index: 0
+            attr: ""
+            max_length: 0
+            entire_subtree: false
+          on_subpage: ""
+          can_be_empty: false
+          components: []
+          date_location: ""
+          date_language: ""
+          hide: false
+        - name: field-3
+          type: text
+          location:
+            selector: div.excerpt__main > div.excerpt__ct.js-show-more > div.excerpt--eventperformance.js-show-more-child > span.excerpt__meta
+            node_index: 0
+            child_index: 0
+            regex_extract:
+              exp: ""
+              index: 0
+            attr: ""
+            max_length: 0
+            entire_subtree: false
+          on_subpage: ""
+          can_be_empty: false
+          components: []
+          date_location: ""
+          date_language: ""
+          hide: false
+    filters: []
+    paginator:
+      location:
+        selector: ""
+        node_index: 0
+        child_index: 0
+        regex_extract:
+          exp: ""
+          index: 0
+        attr: ""
+        max_length: 0
+        entire_subtree: false
+      max_pages: 0

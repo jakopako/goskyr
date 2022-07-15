@@ -54,7 +54,7 @@ outer:
 	}
 }
 
-func GetDynamicFieldsConfig(s *scraper.Scraper) error {
+func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int) error {
 	if s.URL == "" {
 		return errors.New("URL field cannot be empty")
 	}
@@ -116,7 +116,16 @@ parse:
 					for moreAttr {
 						k, v, m := z.TagAttr()
 						if string(k) == "class" && string(v) != "" {
-							tnString += fmt.Sprintf(".%s", strings.Replace(strings.TrimSpace(string(v)), " ", ".", -1))
+							cls := strings.Split(string(v), " ")
+							j := 0
+							for _, cl := range cls {
+								if cl != "" {
+									cls[j] = cl
+									j++
+								}
+							}
+							cls = cls[:j]
+							tnString += fmt.Sprintf(".%s", strings.Join(cls, "."))
 						}
 						moreAttr = m
 					}
@@ -143,27 +152,27 @@ parse:
 		}
 	}
 
-	frequencyBuckets := map[int][]scraper.ElementLocation{}
-	for k, v := range locOcc {
-		frequencyBuckets[v] = append(frequencyBuckets[v], k)
-	}
-	highestOcc := 0
-	highestOccFr := 0
-	minFr := 5
-	for k, v := range frequencyBuckets {
-		n := len(v)
-		if n > highestOcc && k >= minFr {
-			highestOcc = n
-			highestOccFr = k
+	for e, f := range locOcc {
+		if f < minOcc {
+			delete(locOcc, e)
 		}
 	}
 
-	f := frequencyBuckets[highestOccFr]
+	f := make([]scraper.ElementLocation, len(locOcc))
+	i := 0
+	for k := range locOcc {
+		f[i] = k
+		i++
+	}
 	sort.Slice(f, func(p, q int) bool {
 		return f[p].Selector > f[q].Selector
 	})
+
+	colorReset := "\033[0m"
+	colorGreen := "\033[32m"
+	colorBlue := "\033[34m"
 	for i, e := range f {
-		fmt.Printf("field [%d]\n  location: %v\n  examples:\n\t%s\n\n", i, e, strings.Join(locExamples[e], "\n\t"))
+		fmt.Printf("%sfield [%d]%s\n  %slocation:%s %+v\n  %sexamples:%s\n\t%s\n\n", colorGreen, i, colorReset, colorBlue, colorReset, e, colorBlue, colorReset, strings.Join(locExamples[e], "\n\t"))
 	}
 
 	reader := bufio.NewReader(os.Stdin)

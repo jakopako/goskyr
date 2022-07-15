@@ -37,6 +37,7 @@ func main() {
 	printVersion := flag.Bool("version", false, "The version of goskyr.")
 	// add flag to pass min nr of items for the generate flag.
 	generateConfig := flag.String("generate", "", "Needs an additional argument of the url whose config needs to be generated.")
+	m := flag.Int("min", 20, "The minimum number of events on a page. This is needed to filter out noise.")
 
 	flag.Parse()
 
@@ -47,7 +48,7 @@ func main() {
 
 	if *generateConfig != "" {
 		s := &scraper.Scraper{URL: *generateConfig}
-		err := automate.GetDynamicFieldsConfig(s)
+		err := automate.GetDynamicFieldsConfig(s, *m)
 		if err != nil {
 			log.Fatal(err)
 		}

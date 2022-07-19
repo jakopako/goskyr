@@ -14,6 +14,35 @@ import (
 	"golang.org/x/net/html"
 )
 
+type locationProps struct {
+	count    int
+	examples []string
+}
+
+type locationManager map[scraper.ElementLocation]*locationProps
+
+func (l *locationManager) update(e scraper.ElementLocation, s string) {
+	// updates count and examples or adds new element to the locationManager
+	// old implementation
+	if p, found := (*l)[e]; found {
+		p.count += 1
+		if p.count <= 4 {
+			p.examples = append(p.examples, s)
+		}
+	} else {
+		(*l)[e] = &locationProps{count: 1, examples: []string{s}}
+	}
+	// TODO: new implementation
+}
+
+func (l *locationManager) filter(minCount int) {
+	for e, p := range *l {
+		if p.count < minCount {
+			delete(*l, e)
+		}
+	}
+}
+
 func pathToSelector(pathSlice []string) string {
 	return strings.Join(pathSlice, " > ")
 }
@@ -66,8 +95,7 @@ func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int) error {
 		return fmt.Errorf("status code error: %d %s", res.StatusCode, res.Status)
 	}
 	z := html.NewTokenizer(res.Body)
-	locOcc := map[scraper.ElementLocation]int{}
-	locExamples := map[scraper.ElementLocation][]string{}
+	locOcc := locationManager{}
 	nrChildren := map[string]int{}
 	nodePath := []string{}
 	depth := 0
@@ -87,14 +115,13 @@ parse:
 						Selector:   p,
 						ChildIndex: nrChildren[p],
 					}
-					if nr, found := locOcc[l]; found {
-						locOcc[l] = nr + 1
-					} else {
-						locOcc[l] = 1
-					}
-					if len(locExamples[l]) < 4 {
-						locExamples[l] = append(locExamples[l], strings.TrimSpace(text))
-					}
+					// this check has to be updated
+					// we cannot check the exact path because a repeating node might have both
+					// repeating classes and non-repeating classes. So instead of checking whether
+					// we have seen the exact location we need to check whether there is a location
+					// where for each node in the path that there is at least on overlapping class
+					// (if at least one of the two nodes has a class)
+					locOcc.update(l, strings.TrimSpace(text))
 				}
 				nrChildren[p] += 1
 			}
@@ -152,48 +179,47 @@ parse:
 		}
 	}
 
-	for e, f := range locOcc {
-		if f < minOcc {
-			delete(locOcc, e)
+	locOcc.filter(minOcc)
+
+	if len(locOcc) > 0 {
+		f := make([]scraper.ElementLocation, len(locOcc))
+		i := 0
+		for k := range locOcc {
+			f[i] = k
+			i++
 		}
-	}
+		sort.Slice(f, func(p, q int) bool {
+			return f[p].Selector > f[q].Selector
+		})
 
-	f := make([]scraper.ElementLocation, len(locOcc))
-	i := 0
-	for k := range locOcc {
-		f[i] = k
-		i++
-	}
-	sort.Slice(f, func(p, q int) bool {
-		return f[p].Selector > f[q].Selector
-	})
-
-	colorReset := "\033[0m"
-	colorGreen := "\033[32m"
-	colorBlue := "\033[34m"
-	for i, e := range f {
-		fmt.Printf("%sfield [%d]%s\n  %slocation:%s %+v\n  %sexamples:%s\n\t%s\n\n", colorGreen, i, colorReset, colorBlue, colorReset, e, colorBlue, colorReset, strings.Join(locExamples[e], "\n\t"))
-	}
-
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Println("please select one or more of the suggested fields by typing the according numbers separated by spaces:")
-	text, _ := reader.ReadString('\n')
-	var ns []int
-	for _, n := range strings.Split(strings.TrimRight(text, "\n"), " ") {
-		ni, err := strconv.Atoi(n)
-		if err != nil {
-			return fmt.Errorf("please enter valid numbers")
+		colorReset := "\033[0m"
+		colorGreen := "\033[32m"
+		colorBlue := "\033[34m"
+		for i, e := range f {
+			fmt.Printf("%sfield [%d]%s\n  %slocation:%s %+v\n  %sexamples:%s\n\t%s\n\n", colorGreen, i, colorReset, colorBlue, colorReset, e, colorBlue, colorReset, strings.Join(locOcc[e].examples, "\n\t"))
 		}
-		ns = append(ns, ni)
-	}
-	var fs []scraper.ElementLocation
-	for _, n := range ns {
-		if n >= len(f) {
-			return fmt.Errorf("please enter valid numbers")
-		}
-		fs = append(fs, f[n])
-	}
 
-	elementsToConfig(s, fs...)
-	return nil
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Println("please select one or more of the suggested fields by typing the according numbers separated by spaces:")
+		text, _ := reader.ReadString('\n')
+		var ns []int
+		for _, n := range strings.Split(strings.TrimRight(text, "\n"), " ") {
+			ni, err := strconv.Atoi(n)
+			if err != nil {
+				return fmt.Errorf("please enter valid numbers")
+			}
+			ns = append(ns, ni)
+		}
+		var fs []scraper.ElementLocation
+		for _, n := range ns {
+			if n >= len(f) {
+				return fmt.Errorf("please enter valid numbers")
+			}
+			fs = append(fs, f[n])
+		}
+
+		elementsToConfig(s, fs...)
+		return nil
+	}
+	return fmt.Errorf("no fields found")
 }

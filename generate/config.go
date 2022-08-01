@@ -15,32 +15,97 @@ import (
 )
 
 type locationProps struct {
+	loc      scraper.ElementLocation
 	count    int
 	examples []string
 }
 
-type locationManager map[scraper.ElementLocation]*locationProps
+type locationManager []*locationProps
 
-func (l *locationManager) update(e scraper.ElementLocation, s string) {
+func update(l locationManager, e scraper.ElementLocation, s string) locationManager {
 	// updates count and examples or adds new element to the locationManager
 	// old implementation
-	if p, found := (*l)[e]; found {
-		p.count += 1
-		if p.count <= 4 {
-			p.examples = append(p.examples, s)
+	// if p, found := (*l)[e]; found {
+	// 	p.count += 1
+	// 	if p.count <= 4 {
+	// 		p.examples = append(p.examples, s)
+	// 	}
+	// } else {
+	// 	(*l)[e] = &locationProps{count: 1, examples: []string{s}}
+	// }
+
+	// new implementation
+	for _, lp := range l {
+		if checkAndUpdatePath(&lp.loc, &e) {
+			lp.count++
+			if lp.count <= 4 {
+				lp.examples = append(lp.examples, s)
+			}
+			return l
 		}
-	} else {
-		(*l)[e] = &locationProps{count: 1, examples: []string{s}}
 	}
-	// TODO: new implementation
+	return append(l, &locationProps{loc: e, count: 1, examples: []string{s}})
 }
 
-func (l *locationManager) filter(minCount int) {
-	for e, p := range *l {
-		if p.count < minCount {
-			delete(*l, e)
+func checkAndUpdatePath(a, b *scraper.ElementLocation) bool {
+	// returns true if the paths overlap and the rest of the
+	// element location is identical. If true is returned
+	// the Selector of a will be updated if necessary.
+	if a.NodeIndex == b.NodeIndex && a.ChildIndex == b.ChildIndex {
+		if a.Selector == b.Selector {
+			return true
+		} else {
+			ap := selectorToPath(a.Selector)
+			bp := selectorToPath(b.Selector)
+			np := []string{}
+			if len(ap) != len(bp) {
+				return false
+			}
+			for i, an := range ap {
+				ae, be := strings.Split(an, "."), strings.Split(bp[i], ".")
+				at, bt := ae[0], be[0]
+				if at == bt {
+					if len(ae) == 1 && len(be) == 1 {
+						np = append(np, an)
+						continue
+					}
+					ac, bc := ae[1:], be[1:]
+					cc := []string{}
+					for j := 0; j < len(ac); j++ {
+						for k := 0; k < len(bc); k++ {
+							if ac[j] == bc[k] {
+								cc = append(cc, ac[j])
+							}
+						}
+					}
+					if len(cc) > 0 {
+						nnl := append([]string{at}, cc...)
+						nn := strings.Join(nnl, ".")
+						np = append(np, nn)
+						continue
+					}
+
+				}
+				return false
+
+			}
+			// if we get until here there is an overlapping path
+			a.Selector = pathToSelector(np)
+			return true
 		}
 	}
+	return false
+}
+
+func filter(l locationManager, minCount int) locationManager {
+	i := 0
+	for _, p := range l {
+		if p.count >= minCount {
+			l[i] = p
+			i++
+		}
+	}
+	return l[:i]
 }
 
 func pathToSelector(pathSlice []string) string {
@@ -95,7 +160,7 @@ func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int) error {
 		return fmt.Errorf("status code error: %d %s", res.StatusCode, res.Status)
 	}
 	z := html.NewTokenizer(res.Body)
-	locOcc := locationManager{}
+	locMan := locationManager{}
 	nrChildren := map[string]int{}
 	nodePath := []string{}
 	depth := 0
@@ -121,7 +186,7 @@ parse:
 					// we have seen the exact location we need to check whether there is a location
 					// where for each node in the path that there is at least on overlapping class
 					// (if at least one of the two nodes has a class)
-					locOcc.update(l, strings.TrimSpace(text))
+					locMan = update(locMan, l, strings.TrimSpace(text))
 				}
 				nrChildren[p] += 1
 			}
@@ -179,24 +244,18 @@ parse:
 		}
 	}
 
-	locOcc.filter(minOcc)
+	locMan = filter(locMan, minOcc)
 
-	if len(locOcc) > 0 {
-		f := make([]scraper.ElementLocation, len(locOcc))
-		i := 0
-		for k := range locOcc {
-			f[i] = k
-			i++
-		}
-		sort.Slice(f, func(p, q int) bool {
-			return f[p].Selector > f[q].Selector
+	if len(locMan) > 0 {
+		sort.Slice(locMan, func(p, q int) bool {
+			return locMan[p].loc.Selector > locMan[q].loc.Selector
 		})
 
 		colorReset := "\033[0m"
 		colorGreen := "\033[32m"
 		colorBlue := "\033[34m"
-		for i, e := range f {
-			fmt.Printf("%sfield [%d]%s\n  %slocation:%s %+v\n  %sexamples:%s\n\t%s\n\n", colorGreen, i, colorReset, colorBlue, colorReset, e, colorBlue, colorReset, strings.Join(locOcc[e].examples, "\n\t"))
+		for i, e := range locMan {
+			fmt.Printf("%sfield [%d]%s\n  %slocation:%s %+v\n  %sexamples:%s\n\t%s\n\n", colorGreen, i, colorReset, colorBlue, colorReset, e.loc, colorBlue, colorReset, strings.Join(e.examples, "\n\t"))
 		}
 
 		reader := bufio.NewReader(os.Stdin)
@@ -212,10 +271,10 @@ parse:
 		}
 		var fs []scraper.ElementLocation
 		for _, n := range ns {
-			if n >= len(f) {
+			if n >= len(locMan) {
 				return fmt.Errorf("please enter valid numbers")
 			}
-			fs = append(fs, f[n])
+			fs = append(fs, locMan[n].loc)
 		}
 
 		elementsToConfig(s, fs...)

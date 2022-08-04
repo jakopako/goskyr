@@ -529,3 +529,114 @@ scrapers:
                   exp: "[0-9]{1,2}:[0-9]{2}"
               layout: ["15:04"]
           date_location: "Europe/Berlin"
+
+  - name: Plaza
+    url: https://www.plaza-zurich.ch/nu/events/event_list_type/2
+    item: body.nu-page-eventlist.page-template-with-sidebar > div.hfeed.site > div.site-content > div.content-area.nunight.nu-event-list > main.site-main > article.page.type-page.hentry > ul > li.nu-event.nu-e-concert
+    exclude_with_selector: []
+    fields:
+      static: []
+      dynamic:
+        - name: field-0
+          type: text
+          location:
+            selector: div.nu-e-innerwrap > div.nu-e-mobitop > div.nu-e-titleblock > h2
+            node_index: 0
+            child_index: 0
+            regex_extract:
+              exp: ""
+              index: 0
+            attr: ""
+            max_length: 0
+            entire_subtree: false
+          on_subpage: ""
+          can_be_empty: false
+          components: []
+          date_location: ""
+          date_language: ""
+          hide: false
+        - name: field-1
+          type: text
+          location:
+            selector: div.nu-e-innerwrap > div.nu-e-mobitop > div.nu-e-date.icon-e-date > span > span
+            node_index: 0
+            child_index: 0
+            regex_extract:
+              exp: ""
+              index: 0
+            attr: ""
+            max_length: 0
+            entire_subtree: false
+          on_subpage: ""
+          can_be_empty: false
+          components: []
+          date_location: ""
+          date_language: ""
+          hide: false
+        - name: field-2
+          type: text
+          location:
+            selector: div.nu-e-innerwrap > div.nu-e-mobitop > div.nu-e-date.icon-e-date > span
+            node_index: 0
+            child_index: 0
+            regex_extract:
+              exp: ""
+              index: 0
+            attr: ""
+            max_length: 0
+            entire_subtree: false
+          on_subpage: ""
+          can_be_empty: false
+          components: []
+          date_location: ""
+          date_language: ""
+          hide: false
+        - name: field-3
+          type: text
+          location:
+            selector: div.nu-e-innerwrap > div.nu-e-mobidetails > div.nu-e-shortdescription > p > strong
+            node_index: 0
+            child_index: 0
+            regex_extract:
+              exp: ""
+              index: 0
+            attr: ""
+            max_length: 0
+            entire_subtree: false
+          on_subpage: ""
+          can_be_empty: true
+          components: []
+          date_location: ""
+          date_language: ""
+          hide: false
+        - name: field-4
+          type: text
+          location:
+            selector: div.nu-e-innerwrap > div.nu-e-mobidetails > div.nu-e-shortdescription > p
+            node_index: 0
+            child_index: 0
+            regex_extract:
+              exp: ""
+              index: 0
+            attr: ""
+            max_length: 0
+            entire_subtree: false
+          on_subpage: ""
+          can_be_empty: true
+          components: []
+          date_location: ""
+          date_language: ""
+          hide: false
+    filters: []
+    paginator:
+      location:
+        selector: ""
+        node_index: 0
+        child_index: 0
+        regex_extract:
+          exp: ""
+          index: 0
+        attr: ""
+        max_length: 0
+        entire_subtree: false
+      max_pages: 0

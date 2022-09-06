@@ -2,9 +2,7 @@ scrapers:
   - name: ""
     url: https://www.goodreads.com/quotes/tag/life
     item: body > div.content > div.mainContentContainer > div.mainContent > div.mainContentFloat > div.leftContainer > div.quote.mediumText > div.quoteDetails
-    exclude_with_selector: []
     fields:
-      static: []
       dynamic:
         - name: field-0
           type: text

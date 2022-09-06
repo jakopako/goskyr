@@ -7,7 +7,7 @@ This project's goal is to make it easier to scrape structured data from web page
 different venue websites. However, the code has been rewritten to handle a more general use case of extracting a list of items from any website.
 This could be a list of books from an online book store, a list of plays in a public theater, a list of newspaper articles, etc. Currently, information can only be extracted from static websites.
 
-Note that there are already similar projects that might do a better job in certain cases or are more generic tools. However, on the one hand this is a personal project to make myself familiar with webscraping and Go and on the other hand goskyr supports certain features that I haven't found in any other projects. For instance, the way dates can be extracted from websites and the notion of scraping information from subpages defined by previously at runtime extracted urls.
+Note that there are already similar projects that might do a better job in certain cases or are more generic tools. However, on the one hand this is a personal project to make myself familiar with webscraping and Go and on the other hand goskyr supports certain features that I haven't found in any other projects. For instance, the way dates can be extracted from websites and the notion of scraping information from subpages defined by previously at runtime extracted urls. Be sure to checkout the section on [auto configuration](#auto-configuration-experimental).
 
 Similar projects:
 
@@ -49,77 +49,6 @@ goskyr -generate "https://www.goodreads.com/quotes/tag/life"
 
 which will automatically find repeating fields, will ask you to chose a subset of those fields and then return the resulting config snippet, which might look
 something like this:
-
-```yaml
-writer:
-    type: ""
-    uri: ""
-    user: ""
-    password: ""
-    filepath: ""
-scrapers:
-    - name: ""
-      url: https://www.goodreads.com/quotes/tag/life
-      item: body > div.content > div.mainContentContainer > div.mainContent > div.mainContentFloat > div.leftContainer > div.quote.mediumText > div.quoteDetails
-      exclude_with_selector: []
-      fields:
-        static: []
-        dynamic:
-            - name: field-0
-              type: text
-              location:
-                selector: div.quoteText > span.authorOrTitle
-                node_index: 0
-                child_index: 0
-                regex_extract:
-                    exp: ""
-                    index: 0
-                attr: ""
-                max_length: 0
-                entire_subtree: false
-              on_subpage: ""
-              can_be_empty: false
-              components: []
-              date_location: ""
-              date_language: ""
-              hide: false
-            - name: field-1
-              type: text
-              location:
-                selector: div.quoteText
-                node_index: 0
-                child_index: 2
-                regex_extract:
-                    exp: ""
-                    index: 0
-                attr: ""
-                max_length: 0
-                entire_subtree: false
-              on_subpage: ""
-              can_be_empty: false
-              components: []
-              date_location: ""
-              date_language: ""
-              hide: false
-      filters: []
-      paginator:
-        location:
-            selector: ""
-            node_index: 0
-            child_index: 0
-            regex_extract:
-                exp: ""
-                index: 0
-            attr: ""
-            max_length: 0
-            entire_subtree: false
-        max_pages: 0
-global:
-    user-agent: ""
-```
-
-Note that currently all fields are displayed although the majority contains default values that you normally wouldn't have to configure. As a consequence, they can
-be manually removed for better readability which in the above example results in:
 
 ```yaml
 scrapers:

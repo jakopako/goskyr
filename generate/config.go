@@ -180,12 +180,6 @@ parse:
 						Selector:   p,
 						ChildIndex: nrChildren[p],
 					}
-					// this check has to be updated
-					// we cannot check the exact path because a repeating node might have both
-					// repeating classes and non-repeating classes. So instead of checking whether
-					// we have seen the exact location we need to check whether there is a location
-					// where for each node in the path that there is at least on overlapping class
-					// (if at least one of the two nodes has a class)
 					locMan = update(locMan, l, strings.TrimSpace(text))
 				}
 				nrChildren[p] += 1

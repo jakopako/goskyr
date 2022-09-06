@@ -31,9 +31,9 @@ type GlobalConfig struct {
 // Values will be taken from a config yml file or environment variables
 // or both.
 type Config struct {
-	Writer   output.WriterConfig `yaml:"writer"`
-	Scrapers []Scraper           `yaml:"scrapers"`
-	Global   GlobalConfig        `yaml:"global"`
+	Writer   output.WriterConfig `yaml:"writer,omitempty"`
+	Scrapers []Scraper           `yaml:"scrapers,omitempty"`
+	Global   GlobalConfig        `yaml:"global,omitempty"`
 }
 
 func NewConfig(configPath string) (*Config, error) {
@@ -65,13 +65,13 @@ type RegexConfig struct {
 
 // ElementLocation is used to find a specific string in a html document
 type ElementLocation struct {
-	Selector      string      `yaml:"selector"`
-	NodeIndex     int         `yaml:"node_index"`
-	ChildIndex    int         `yaml:"child_index"`
-	RegexExtract  RegexConfig `yaml:"regex_extract"`
-	Attr          string      `yaml:"attr"`
-	MaxLength     int         `yaml:"max_length"`
-	EntireSubtree bool        `yaml:"entire_subtree"`
+	Selector      string      `yaml:"selector,omitempty"`
+	NodeIndex     int         `yaml:"node_index,omitempty"`
+	ChildIndex    int         `yaml:"child_index,omitempty"`
+	RegexExtract  RegexConfig `yaml:"regex_extract,omitempty"`
+	Attr          string      `yaml:"attr,omitempty"`
+	MaxLength     int         `yaml:"max_length,omitempty"`
+	EntireSubtree bool        `yaml:"entire_subtree,omitempty"`
 }
 
 // CoveredDateParts is used to determine what parts of a date a
@@ -103,16 +103,16 @@ type StaticField struct {
 // for each item
 type DynamicField struct {
 	Name string `yaml:"name"`
-	Type string `yaml:"type"` // can currently be text, url or date
+	Type string `yaml:"type,omitempty"` // can currently be text, url or date
 	// If a field can be found on a subpage the following variable has to contain a field name of
 	// a field of type 'url' that is located on the main page.
-	ElementLocation ElementLocation `yaml:"location"`
-	OnSubpage       string          `yaml:"on_subpage"`    // applies to text, url, date
-	CanBeEmpty      bool            `yaml:"can_be_empty"`  // applies to text, url
-	Components      []DateComponent `yaml:"components"`    // applies to date
-	DateLocation    string          `yaml:"date_location"` // applies to date
-	DateLanguage    string          `yaml:"date_language"` // applies to date
-	Hide            bool            `yaml:"hide"`          // appliess to text, url, date
+	ElementLocation ElementLocation `yaml:"location,omitempty"`
+	OnSubpage       string          `yaml:"on_subpage,omitempty"`    // applies to text, url, date
+	CanBeEmpty      bool            `yaml:"can_be_empty,omitempty"`  // applies to text, url
+	Components      []DateComponent `yaml:"components,omitempty"`    // applies to date
+	DateLocation    string          `yaml:"date_location,omitempty"` // applies to date
+	DateLanguage    string          `yaml:"date_language,omitempty"` // applies to date
+	Hide            bool            `yaml:"hide,omitempty"`          // appliess to text, url, date
 }
 
 // A Filter is used to filter certain items from the result list
@@ -128,16 +128,16 @@ type Scraper struct {
 	Name                string   `yaml:"name"`
 	URL                 string   `yaml:"url"`
 	Item                string   `yaml:"item"`
-	ExcludeWithSelector []string `yaml:"exclude_with_selector"`
+	ExcludeWithSelector []string `yaml:"exclude_with_selector,omitempty"`
 	Fields              struct {
-		Static  []StaticField  `yaml:"static"`
-		Dynamic []DynamicField `yaml:"dynamic"`
+		Static  []StaticField  `yaml:"static,omitempty"`
+		Dynamic []DynamicField `yaml:"dynamic,omitempty"`
 	} `yaml:"fields"`
-	Filters   []Filter `yaml:"filters"`
+	Filters   []Filter `yaml:"filters,omitempty"`
 	Paginator struct {
-		Location ElementLocation `yaml:"location"`
-		MaxPages int             `yaml:"max_pages"`
-	}
+		Location ElementLocation `yaml:"location,omitempty"`
+		MaxPages int             `yaml:"max_pages,omitempty"`
+	} `yaml:"paginator,omitempty"`
 }
 
 // GetItems fetches and returns all items from a website according to the

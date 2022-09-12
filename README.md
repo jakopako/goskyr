@@ -67,8 +67,7 @@ scrapers:
                 selector: div.quoteText
 ```
 
-Save this to a file and run `goskyr -config <your-file>`. Since this auto config generation is an experimental feature it currently only works for `text` fields.
-Checkout the below sections for further details on manually configuring the scraper.
+Save this to a file and run `goskyr -config <your-file>`. For now the automatic config extraction only works for `text` and `url` fields. Checkout the below sections for further details on manually configuring the scraper.
 
 ## Manual Configuration & Usage
 

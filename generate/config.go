@@ -130,7 +130,7 @@ outer:
 				c = selectorToPath(e.Selector)[i]
 			} else {
 				if selectorToPath(e.Selector)[i] != c {
-					itemSelector = pathToSelector(selectorToPath(e.Selector)[:i-1])
+					itemSelector = pathToSelector(selectorToPath(e.Selector)[:i])
 					break outer
 				}
 			}
@@ -263,6 +263,7 @@ parse:
 			}
 			ns = append(ns, ni)
 		}
+		// ns := []int{0, 3, 4}
 		var fs []scraper.ElementLocation
 		for _, n := range ns {
 			if n >= len(locMan) {

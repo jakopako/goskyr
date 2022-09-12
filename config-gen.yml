@@ -1,14 +1,18 @@
 scrapers:
-  - name: ""
-    url: https://www.goodreads.com/quotes/tag/life
-    item: body > div.content > div.mainContentContainer > div.mainContent > div.mainContentFloat > div.leftContainer > div.quote.mediumText > div.quoteDetails
+  - name: "Luxor"
+    url: https://www.luxor-koeln.de/programm/
+    item: body.page-template.page-template-page-events.page-template-page-events-php.page.page-id-26.wp-embed-responsive.preload > main.content > article.article.post-26.page.type-page.status-publish.hentry > section.events-overview.alignwide > div.events-overview__listing > article.event-sneak-peek.event.type-event.status-publish.has-post-thumbnail.hentry
     fields:
       dynamic:
         - name: field-0
           type: text
           location:
-            selector: div.quoteText > span.authorOrTitle
+            selector: div.event-sneak-peek__meta > div.event-sneak-peek__time
         - name: field-1
           type: text
           location:
-            selector: div.quoteText
+            selector: div.event-sneak-peek__meta > div.event-sneak-peek__date
+        - name: field-2
+          type: text
+          location:
+            selector: div.event-sneak-peek__content > h3.event-sneak-peek__title > a

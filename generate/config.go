@@ -23,17 +23,6 @@ type locationProps struct {
 type locationManager []*locationProps
 
 func update(l locationManager, e scraper.ElementLocation, s string) locationManager {
-	// updates count and examples or adds new element to the locationManager
-	// old implementation
-	// if p, found := (*l)[e]; found {
-	// 	p.count += 1
-	// 	if p.count <= 4 {
-	// 		p.examples = append(p.examples, s)
-	// 	}
-	// } else {
-	// 	(*l)[e] = &locationProps{count: 1, examples: []string{s}}
-	// }
-
 	// new implementation
 	for _, lp := range l {
 		if checkAndUpdatePath(&lp.loc, &e) {
@@ -51,7 +40,7 @@ func checkAndUpdatePath(a, b *scraper.ElementLocation) bool {
 	// returns true if the paths overlap and the rest of the
 	// element location is identical. If true is returned
 	// the Selector of a will be updated if necessary.
-	if a.NodeIndex == b.NodeIndex && a.ChildIndex == b.ChildIndex {
+	if a.NodeIndex == b.NodeIndex && a.ChildIndex == b.ChildIndex && a.Attr == b.Attr {
 		if a.Selector == b.Selector {
 			return true
 		} else {
@@ -139,9 +128,13 @@ outer:
 	s.Item = itemSelector
 	for i, e := range l {
 		e.Selector = strings.TrimLeft(strings.TrimPrefix(e.Selector, itemSelector), " >")
+		fieldType := "text"
+		if e.Attr == "href" {
+			fieldType = "url"
+		}
 		d := scraper.DynamicField{
 			Name:            fmt.Sprintf("field-%d", i),
-			Type:            "text",
+			Type:            fieldType,
 			ElementLocation: e,
 		}
 		s.Fields.Dynamic = append(s.Fields.Dynamic, d)
@@ -199,6 +192,7 @@ parse:
 				if tt == html.StartTagToken {
 					nrChildren[pathToSelector(nodePath)] += 1
 					moreAttr := true
+					var hrefVal string
 					for moreAttr {
 						k, v, m := z.TagAttr()
 						if string(k) == "class" && string(v) != "" {
@@ -213,12 +207,24 @@ parse:
 							cls = cls[:j]
 							tnString += fmt.Sprintf(".%s", strings.Join(cls, "."))
 						}
+						if string(k) == "href" {
+							hrefVal = string(v)
+						}
 						moreAttr = m
 					}
 					if tnString != "br" {
 						nodePath = append(nodePath, tnString)
 						nrChildren[pathToSelector(nodePath)] = 0
 						depth++
+						if tnString == "a" && hrefVal != "" {
+							p := pathToSelector(nodePath)
+							l := scraper.ElementLocation{
+								Selector:   p,
+								ChildIndex: nrChildren[p],
+								Attr:       "href",
+							}
+							locMan = update(locMan, l, hrefVal)
+						}
 					}
 				} else {
 					n := true

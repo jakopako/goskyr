@@ -6,10 +6,9 @@ scrapers:
     url: https://www.goodreads.com/quotes/tag/life
     item: ".quote"
     fields:
-      dynamic:
-        - name: "quote"
-          location:
-            selector: ".quoteText"
-        - name: "author"
-          location:
-            selector: ".authorOrTitle"
+      - name: "quote"
+        location:
+          selector: ".quoteText"
+      - name: "author"
+        location:
+          selector: ".authorOrTitle"

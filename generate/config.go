@@ -132,12 +132,12 @@ outer:
 		if e.Attr == "href" {
 			fieldType = "url"
 		}
-		d := scraper.DynamicField{
+		d := scraper.Field{
 			Name:            fmt.Sprintf("field-%d", i),
 			Type:            fieldType,
 			ElementLocation: e,
 		}
-		s.Fields.Dynamic = append(s.Fields.Dynamic, d)
+		s.Fields = append(s.Fields, d)
 	}
 }
 

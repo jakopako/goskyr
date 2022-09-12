@@ -91,19 +91,13 @@ type DateComponent struct {
 	Layout          []string         `yaml:"layout"`
 }
 
-// A StaticField defines a field that has a fixed name and value
-// across all scraped items
-type StaticField struct {
-	Name  string `yaml:"name"`
-	Value string `yaml:"value"`
-}
-
-// A DynamicField contains all the information necessary to scrape
+// A Field contains all the information necessary to scrape
 // a dynamic field from a website, ie a field who's value changes
 // for each item
-type DynamicField struct {
-	Name string `yaml:"name"`
-	Type string `yaml:"type,omitempty"` // can currently be text, url or date
+type Field struct {
+	Name  string `yaml:"name"`
+	Value string `yaml:"value,omitempty"`
+	Type  string `yaml:"type,omitempty"` // can currently be text, url or date
 	// If a field can be found on a subpage the following variable has to contain a field name of
 	// a field of type 'url' that is located on the main page.
 	ElementLocation ElementLocation `yaml:"location,omitempty"`
@@ -129,12 +123,9 @@ type Scraper struct {
 	URL                 string   `yaml:"url"`
 	Item                string   `yaml:"item"`
 	ExcludeWithSelector []string `yaml:"exclude_with_selector,omitempty"`
-	Fields              struct {
-		Static  []StaticField  `yaml:"static,omitempty"`
-		Dynamic []DynamicField `yaml:"dynamic,omitempty"`
-	} `yaml:"fields"`
-	Filters   []Filter `yaml:"filters,omitempty"`
-	Paginator struct {
+	Fields              []Field  `yaml:"fields,omitempty"`
+	Filters             []Filter `yaml:"filters,omitempty"`
+	Paginator           struct {
 		Location ElementLocation `yaml:"location,omitempty"`
 		MaxPages int             `yaml:"max_pages,omitempty"`
 	} `yaml:"paginator,omitempty"`
@@ -173,19 +164,19 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig) ([]map[string]interface{},
 				}
 			}
 
-			// add static fields
 			currentItem := make(map[string]interface{})
-			for _, sf := range c.Fields.Static {
-				currentItem[sf.Name] = sf.Value
-			}
-
-			// handle all fields on the main page
-			for _, f := range c.Fields.Dynamic {
-				if f.OnSubpage == "" {
-					err := extractField(&f, currentItem, s, c.URL, res)
-					if err != nil {
-						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping item %v.", c.Name, f.Name, err, currentItem)
-						return
+			for _, f := range c.Fields {
+				if f.Value != "" {
+					// add static fields
+					currentItem[f.Name] = f.Value
+				} else {
+					// handle all dynamic fields on the main page
+					if f.OnSubpage == "" {
+						err := extractField(&f, currentItem, s, c.URL, res)
+						if err != nil {
+							log.Printf("%s ERROR: error while parsing field %s: %v. Skipping item %v.", c.Name, f.Name, err, currentItem)
+							return
+						}
 					}
 				}
 			}
@@ -198,8 +189,8 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig) ([]map[string]interface{},
 			// can only be read once.
 			subpagesResp := make(map[string]*http.Response)
 			subpagesBody := make(map[string]*goquery.Document)
-			for _, f := range c.Fields.Dynamic {
-				if f.OnSubpage != "" {
+			for _, f := range c.Fields {
+				if f.OnSubpage != "" && f.Value == "" {
 					// check whether we fetched the page already
 					subpageURL := fmt.Sprint(currentItem[f.OnSubpage])
 					resSub, found := subpagesResp[subpageURL]
@@ -293,7 +284,7 @@ func (c *Scraper) filterItem(item map[string]interface{}) (bool, error) {
 }
 
 func (c *Scraper) removeHiddenFields(item map[string]interface{}) map[string]interface{} {
-	for _, f := range c.Fields.Dynamic {
+	for _, f := range c.Fields {
 		if f.Hide {
 			delete(item, f.Name)
 		}
@@ -301,7 +292,7 @@ func (c *Scraper) removeHiddenFields(item map[string]interface{}) map[string]int
 	return item
 }
 
-func extractField(field *DynamicField, event map[string]interface{}, s *goquery.Selection, baseURL string, res *http.Response) error {
+func extractField(field *Field, event map[string]interface{}, s *goquery.Selection, baseURL string, res *http.Response) error {
 	switch field.Type {
 	case "text", "": // the default, ie when type is not configured, is 'text'
 		ts, err := getTextString(&field.ElementLocation, s)
@@ -335,7 +326,7 @@ type datePart struct {
 	layoutParts []string
 }
 
-func getDate(f *DynamicField, s *goquery.Selection) (time.Time, error) {
+func getDate(f *Field, s *goquery.Selection) (time.Time, error) {
 	// time zone
 	var t time.Time
 	loc, err := time.LoadLocation(f.DateLocation)

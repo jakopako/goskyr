@@ -1,27 +1,18 @@
 scrapers:
   - name: "Reduta"
     url: http://www.redutajazzclub.cz/program-en
-    item: body > div.container.frontpage > div.row.textpage.programpage > div.col.s12.row.nopadding > div.row.bookingList > div.doubleprog.col.row.s12.hl2 > div.progitem.col.s12.row > div.col.s12.row
+    item: body > div.container.frontpage > div.row.textpage.programpage > div.col.s12.row.nopadding > div.row.bookingList > div.doubleprog.col.row.s12.hl2 > div.progitem.col.s12.row > div.col.s12.row > div.col.program
     fields:
-      dynamic:
-        - name: field-0
-          type: text
-          location:
-            selector: div.col.program > div.progheader > a
-        - name: field-1
-          type: url
-          location:
-            selector: div.col.program > div.progheader > a
-            attr: href
-        - name: field-2
-          type: text
-          location:
-            selector: div.col.program > div.progaddtext > p
-        - name: field-3
-          type: text
-          location:
-            selector: div.col.datum > div.time
-        - name: field-4
-          type: text
-          location:
-            selector: div.col.datum > div.date
+      - name: field-0
+        type: text
+        location:
+          selector: div.progheader > a
+      - name: field-1
+        type: url
+        location:
+          selector: div.progheader > a
+          attr: href
+      - name: field-2
+        type: text
+        location:
+          selector: div.progaddtext > p

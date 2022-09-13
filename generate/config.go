@@ -9,8 +9,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gdamore/tcell/v2"
 	"github.com/jakopako/goskyr/scraper"
 	"github.com/jakopako/goskyr/utils"
+	"github.com/rivo/tview"
 	"golang.org/x/net/html"
 )
 
@@ -18,6 +20,7 @@ type locationProps struct {
 	loc      scraper.ElementLocation
 	count    int
 	examples []string
+	selected bool
 }
 
 type locationManager []*locationProps
@@ -152,7 +155,7 @@ outer:
 	}
 }
 
-func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int) error {
+func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, showDetails bool) error {
 	if s.URL == "" {
 		return errors.New("URL field cannot be empty")
 	}
@@ -262,12 +265,7 @@ parse:
 			return locMan[p].loc.Selector > locMan[q].loc.Selector
 		})
 
-		colorReset := "\033[0m"
-		colorGreen := "\033[32m"
-		colorBlue := "\033[34m"
-		for i, e := range locMan {
-			fmt.Printf("%sfield [%d]%s\n  %slocation:%s %+v\n  %sexamples:%s\n\t%s\n\n", colorGreen, i, colorReset, colorBlue, colorReset, e.loc, colorBlue, colorReset, strings.Join(e.examples, "\n\t"))
-		}
+		showFieldsTable(locMan, showDetails)
 
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Println("please select one or more of the suggested fields by typing the according numbers separated by spaces:")
@@ -293,4 +291,57 @@ parse:
 		return nil
 	}
 	return fmt.Errorf("no fields found")
+}
+
+func showFieldsTable(locMan locationManager, showDetails bool) {
+	app := tview.NewApplication()
+	table := tview.NewTable().SetBorders(true)
+	cols, rows := 5, len(locMan)+1
+	for r := 0; r < rows; r++ {
+		for c := 0; c < cols; c++ {
+			color := tcell.ColorWhite
+			if c < 1 || r < 1 {
+				if c < 1 && r > 0 {
+					color = tcell.ColorGreen
+					table.SetCell(r, c, tview.NewTableCell(fmt.Sprintf("field [%d]", r-1)).
+						SetTextColor(color).
+						SetAlign(tview.AlignCenter))
+				} else if r == 0 && c > 0 {
+					color = tcell.ColorBlue
+					table.SetCell(r, c, tview.NewTableCell(fmt.Sprintf("example [%d]", c-1)).
+						SetTextColor(color).
+						SetAlign(tview.AlignCenter))
+				} else {
+					table.SetCell(r, c,
+						tview.NewTableCell("").
+							SetTextColor(color).
+							SetAlign(tview.AlignCenter))
+				}
+			} else {
+				ss := utils.ShortenString(locMan[r-1].examples[c-1], 50)
+				table.SetCell(r, c,
+					tview.NewTableCell(ss).
+						SetTextColor(color).
+						SetAlign(tview.AlignCenter))
+			}
+		}
+	}
+	table.Select(1, 1).SetFixed(1, 1).SetDoneFunc(func(key tcell.Key) {
+		if key == tcell.KeyEscape {
+			app.Stop()
+		}
+		if key == tcell.KeyEnter {
+			table.SetSelectable(true, false)
+		}
+	}).SetSelectedFunc(func(row int, column int) {
+		locMan[row-1].selected = !locMan[row-1].selected
+		if locMan[row-1].selected {
+			table.GetCell(row, 0).SetTextColor(tcell.ColorRed)
+		} else {
+			table.GetCell(row, 0).SetTextColor(tcell.ColorGreen)
+		}
+	})
+	if err := app.SetRoot(table, true).SetFocus(table).Run(); err != nil {
+		panic(err)
+	}
 }

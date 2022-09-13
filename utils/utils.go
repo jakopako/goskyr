@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"net/http"
 )
 
@@ -20,4 +21,11 @@ func FetchUrl(url string, userAgent string) (*http.Response, error) {
 	}
 	req.Header.Set("Accept", "*/*")
 	return client.Do(req)
+}
+
+func ShortenString(s string, l int) string {
+	if len(s) > l {
+		return fmt.Sprintf("%s...", s[:l-3])
+	}
+	return s
 }

@@ -38,6 +38,7 @@ func main() {
 	// add flag to pass min nr of items for the generate flag.
 	generateConfig := flag.String("generate", "", "Needs an additional argument of the url whose config needs to be generated.")
 	m := flag.Int("min", 20, "The minimum number of events on a page. This is needed to filter out noise.")
+	d := flag.Bool("details", false, "Show details when presenting the different fields found with the generate flag.")
 
 	flag.Parse()
 
@@ -48,7 +49,7 @@ func main() {
 
 	if *generateConfig != "" {
 		s := &scraper.Scraper{URL: *generateConfig}
-		err := automate.GetDynamicFieldsConfig(s, *m)
+		err := automate.GetDynamicFieldsConfig(s, *m, *d)
 		if err != nil {
 			log.Fatal(err)
 		}

@@ -87,11 +87,22 @@ func checkAndUpdatePath(a, b *scraper.ElementLocation) bool {
 }
 
 func filter(l locationManager, minCount int) locationManager {
+	// remove if count is smaller than minCount
+	// or if the examples are all the same.
 	i := 0
 	for _, p := range l {
 		if p.count >= minCount {
-			l[i] = p
-			i++
+			eqEx := true
+			for _, ex := range p.examples {
+				if ex != p.examples[0] {
+					eqEx = false
+					break
+				}
+			}
+			if !eqEx {
+				l[i] = p
+				i++
+			}
 		}
 	}
 	return l[:i]

@@ -152,7 +152,7 @@ outer:
 	}
 }
 
-func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, showDetails bool) error {
+func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int) error {
 	if s.URL == "" {
 		return errors.New("URL field cannot be empty")
 	}
@@ -263,7 +263,7 @@ parse:
 			return locMan[p].loc.Selector > locMan[q].loc.Selector
 		})
 
-		selectFieldsTable(locMan, showDetails)
+		selectFieldsTable(locMan)
 
 		var fs []scraper.ElementLocation
 		for _, lm := range locMan {
@@ -281,7 +281,7 @@ parse:
 	return fmt.Errorf("no fields found")
 }
 
-func selectFieldsTable(locMan locationManager, showDetails bool) {
+func selectFieldsTable(locMan locationManager) {
 	app := tview.NewApplication()
 	table := tview.NewTable().SetBorders(true)
 	cols, rows := 5, len(locMan)+1

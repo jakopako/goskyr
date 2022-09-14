@@ -1,12 +1,9 @@
 package automate
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
-	"os"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/gdamore/tcell/v2"
@@ -265,35 +262,37 @@ parse:
 			return locMan[p].loc.Selector > locMan[q].loc.Selector
 		})
 
-		showFieldsTable(locMan, showDetails)
+		selectFieldsTable(locMan, showDetails)
 
-		reader := bufio.NewReader(os.Stdin)
-		fmt.Println("please select one or more of the suggested fields by typing the according numbers separated by spaces:")
-		text, _ := reader.ReadString('\n')
-		var ns []int
-		for _, n := range strings.Split(strings.TrimRight(text, "\n"), " ") {
-			ni, err := strconv.Atoi(n)
-			if err != nil {
-				return fmt.Errorf("please enter valid numbers")
-			}
-			ns = append(ns, ni)
-		}
-		// ns := []int{0, 3, 4}
+		// reader := bufio.NewReader(os.Stdin)
+		// fmt.Println("please select one or more of the suggested fields by typing the according numbers separated by spaces:")
+		// text, _ := reader.ReadString('\n')
+		// var ns []int
+		// for _, n := range strings.Split(strings.TrimRight(text, "\n"), " ") {
+		// 	ni, err := strconv.Atoi(n)
+		// 	if err != nil {
+		// 		return fmt.Errorf("please enter valid numbers")
+		// 	}
+		// 	ns = append(ns, ni)
+		// }
+		// // ns := []int{0, 3, 4}
 		var fs []scraper.ElementLocation
-		for _, n := range ns {
-			if n >= len(locMan) {
-				return fmt.Errorf("please enter valid numbers")
+		for _, lm := range locMan {
+			if lm.selected {
+				fs = append(fs, lm.loc)
 			}
-			fs = append(fs, locMan[n].loc)
 		}
 
-		elementsToConfig(s, fs...)
-		return nil
+		if len(fs) > 0 {
+			elementsToConfig(s, fs...)
+			return nil
+		}
+		return fmt.Errorf("no fields selected")
 	}
 	return fmt.Errorf("no fields found")
 }
 
-func showFieldsTable(locMan locationManager, showDetails bool) {
+func selectFieldsTable(locMan locationManager, showDetails bool) {
 	app := tview.NewApplication()
 	table := tview.NewTable().SetBorders(true)
 	cols, rows := 5, len(locMan)+1
@@ -326,6 +325,7 @@ func showFieldsTable(locMan locationManager, showDetails bool) {
 			}
 		}
 	}
+	table.SetSelectable(true, false)
 	table.Select(1, 1).SetFixed(1, 1).SetDoneFunc(func(key tcell.Key) {
 		if key == tcell.KeyEscape {
 			app.Stop()
@@ -337,10 +337,20 @@ func showFieldsTable(locMan locationManager, showDetails bool) {
 		locMan[row-1].selected = !locMan[row-1].selected
 		if locMan[row-1].selected {
 			table.GetCell(row, 0).SetTextColor(tcell.ColorRed)
+			for i := 1; i < 5; i++ {
+				table.GetCell(row, i).SetTextColor(tcell.ColorOrange)
+			}
 		} else {
 			table.GetCell(row, 0).SetTextColor(tcell.ColorGreen)
+			for i := 1; i < 5; i++ {
+				table.GetCell(row, i).SetTextColor(tcell.ColorWhite)
+			}
 		}
 	})
+	button := tview.NewButton("Hit Enter to close").SetSelectedFunc(func() {
+		app.Stop()
+	})
+	button.SetBorder(true).SetRect(0, 0, 22, 3)
 	if err := app.SetRoot(table, true).SetFocus(table).Run(); err != nil {
 		panic(err)
 	}

@@ -196,7 +196,7 @@ parse:
 			}
 			if inBody {
 				// what type of token is <br /> ? Same as <br> ?
-				if tnString == "br" {
+				if tnString == "br" || tnString == "input" {
 					nrChildren[pathToSelector(nodePath)] += 1
 					continue
 				}
@@ -223,20 +223,21 @@ parse:
 						}
 						moreAttr = m
 					}
-					if tnString != "br" {
-						nodePath = append(nodePath, tnString)
-						nrChildren[pathToSelector(nodePath)] = 0
-						depth++
-						if tnString == "a" && hrefVal != "" {
-							p := pathToSelector(nodePath)
-							l := scraper.ElementLocation{
-								Selector:   p,
-								ChildIndex: nrChildren[p],
-								Attr:       "href",
-							}
-							locMan = update(locMan, l, hrefVal)
+					// is this check necessary?
+					// if tnString != "br" {
+					nodePath = append(nodePath, tnString)
+					nrChildren[pathToSelector(nodePath)] = 0
+					depth++
+					if tnString == "a" && hrefVal != "" {
+						p := pathToSelector(nodePath)
+						l := scraper.ElementLocation{
+							Selector:   p,
+							ChildIndex: nrChildren[p],
+							Attr:       "href",
 						}
+						locMan = update(locMan, l, hrefVal)
 					}
+					// }
 				} else {
 					n := true
 					for n && depth > 0 {
@@ -264,18 +265,6 @@ parse:
 
 		selectFieldsTable(locMan, showDetails)
 
-		// reader := bufio.NewReader(os.Stdin)
-		// fmt.Println("please select one or more of the suggested fields by typing the according numbers separated by spaces:")
-		// text, _ := reader.ReadString('\n')
-		// var ns []int
-		// for _, n := range strings.Split(strings.TrimRight(text, "\n"), " ") {
-		// 	ni, err := strconv.Atoi(n)
-		// 	if err != nil {
-		// 		return fmt.Errorf("please enter valid numbers")
-		// 	}
-		// 	ns = append(ns, ni)
-		// }
-		// // ns := []int{0, 3, 4}
 		var fs []scraper.ElementLocation
 		for _, lm := range locMan {
 			if lm.selected {
@@ -317,7 +306,7 @@ func selectFieldsTable(locMan locationManager, showDetails bool) {
 							SetAlign(tview.AlignCenter))
 				}
 			} else {
-				ss := utils.ShortenString(locMan[r-1].examples[c-1], 50)
+				ss := utils.ShortenString(locMan[r-1].examples[c-1], 40)
 				table.SetCell(r, c,
 					tview.NewTableCell(ss).
 						SetTextColor(color).
@@ -347,11 +336,26 @@ func selectFieldsTable(locMan locationManager, showDetails bool) {
 			}
 		}
 	})
-	button := tview.NewButton("Hit Enter to close").SetSelectedFunc(func() {
+	button := tview.NewButton("Hit Enter generate config").SetSelectedFunc(func() {
 		app.Stop()
 	})
-	button.SetBorder(true).SetRect(0, 0, 22, 3)
-	if err := app.SetRoot(table, true).SetFocus(table).Run(); err != nil {
+
+	grid := tview.NewGrid().SetRows(-11, -1).SetColumns(-1, -1, -1).SetBorders(false).
+		AddItem(table, 0, 0, 1, 3, 0, 0, true).
+		AddItem(button, 1, 1, 1, 1, 0, 0, false)
+	grid.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyTab {
+			if button.HasFocus() {
+				app.SetFocus(table)
+			} else {
+				app.SetFocus(button)
+			}
+			return nil
+		}
+		return event
+	})
+
+	if err := app.SetRoot(grid, true).SetFocus(grid).Run(); err != nil {
 		panic(err)
 	}
 }

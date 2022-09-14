@@ -44,7 +44,7 @@ func (f *APIWriter) Write(items chan map[string]interface{}, wg *sync.WaitGroup)
 		currentSrc := item["sourceUrl"].(string)
 		if _, found := deletedSources[currentSrc]; !found {
 			deletedSources[currentSrc] = true
-			// delete all events from the given source
+			// delete all items from the given source
 			firstDate := item["date"].(time.Time).UTC().Format("2006-01-02 15:04")
 			deleteURL := fmt.Sprintf("%s?sourceUrl=%s&datetime=%s", apiURL, url.QueryEscape(currentSrc), url.QueryEscape(firstDate))
 			req, _ := http.NewRequest("DELETE", deleteURL, nil)
@@ -58,7 +58,7 @@ func (f *APIWriter) Write(items chan map[string]interface{}, wg *sync.WaitGroup)
 				if err != nil {
 					log.Fatal(err)
 				}
-				log.Fatalf("something went wrong while deleting events. Status Code: %d\nUrl: %s Response: %s", resp.StatusCode, deleteURL, body)
+				log.Fatalf("something went wrong while deleting items. Status Code: %d\nUrl: %s Response: %s", resp.StatusCode, deleteURL, body)
 			}
 			resp.Body.Close()
 		}
@@ -84,5 +84,5 @@ func (f *APIWriter) Write(items chan map[string]interface{}, wg *sync.WaitGroup)
 		}
 		resp.Body.Close()
 	}
-	log.Printf("wrote %d events from %d sources to the api", nrItems, len(deletedSources))
+	log.Printf("wrote %d items from %d sources to the api", nrItems, len(deletedSources))
 }

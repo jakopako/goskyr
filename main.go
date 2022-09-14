@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"sync"
 
 	automate "github.com/jakopako/goskyr/generate"
@@ -24,7 +25,7 @@ func runScraper(s scraper.Scraper, itemsChannel chan map[string]interface{}, glo
 		log.Printf("%s ERROR: %s", s.Name, err)
 		return
 	}
-	log.Printf("fetched %d %s events\n", len(items), s.Name)
+	log.Printf("fetched %d %s items\n", len(items), s.Name)
 	for _, item := range items {
 		itemsChannel <- item
 	}
@@ -32,12 +33,12 @@ func runScraper(s scraper.Scraper, itemsChannel chan map[string]interface{}, glo
 
 func main() {
 	singleScraper := flag.String("single", "", "The name of the scraper to be run.")
-	toStdout := flag.Bool("stdout", false, "If set to true the scraped data will be written to stdout despite any other existing writer configurations.")
+	toStdout := flag.Bool("stdout", false, "If set to true the scraped data will be written to stdout despite any other existing writer configurations. In combination with the -generate flag the newly generated config will be written to stdout instead of to a file.")
 	configFile := flag.String("config", "./config.yml", "The location of the configuration file.")
 	printVersion := flag.Bool("version", false, "The version of goskyr.")
 	// add flag to pass min nr of items for the generate flag.
 	generateConfig := flag.String("generate", "", "Needs an additional argument of the url whose config needs to be generated.")
-	m := flag.Int("min", 20, "The minimum number of events on a page. This is needed to filter out noise.")
+	m := flag.Int("min", 20, "The minimum number of items on a page. This is needed to filter out noise.")
 	d := flag.Bool("details", false, "Show details when presenting the different fields found with the generate flag.")
 
 	flag.Parse()
@@ -63,7 +64,20 @@ func main() {
 			log.Fatalf("Error while Marshaling. %v", err)
 		}
 
-		fmt.Println(string(yamlData))
+		if *toStdout {
+			fmt.Println(string(yamlData))
+		} else {
+			f, err := os.Create(*configFile)
+			if err != nil {
+				log.Fatalf("ERROR while trying to open file: %v", err)
+			}
+			defer f.Close()
+			_, err = f.Write(yamlData)
+			if err != nil {
+				log.Fatalf("ERROR while trying to write to file: %v", err)
+			}
+			log.Printf("successfully wrote config to file %s", *configFile)
+		}
 		return
 	}
 

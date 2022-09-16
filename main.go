@@ -36,10 +36,9 @@ func main() {
 	toStdout := flag.Bool("stdout", false, "If set to true the scraped data will be written to stdout despite any other existing writer configurations. In combination with the -generate flag the newly generated config will be written to stdout instead of to a file.")
 	configFile := flag.String("c", "./config.yml", "The location of the configuration file.")
 	printVersion := flag.Bool("v", false, "The version of goskyr.")
-	// add flag to pass min nr of items for the generate flag.
 	generateConfig := flag.String("g", "", "Needs an additional argument of the url whose config needs to be generated.")
-	m := flag.Int("m", 20, "The minimum number of items on a page. This is needed to filter out noise.")
-	// d := flag.Bool("details", false, "Show details when presenting the different fields found with the generate flag.")
+	m := flag.Int("m", 20, "The minimum number of items on a page. This is needed to filter out noise. Works in combination with the -g flag.")
+	f := flag.Bool("f", false, "Only show fields that have varying values across the list of items. Works in combination with the -g flag.")
 
 	flag.Parse()
 
@@ -50,7 +49,7 @@ func main() {
 
 	if *generateConfig != "" {
 		s := &scraper.Scraper{URL: *generateConfig}
-		err := automate.GetDynamicFieldsConfig(s, *m)
+		err := automate.GetDynamicFieldsConfig(s, *m, *f)
 		if err != nil {
 			log.Fatal(err)
 		}

@@ -59,14 +59,23 @@ func checkAndUpdatePath(a, b *scraper.ElementLocation) bool {
 						continue
 					}
 					ac, bc := ae[1:], be[1:]
+					sort.Strings(ac)
+					sort.Strings(bc)
+
 					cc := []string{}
-					for j := 0; j < len(ac); j++ {
-						for k := 0; k < len(bc); k++ {
-							if ac[j] == bc[k] {
-								cc = append(cc, ac[j])
-							}
+					// find overlapping classes
+					for j, k := 0, 0; j < len(ac) && k < len(bc); {
+						if ac[j] == bc[k] {
+							cc = append(cc, ac[j])
+							j++
+							k++
+						} else if ac[j] > bc[k] {
+							k++
+						} else {
+							j++
 						}
 					}
+
 					if len(cc) > 0 {
 						nnl := append([]string{at}, cc...)
 						nn := strings.Join(nnl, ".")
@@ -86,20 +95,25 @@ func checkAndUpdatePath(a, b *scraper.ElementLocation) bool {
 	return false
 }
 
-func filter(l locationManager, minCount int) locationManager {
+func filter(l locationManager, minCount int, removeStaticFields bool) locationManager {
 	// remove if count is smaller than minCount
-	// or if the examples are all the same.
+	// or if the examples are all the same (if removeStaticFields is true)
 	i := 0
 	for _, p := range l {
 		if p.count >= minCount {
-			eqEx := true
-			for _, ex := range p.examples {
-				if ex != p.examples[0] {
-					eqEx = false
-					break
+			if removeStaticFields {
+				eqEx := true
+				for _, ex := range p.examples {
+					if ex != p.examples[0] {
+						eqEx = false
+						break
+					}
 				}
-			}
-			if !eqEx {
+				if !eqEx {
+					l[i] = p
+					i++
+				}
+			} else {
 				l[i] = p
 				i++
 			}
@@ -152,7 +166,7 @@ outer:
 	}
 }
 
-func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int) error {
+func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool) error {
 	if s.URL == "" {
 		return errors.New("URL field cannot be empty")
 	}
@@ -210,7 +224,8 @@ parse:
 							cls := strings.Split(string(v), " ")
 							j := 0
 							for _, cl := range cls {
-								if cl != "" {
+								// for now we ignore classes that contain dots
+								if cl != "" && !strings.Contains(cl, ".") {
 									cls[j] = cl
 									j++
 								}
@@ -256,7 +271,7 @@ parse:
 		}
 	}
 
-	locMan = filter(locMan, minOcc)
+	locMan = filter(locMan, minOcc, removeStaticFields)
 
 	if len(locMan) > 0 {
 		sort.Slice(locMan, func(p, q int) bool {
@@ -336,7 +351,7 @@ func selectFieldsTable(locMan locationManager) {
 			}
 		}
 	})
-	button := tview.NewButton("Hit Enter generate config").SetSelectedFunc(func() {
+	button := tview.NewButton("Hit Enter to generate config").SetSelectedFunc(func() {
 		app.Stop()
 	})
 

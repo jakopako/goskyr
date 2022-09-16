@@ -321,7 +321,10 @@ func selectFieldsTable(locMan locationManager) {
 							SetAlign(tview.AlignCenter))
 				}
 			} else {
-				ss := utils.ShortenString(locMan[r-1].examples[c-1], 40)
+				var ss string
+				if len(locMan[r-1].examples) >= c {
+					ss = utils.ShortenString(locMan[r-1].examples[c-1], 40)
+				}
 				table.SetCell(r, c,
 					tview.NewTableCell(ss).
 						SetTextColor(color).

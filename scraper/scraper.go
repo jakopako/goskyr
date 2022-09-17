@@ -511,8 +511,8 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 							fieldString, err = extractStringRegex(&t.RegexExtract, fieldNode.Data)
 							if err == nil {
 								fieldString = strings.TrimSpace(fieldString)
-								if t.MaxLength > 0 && t.MaxLength < len(fieldString) {
-									fieldString = fieldString[:t.MaxLength] + "..."
+								if t.MaxLength > 0 {
+									fieldString = utils.ShortenString(fieldString, t.MaxLength)
 								}
 								return fieldString, nil
 							} else if t.ChildIndex != -1 {

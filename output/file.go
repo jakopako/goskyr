@@ -32,7 +32,7 @@ func (fr *FileWriter) Write(items chan map[string]interface{}, wg *sync.WaitGrou
 
 	// We cannot use the following line of code because it automatically replaces certain html characters
 	// with the corresponding Unicode replacement rune.
-	// eventsJson, err := json.MarshalIndent(events, "", "  ")
+	// itemsJson, err := json.MarshalIndent(items, "", "  ")
 	// if err != nil {
 	// 	log.Print(err.Error())
 	// }
@@ -56,5 +56,5 @@ func (fr *FileWriter) Write(items chan map[string]interface{}, wg *sync.WaitGrou
 	if err != nil {
 		log.Printf("FileWriter ERROR while writing json to file: %v", err)
 	}
-	log.Printf("wrote %d events to file %s", len(allItems), fr.writerConfig.FilePath)
+	log.Printf("wrote %d items to file %s", len(allItems), fr.writerConfig.FilePath)
 }

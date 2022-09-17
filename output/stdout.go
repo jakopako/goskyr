@@ -15,7 +15,7 @@ func (s *StdoutWriter) Write(items chan map[string]interface{}, wg *sync.WaitGro
 	for item := range items {
 		// We cannot use the following line of code because it automatically replaces certain html characters
 		// with the corresponding Unicode replacement rune.
-		// eventsJson, err := json.MarshalIndent(events, "", "  ")
+		// itemsJson, err := json.MarshalIndent(items, "", "  ")
 		// if err != nil {
 		// 	log.Print(err.Error())
 		// }

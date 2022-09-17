@@ -1,16 +1,15 @@
 package automate
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
-	"os"
 	"sort"
-	"strconv"
 	"strings"
 
+	"github.com/gdamore/tcell/v2"
 	"github.com/jakopako/goskyr/scraper"
 	"github.com/jakopako/goskyr/utils"
+	"github.com/rivo/tview"
 	"golang.org/x/net/html"
 )
 
@@ -18,12 +17,12 @@ type locationProps struct {
 	loc      scraper.ElementLocation
 	count    int
 	examples []string
+	selected bool
 }
 
 type locationManager []*locationProps
 
 func update(l locationManager, e scraper.ElementLocation, s string) locationManager {
-	// new implementation
 	for _, lp := range l {
 		if checkAndUpdatePath(&lp.loc, &e) {
 			lp.count++
@@ -59,14 +58,23 @@ func checkAndUpdatePath(a, b *scraper.ElementLocation) bool {
 						continue
 					}
 					ac, bc := ae[1:], be[1:]
+					sort.Strings(ac)
+					sort.Strings(bc)
+
 					cc := []string{}
-					for j := 0; j < len(ac); j++ {
-						for k := 0; k < len(bc); k++ {
-							if ac[j] == bc[k] {
-								cc = append(cc, ac[j])
-							}
+					// find overlapping classes
+					for j, k := 0, 0; j < len(ac) && k < len(bc); {
+						if ac[j] == bc[k] {
+							cc = append(cc, ac[j])
+							j++
+							k++
+						} else if ac[j] > bc[k] {
+							k++
+						} else {
+							j++
 						}
 					}
+
 					if len(cc) > 0 {
 						nnl := append([]string{at}, cc...)
 						nn := strings.Join(nnl, ".")
@@ -86,20 +94,25 @@ func checkAndUpdatePath(a, b *scraper.ElementLocation) bool {
 	return false
 }
 
-func filter(l locationManager, minCount int) locationManager {
+func filter(l locationManager, minCount int, removeStaticFields bool) locationManager {
 	// remove if count is smaller than minCount
-	// or if the examples are all the same.
+	// or if the examples are all the same (if removeStaticFields is true)
 	i := 0
 	for _, p := range l {
 		if p.count >= minCount {
-			eqEx := true
-			for _, ex := range p.examples {
-				if ex != p.examples[0] {
-					eqEx = false
-					break
+			if removeStaticFields {
+				eqEx := true
+				for _, ex := range p.examples {
+					if ex != p.examples[0] {
+						eqEx = false
+						break
+					}
 				}
-			}
-			if !eqEx {
+				if !eqEx {
+					l[i] = p
+					i++
+				}
+			} else {
 				l[i] = p
 				i++
 			}
@@ -116,20 +129,48 @@ func selectorToPath(s string) []string {
 	return strings.Split(s, " > ")
 }
 
+func nodesEqual(n1, n2 string) bool {
+	if n1 == n2 {
+		return true
+	}
+	nl1, nl2 := strings.Split(n1, "."), strings.Split(n2, ".")
+	if nl1[0] == nl2[0] {
+		lnl1, lnl2 := len(nl1), len(nl2)
+		if lnl1 == lnl2 {
+			if lnl1 > 1 {
+				cn1, cn2 := nl1[1:], nl2[1:]
+				sort.Strings(cn1)
+				sort.Strings(cn2)
+				for i := 0; i < len(cn1); i++ {
+					if cn1[i] != cn2[i] {
+						return false
+					}
+				}
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func removeNodesPrefix(s1 string, n int) string {
+	return pathToSelector(selectorToPath(s1)[n:])
+}
+
 func elementsToConfig(s *scraper.Scraper, l ...scraper.ElementLocation) {
 	var itemSelector string
 outer:
 	for i := 0; ; i++ {
-		var c string
+		var n string
 		for j, e := range l {
 			if i >= len(selectorToPath(e.Selector)) {
 				itemSelector = pathToSelector(selectorToPath(e.Selector)[:i-1])
 				break outer
 			}
 			if j == 0 {
-				c = selectorToPath(e.Selector)[i]
+				n = selectorToPath(e.Selector)[i]
 			} else {
-				if selectorToPath(e.Selector)[i] != c {
+				if !nodesEqual(selectorToPath(e.Selector)[i], n) {
 					itemSelector = pathToSelector(selectorToPath(e.Selector)[:i])
 					break outer
 				}
@@ -138,7 +179,7 @@ outer:
 	}
 	s.Item = itemSelector
 	for i, e := range l {
-		e.Selector = strings.TrimLeft(strings.TrimPrefix(e.Selector, itemSelector), " >")
+		e.Selector = removeNodesPrefix(e.Selector, len(strings.Split(itemSelector, " > ")))
 		fieldType := "text"
 		if e.Attr == "href" {
 			fieldType = "url"
@@ -152,7 +193,7 @@ outer:
 	}
 }
 
-func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int) error {
+func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool) error {
 	if s.URL == "" {
 		return errors.New("URL field cannot be empty")
 	}
@@ -179,10 +220,14 @@ parse:
 			if inBody {
 				text := string(z.Text())
 				p := pathToSelector(nodePath)
-				if len(strings.TrimSpace(text)) > 1 {
+				if len(strings.TrimSpace(text)) > 0 {
+					cI := nrChildren[p]
+					if cI > 0 {
+						cI++
+					}
 					l := scraper.ElementLocation{
 						Selector:   p,
-						ChildIndex: nrChildren[p],
+						ChildIndex: cI,
 					}
 					locMan = update(locMan, l, strings.TrimSpace(text))
 				}
@@ -196,7 +241,7 @@ parse:
 			}
 			if inBody {
 				// what type of token is <br /> ? Same as <br> ?
-				if tnString == "br" {
+				if tnString == "br" || tnString == "input" {
 					nrChildren[pathToSelector(nodePath)] += 1
 					continue
 				}
@@ -210,7 +255,8 @@ parse:
 							cls := strings.Split(string(v), " ")
 							j := 0
 							for _, cl := range cls {
-								if cl != "" {
+								// for now we ignore classes that contain dots
+								if cl != "" && !strings.Contains(cl, ".") {
 									cls[j] = cl
 									j++
 								}
@@ -223,19 +269,17 @@ parse:
 						}
 						moreAttr = m
 					}
-					if tnString != "br" {
-						nodePath = append(nodePath, tnString)
-						nrChildren[pathToSelector(nodePath)] = 0
-						depth++
-						if tnString == "a" && hrefVal != "" {
-							p := pathToSelector(nodePath)
-							l := scraper.ElementLocation{
-								Selector:   p,
-								ChildIndex: nrChildren[p],
-								Attr:       "href",
-							}
-							locMan = update(locMan, l, hrefVal)
+					nodePath = append(nodePath, tnString)
+					nrChildren[pathToSelector(nodePath)] = 0
+					depth++
+					if (strings.HasPrefix(tnString, "a.") || tnString == "a") && hrefVal != "" {
+						p := pathToSelector(nodePath)
+						l := scraper.ElementLocation{
+							Selector:   p,
+							ChildIndex: nrChildren[p],
+							Attr:       "href",
 						}
+						locMan = update(locMan, l, hrefVal)
 					}
 				} else {
 					n := true
@@ -255,42 +299,109 @@ parse:
 		}
 	}
 
-	locMan = filter(locMan, minOcc)
+	locMan = filter(locMan, minOcc, removeStaticFields)
 
 	if len(locMan) > 0 {
 		sort.Slice(locMan, func(p, q int) bool {
 			return locMan[p].loc.Selector > locMan[q].loc.Selector
 		})
 
-		colorReset := "\033[0m"
-		colorGreen := "\033[32m"
-		colorBlue := "\033[34m"
-		for i, e := range locMan {
-			fmt.Printf("%sfield [%d]%s\n  %slocation:%s %+v\n  %sexamples:%s\n\t%s\n\n", colorGreen, i, colorReset, colorBlue, colorReset, e.loc, colorBlue, colorReset, strings.Join(e.examples, "\n\t"))
-		}
+		selectFieldsTable(locMan)
 
-		reader := bufio.NewReader(os.Stdin)
-		fmt.Println("please select one or more of the suggested fields by typing the according numbers separated by spaces:")
-		text, _ := reader.ReadString('\n')
-		var ns []int
-		for _, n := range strings.Split(strings.TrimRight(text, "\n"), " ") {
-			ni, err := strconv.Atoi(n)
-			if err != nil {
-				return fmt.Errorf("please enter valid numbers")
-			}
-			ns = append(ns, ni)
-		}
-		// ns := []int{0, 3, 4}
 		var fs []scraper.ElementLocation
-		for _, n := range ns {
-			if n >= len(locMan) {
-				return fmt.Errorf("please enter valid numbers")
+		for _, lm := range locMan {
+			if lm.selected {
+				fs = append(fs, lm.loc)
 			}
-			fs = append(fs, locMan[n].loc)
 		}
 
-		elementsToConfig(s, fs...)
-		return nil
+		if len(fs) > 0 {
+			elementsToConfig(s, fs...)
+			return nil
+		}
+		return fmt.Errorf("no fields selected")
 	}
 	return fmt.Errorf("no fields found")
+}
+
+func selectFieldsTable(locMan locationManager) {
+	app := tview.NewApplication()
+	table := tview.NewTable().SetBorders(true)
+	cols, rows := 5, len(locMan)+1
+	for r := 0; r < rows; r++ {
+		for c := 0; c < cols; c++ {
+			color := tcell.ColorWhite
+			if c < 1 || r < 1 {
+				if c < 1 && r > 0 {
+					color = tcell.ColorGreen
+					table.SetCell(r, c, tview.NewTableCell(fmt.Sprintf("field [%d]", r-1)).
+						SetTextColor(color).
+						SetAlign(tview.AlignCenter))
+				} else if r == 0 && c > 0 {
+					color = tcell.ColorBlue
+					table.SetCell(r, c, tview.NewTableCell(fmt.Sprintf("example [%d]", c-1)).
+						SetTextColor(color).
+						SetAlign(tview.AlignCenter))
+				} else {
+					table.SetCell(r, c,
+						tview.NewTableCell("").
+							SetTextColor(color).
+							SetAlign(tview.AlignCenter))
+				}
+			} else {
+				var ss string
+				if len(locMan[r-1].examples) >= c {
+					ss = utils.ShortenString(locMan[r-1].examples[c-1], 40)
+				}
+				table.SetCell(r, c,
+					tview.NewTableCell(ss).
+						SetTextColor(color).
+						SetAlign(tview.AlignCenter))
+			}
+		}
+	}
+	table.SetSelectable(true, false)
+	table.Select(1, 1).SetFixed(1, 1).SetDoneFunc(func(key tcell.Key) {
+		if key == tcell.KeyEscape {
+			app.Stop()
+		}
+		if key == tcell.KeyEnter {
+			table.SetSelectable(true, false)
+		}
+	}).SetSelectedFunc(func(row int, column int) {
+		locMan[row-1].selected = !locMan[row-1].selected
+		if locMan[row-1].selected {
+			table.GetCell(row, 0).SetTextColor(tcell.ColorRed)
+			for i := 1; i < 5; i++ {
+				table.GetCell(row, i).SetTextColor(tcell.ColorOrange)
+			}
+		} else {
+			table.GetCell(row, 0).SetTextColor(tcell.ColorGreen)
+			for i := 1; i < 5; i++ {
+				table.GetCell(row, i).SetTextColor(tcell.ColorWhite)
+			}
+		}
+	})
+	button := tview.NewButton("Hit Enter to generate config").SetSelectedFunc(func() {
+		app.Stop()
+	})
+
+	grid := tview.NewGrid().SetRows(-11, -1).SetColumns(-1, -1, -1).SetBorders(false).
+		AddItem(table, 0, 0, 1, 3, 0, 0, true).
+		AddItem(button, 1, 1, 1, 1, 0, 0, false)
+	grid.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyTab {
+			if button.HasFocus() {
+				app.SetFocus(table)
+			} else {
+				app.SetFocus(button)
+			}
+			return nil
+		}
+		return event
+	})
+
+	if err := app.SetRoot(grid, true).SetFocus(grid).Run(); err != nil {
+		panic(err)
+	}
 }

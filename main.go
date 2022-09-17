@@ -7,7 +7,7 @@ import (
 	"os"
 	"sync"
 
-	automate "github.com/jakopako/goskyr/generate"
+	"github.com/jakopako/goskyr/automate"
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/scraper"
 	"gopkg.in/yaml.v3"

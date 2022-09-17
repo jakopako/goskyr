@@ -130,20 +130,53 @@ func selectorToPath(s string) []string {
 	return strings.Split(s, " > ")
 }
 
+func nodesEqual(n1, n2 string) bool {
+	if n1 == n2 {
+		return true
+	}
+	nl1, nl2 := strings.Split(n1, "."), strings.Split(n2, ".")
+	if nl1[0] == nl2[0] {
+		lnl1, lnl2 := len(nl1), len(nl2)
+		if lnl1 == lnl2 {
+			if lnl1 > 1 {
+				cn1, cn2 := nl1[1:], nl2[1:]
+				sort.Strings(cn1)
+				sort.Strings(cn2)
+				for i := 0; i < len(cn1); i++ {
+					if cn1[i] != cn2[i] {
+						return false
+					}
+				}
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func removeNodesPrefix(s1 string, n int) string {
+	return pathToSelector(selectorToPath(s1)[n:])
+}
+
 func elementsToConfig(s *scraper.Scraper, l ...scraper.ElementLocation) {
 	var itemSelector string
 outer:
 	for i := 0; ; i++ {
-		var c string
+		var n string
 		for j, e := range l {
 			if i >= len(selectorToPath(e.Selector)) {
 				itemSelector = pathToSelector(selectorToPath(e.Selector)[:i-1])
 				break outer
 			}
 			if j == 0 {
-				c = selectorToPath(e.Selector)[i]
+				n = selectorToPath(e.Selector)[i]
 			} else {
-				if selectorToPath(e.Selector)[i] != c {
+				// this comparison does not handle all cases correctly
+				// eg
+				// body.role-anonymous.page.page--content_page > div.dialog-off-canvas-main-canvas
+				// body.page.page--content_page.role-anonymous > div.dialog-off-canvas-main-canvas
+				// here we'd want the first element to be considered equal
+				if !nodesEqual(selectorToPath(e.Selector)[i], n) {
 					itemSelector = pathToSelector(selectorToPath(e.Selector)[:i])
 					break outer
 				}
@@ -152,7 +185,9 @@ outer:
 	}
 	s.Item = itemSelector
 	for i, e := range l {
-		e.Selector = strings.TrimLeft(strings.TrimPrefix(e.Selector, itemSelector), " >")
+		// TODO not correct anymore
+		e.Selector = removeNodesPrefix(e.Selector, len(strings.Split(itemSelector, " > ")))
+		// e.Selector = strings.TrimLeft(strings.TrimPrefix(e.Selector, itemSelector), " >")
 		fieldType := "text"
 		if e.Attr == "href" {
 			fieldType = "url"
@@ -193,10 +228,14 @@ parse:
 			if inBody {
 				text := string(z.Text())
 				p := pathToSelector(nodePath)
-				if len(strings.TrimSpace(text)) > 1 {
+				if len(strings.TrimSpace(text)) > 0 {
+					cI := nrChildren[p]
+					if cI > 0 {
+						cI++
+					}
 					l := scraper.ElementLocation{
 						Selector:   p,
-						ChildIndex: nrChildren[p],
+						ChildIndex: cI,
 					}
 					locMan = update(locMan, l, strings.TrimSpace(text))
 				}
@@ -238,12 +277,10 @@ parse:
 						}
 						moreAttr = m
 					}
-					// is this check necessary?
-					// if tnString != "br" {
 					nodePath = append(nodePath, tnString)
 					nrChildren[pathToSelector(nodePath)] = 0
 					depth++
-					if tnString == "a" && hrefVal != "" {
+					if (strings.HasPrefix(tnString, "a.") || tnString == "a") && hrefVal != "" {
 						p := pathToSelector(nodePath)
 						l := scraper.ElementLocation{
 							Selector:   p,
@@ -252,7 +289,6 @@ parse:
 						}
 						locMan = update(locMan, l, hrefVal)
 					}
-					// }
 				} else {
 					n := true
 					for n && depth > 0 {

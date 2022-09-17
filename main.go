@@ -36,7 +36,7 @@ func main() {
 	toStdout := flag.Bool("stdout", false, "If set to true the scraped data will be written to stdout despite any other existing writer configurations. In combination with the -generate flag the newly generated config will be written to stdout instead of to a file.")
 	configFile := flag.String("c", "./config.yml", "The location of the configuration file.")
 	printVersion := flag.Bool("v", false, "The version of goskyr.")
-	generateConfig := flag.String("g", "", "Needs an additional argument of the url whose config needs to be generated.")
+	generateConfig := flag.String("g", "", "Automatically generate a config file for the given url.")
 	m := flag.Int("m", 20, "The minimum number of items on a page. This is needed to filter out noise. Works in combination with the -g flag.")
 	f := flag.Bool("f", false, "Only show fields that have varying values across the list of items. Works in combination with the -g flag.")
 

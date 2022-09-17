@@ -23,7 +23,6 @@ type locationProps struct {
 type locationManager []*locationProps
 
 func update(l locationManager, e scraper.ElementLocation, s string) locationManager {
-	// new implementation
 	for _, lp := range l {
 		if checkAndUpdatePath(&lp.loc, &e) {
 			lp.count++
@@ -171,11 +170,6 @@ outer:
 			if j == 0 {
 				n = selectorToPath(e.Selector)[i]
 			} else {
-				// this comparison does not handle all cases correctly
-				// eg
-				// body.role-anonymous.page.page--content_page > div.dialog-off-canvas-main-canvas
-				// body.page.page--content_page.role-anonymous > div.dialog-off-canvas-main-canvas
-				// here we'd want the first element to be considered equal
 				if !nodesEqual(selectorToPath(e.Selector)[i], n) {
 					itemSelector = pathToSelector(selectorToPath(e.Selector)[:i])
 					break outer
@@ -185,9 +179,7 @@ outer:
 	}
 	s.Item = itemSelector
 	for i, e := range l {
-		// TODO not correct anymore
 		e.Selector = removeNodesPrefix(e.Selector, len(strings.Split(itemSelector, " > ")))
-		// e.Selector = strings.TrimLeft(strings.TrimPrefix(e.Selector, itemSelector), " >")
 		fieldType := "text"
 		if e.Attr == "href" {
 			fieldType = "url"

@@ -3,8 +3,7 @@
 [![Release](https://img.shields.io/github/release/jakopako/goskyr.svg)](https://github.com/jakopako/goskyr/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/jakopako/goskyr)](https://goreportcard.com/report/github.com/jakopako/goskyr)
 
-This project's goal is to make it easier to scrape structured data from web pages. Initially, the main use case was to extract event data from
-different venue websites. However, the code has been rewritten to handle a more general use case of extracting a list of items from any website.
+This project's goal is to make it easier to scrape structured data from web pages.
 This could be a list of books from an online book store, a list of plays in a public theater, a list of newspaper articles, etc. Currently, information can only be extracted from static websites.
 
 Note that there are already similar projects that might do a better job in certain cases or are more generic tools. However, on the one hand this is a personal project to make myself familiar with webscraping and Go and on the other hand goskyr supports certain features that I haven't found in any other projects. For instance, the way dates can be extracted from websites and the notion of scraping information from subpages defined by previously at runtime extracted urls. Be sure to checkout the section on [auto configuration](#auto-configuration-experimental).
@@ -15,16 +14,9 @@ Similar projects:
 - [slotix/dataflowkit](https://github.com/slotix/dataflowkit)
 - [andrewstuart/goq](https://github.com/andrewstuart/goq)
 
-## Related projects
+## Quick Start
 
-The main motivation to start this project was a website idea that I wanted to implement. Currently, there are four
-repositories involved in this idea. The first one is of course this one, goskyr. The other three are:
 
-- [croncert-web](https://github.com/jakopako/croncert-web): a website that shows concerts in your area, deployed to [croncert.ch](https://croncert.ch).
-- [croncert-config](https://github.com/jakopako/croncert-config): a repository that contains a big configuration file for
-  goskyr, where all the concert venue websites that are part of [croncert.ch](https://croncert.ch) are configured. If you're interested, check out this repository to find out how to add new concert locations and to make yourself more familiar with how to use goskyr.
-- [event-api](https://github.com/jakopako/event-api): an API to store and fetch concert info, that serves as backend for
-  [croncert.ch](https://croncert.ch).
 
 ## Installation
 
@@ -353,6 +345,17 @@ filters:
 ```
 
 The `field` key determines to which field the regular expression will be applied. `regex` defines the regular expression and `match` determines whether the item should be included or excluded on match. Note, that as soon as there is one match for a regular expression that has `match` set to **false** the respective item will be exlcuded from the results without looking at the other filters.
+
+## Related projects
+
+The main motivation to start this project was a website idea that I wanted to implement. Currently, there are four
+repositories involved in this idea. The first one is of course this one, goskyr. The other three are:
+
+- [croncert-web](https://github.com/jakopako/croncert-web): a website that shows concerts in your area, deployed to [croncert.ch](https://croncert.ch).
+- [croncert-config](https://github.com/jakopako/croncert-config): a repository that contains a big configuration file for
+  goskyr, where all the concert venue websites that are part of [croncert.ch](https://croncert.ch) are configured. If you're interested, check out this repository to find out how to add new concert locations and to make yourself more familiar with how to use goskyr.
+- [event-api](https://github.com/jakopako/event-api): an API to store and fetch concert info, that serves as backend for
+  [croncert.ch](https://croncert.ch).
 
 ## Build & release
 

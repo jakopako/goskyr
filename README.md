@@ -3,11 +3,10 @@
 [![Release](https://img.shields.io/github/release/jakopako/goskyr.svg)](https://github.com/jakopako/goskyr/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/jakopako/goskyr)](https://goreportcard.com/report/github.com/jakopako/goskyr)
 
-This project's goal is to make it easier to scrape structured data from web pages. Initially, the main use case was to extract event data from
-different venue websites. However, the code has been rewritten to handle a more general use case of extracting a list of items from any website.
-This could be a list of books from an online book store, a list of plays in a public theater, a list of newspaper articles, etc. Currently, information can only be extracted from static websites.
+This project's goal is to make it easier to scrape structured data from web pages.
+This could be a list of books from an online book store, a list of plays in a public theater, a list of newspaper articles, etc. Currently, information can only be extracted from static websites. Next to [manually configuring](#manual-configuration--usage) the scraper there is a new option of (semi-)automatically generating a configuration file, see [quick start](#quick-start).
 
-Note that there are already similar projects that might do a better job in certain cases or are more generic tools. However, on the one hand this is a personal project to make myself familiar with webscraping and Go and on the other hand goskyr supports certain features that I haven't found in any other projects. For instance, the way dates can be extracted from websites and the notion of scraping information from subpages defined by previously at runtime extracted urls. Be sure to checkout the section on [auto configuration](#auto-configuration-experimental).
+Note that there are already similar projects that might do a better job in certain cases or are more generic tools. However, on the one hand this is a personal project to make myself familiar with webscraping and Go and on the other hand goskyr supports certain features that I haven't found in any other projects. For instance, the way dates can be extracted from websites and the notion of scraping information from subpages defined by previously at runtime extracted urls.
 
 Similar projects:
 
@@ -15,16 +14,31 @@ Similar projects:
 - [slotix/dataflowkit](https://github.com/slotix/dataflowkit)
 - [andrewstuart/goq](https://github.com/andrewstuart/goq)
 
-## Related projects
+## Quick Start
 
-The main motivation to start this project was a website idea that I wanted to implement. Currently, there are four
-repositories involved in this idea. The first one is of course this one, goskyr. The other three are:
+![2022-09-18-13-30-51](https://user-images.githubusercontent.com/26999089/190899996-506ea39d-58ef-4344-9ebd-e5258dc63755.gif)
 
-- [croncert-web](https://github.com/jakopako/croncert-web): a website that shows concerts in your area, deployed to [croncert.ch](https://croncert.ch).
-- [croncert-config](https://github.com/jakopako/croncert-config): a repository that contains a big configuration file for
-  goskyr, where all the concert venue websites that are part of [croncert.ch](https://croncert.ch) are configured. If you're interested, check out this repository to find out how to add new concert locations and to make yourself more familiar with how to use goskyr.
-- [event-api](https://github.com/jakopako/event-api): an API to store and fetch concert info, that serves as backend for
-  [croncert.ch](https://croncert.ch).
+To reproduce what happens above [install goskyr](#installation) and then run the following steps:
+
+Start the configuration generation. The configuration file is written to the default location `config.yml`. Navigation in the interactive terminal window is done with the arrow keys, the return key and the tab key.
+
+```bash
+goskyr -g https://www.imdb.com/chart/top/ -f
+```
+
+Start the scraping process. The configuration file is read from the default location `config.yml`.
+
+```bash
+goskyr
+```
+
+Optionally, modify the configuration file according to your needs. For more information check out the section on [manually configuring](#manual-configuration--usage) the scraper. For a better understanding of the command line flags run
+
+```bash
+goskyr -help
+```
+
+Note that the feature to (semi-)automatically generate a configuration file is currently in an experimental stage and might not properly work in a lot of cases.
 
 ## Installation
 
@@ -38,38 +52,9 @@ go install github.com/jakopako/goskyr@latest
 
 Or clone the repository and then run with `go run main.go ...` or build it yourself.
 
-## Auto configuration (experimental)
-
-To reduce the manual effort of configuring the scraper I am currently working on a feature that automatically generates a config snippet for a given website.
-The command looks like this:
-
-```bash
-goskyr -generate "https://www.goodreads.com/quotes/tag/life"
-```
-
-which will automatically find repeating fields, will ask you to chose a subset of those fields and then return the resulting config snippet, which might look
-something like this:
-
-```yaml
-scrapers:
-    - name: ""
-      url: https://www.goodreads.com/quotes/tag/life
-      item: body > div.content > div.mainContentContainer > div.mainContent > div.mainContentFloat > div.leftContainer > div.quote.mediumText > div.quoteDetails
-      fields:
-        dynamic:
-            - name: field-0
-              type: text
-              location:
-                selector: div.quoteText > span.authorOrTitle
-            - name: field-1
-              type: text
-              location:
-                selector: div.quoteText
-```
-
-Save this to a file and run `goskyr -config <your-file>`. For now the automatic config extraction only works for `text` and `url` fields. Checkout the below sections for further details on manually configuring the scraper.
-
 ## Manual Configuration & Usage
+
+Despite the option to automatically generate a configuration file for goskyr there are a lot more options that can be configured manually.
 
 A very simple configuration would look something like this:
 
@@ -112,42 +97,40 @@ scrapers:
     url: "https://kaufleuten.ch/events/kultur/konzerte/"
     item: ".event"
     fields:
-      static:
-        - name: "location"
-          value: "Kaufleuten"
-        - name: "city"
-          value: "Zurich"
-        - name: "type"
-          value: "concert"
-      dynamic:
-        - name: "title"
-          location:
-            selector: "h3"
-            regex_extract:
-              exp: "[^•]*"
-              index: 0
-        - name: "comment"
-          can_be_empty: true
-          location:
-            selector: ".subtitle strong"
-        - name: "url"
-          type: "url"
-          location:
-            selector: ".event-link"
-        - name: "date"
-          type: "date"
-          on_subpage: "url"
-          components:
-            - covers:
-                day: true
-                month: true
-                year: true
-                time: true
-              location:
-                selector: ".event-meta time"
-                attr: "datetime"
-              layout: "2006-01-02T15:04:05-07:00"
-          date_location: "Europe/Berlin"
+      - name: "location"
+        value: "Kaufleuten"
+      - name: "city"
+        value: "Zurich"
+      - name: "type"
+        value: "concert"
+      - name: "title"
+        location:
+          selector: "h3"
+          regex_extract:
+            exp: "[^•]*"
+            index: 0
+      - name: "comment"
+        can_be_empty: true
+        location:
+          selector: ".subtitle strong"
+      - name: "url"
+        type: "url"
+        location:
+          selector: ".event-link"
+      - name: "date"
+        type: "date"
+        on_subpage: "url"
+        components:
+          - covers:
+              day: true
+              month: true
+              year: true
+              time: true
+            location:
+              selector: ".event-meta time"
+              attr: "datetime"
+            layout: "2006-01-02T15:04:05-07:00"
+        date_location: "Europe/Berlin"
     filters:
       - field: "title"
         regex: "Verschoben.*"
@@ -187,13 +170,12 @@ Basically, a config file contains a list of scrapers that each may have static a
 
 ### Static fields
 
-Each scraper can define a number of static fields. Those fields are the same over all returned items. For the event crawling use case this might be the location name as shown in the example above. For a static field only a name and a value need to be defined:
+Each scraper can define a number of static fields. Those fields are the same over all returned items. For the event scraping use case this might be the location name as shown in the example above. For a static field only a name and a value need to be defined:
 
 ```yml
 fields:
-  static:
-    - name: "location"
-      value: "Kaufleuten"
+  - name: "location"
+    value: "Kaufleuten"
 ```
 
 ### Dynamic fields
@@ -202,10 +184,9 @@ Dynamic fields are a little more complex as their values are extracted from the 
 
 ```yml
 fields:
-  dynamic:
-    - name: "quote"
-      location:
-        selector: ".quoteText"
+  - name: "quote"
+    location:
+      selector: ".quoteText"
 ```
 
 **Key: `location`**
@@ -214,13 +195,12 @@ However, it might be a bit more complex to extract the desired information. Take
 
 ```yml
 fields:
-  dynamic:
-    - name: "title"
-      location:
-        selector: "h3"
-        regex_extract:
-          exp: "[^•]*"
-          index: 0
+  - name: "title"
+    location:
+      selector: "h3"
+      regex_extract:
+        exp: "[^•]*"
+        index: 0
 ```
 
 This field is implicitly of type `text`. Other types, such as `url` or `date` would have to be configured with the keyword `type`. The `location` tells the scraper where to look for the field value and how to extract it. In this case the selector on its own would not be enough to extract the desired value as we would get something like this: `Bastian Baker • Konzert`. That's why there is an extra option to define a regular expression to extract a substring. Note that in this example our extracted string would still contain a trainling space which is automatically removed by the scraper. Let's have a look at two more examples to have a better understanding of the location configuration. Let's say we want to extract "Tonhalle-Orchester Zürich" from the following html snippet.
@@ -313,7 +293,7 @@ A dynamic field has a field type that can either be `text`, `url` or `date`. The
 
 - `url`
 
-  A url has one additional boolean option: `relative`. This option determines whether this scraper's base url will be prepended to the string that has been extracted with the given `location`
+  Setting the type `url` tells the scraper to make sure the extracted field is a valid url and if needed complete it accordingly, eg by prepending the base path. Also, the `location.attr` field is implicetly set to `"href"` if not defined by the user.
 
 - `date`
 
@@ -353,6 +333,17 @@ filters:
 ```
 
 The `field` key determines to which field the regular expression will be applied. `regex` defines the regular expression and `match` determines whether the item should be included or excluded on match. Note, that as soon as there is one match for a regular expression that has `match` set to **false** the respective item will be exlcuded from the results without looking at the other filters.
+
+## Related projects
+
+The main motivation to start this project was a website idea that I wanted to implement. Currently, there are four
+repositories involved in this idea. The first one is of course this one, goskyr. The other three are:
+
+- [croncert-web](https://github.com/jakopako/croncert-web): a website that shows concerts in your area, deployed to [croncert.ch](https://croncert.ch).
+- [croncert-config](https://github.com/jakopako/croncert-config): a repository that contains a big configuration file for
+  goskyr, where all the concert venue websites that are part of [croncert.ch](https://croncert.ch) are configured. If you're interested, check out this repository to find out how to add new concert locations and to make yourself more familiar with how to use goskyr.
+- [event-api](https://github.com/jakopako/event-api): an API to store and fetch concert info, that serves as backend for
+  [croncert.ch](https://croncert.ch).
 
 ## Build & release
 

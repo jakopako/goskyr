@@ -16,8 +16,7 @@ Similar projects:
 
 ## Quick Start
 
-![2022-09-18-12-42-21](https://user-images.githubusercontent.com/26999089/190899052-840c4275-5475-4d3f-801b-9a8028a5f9ff.gif)
-
+![2022-09-18-13-30-51](https://user-images.githubusercontent.com/26999089/190899996-506ea39d-58ef-4344-9ebd-e5258dc63755.gif)
 
 ## Installation
 

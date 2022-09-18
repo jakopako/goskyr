@@ -17,7 +17,7 @@ var version = "dev"
 
 func runScraper(s scraper.Scraper, itemsChannel chan map[string]interface{}, globalConfig *scraper.GlobalConfig, wg *sync.WaitGroup) {
 	defer wg.Done()
-	log.Printf("crawling %s\n", s.Name)
+	log.Printf("scraping %s\n", s.Name)
 	// This could probably be improved. We could pass the channel to
 	// GetItems instead of waiting for the scraper to finish.
 	items, err := s.GetItems(globalConfig)

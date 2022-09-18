@@ -197,6 +197,7 @@ func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields b
 	if s.URL == "" {
 		return errors.New("URL field cannot be empty")
 	}
+	s.Name = s.URL
 	res, err := utils.FetchUrl(s.URL, "")
 	if err != nil {
 		return err

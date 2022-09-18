@@ -73,7 +73,7 @@ scrapers:
             selector: ".authorOrTitle"
 ```
 
-Save this to a file, e.g. `quotes-config.yml` and run `goskyr -config quotes-config.yml` (or `go run main.go -config quotes-config.yml`) to retreive the scraped quotes as json string. The result should look something like this:
+Save this to a file, e.g. `quotes-config.yml` and run `goskyr -c quotes-config.yml` (or `go run main.go -c quotes-config.yml`) to retreive the scraped quotes as json string. The result should look something like this:
 
 ```json
 [

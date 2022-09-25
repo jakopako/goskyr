@@ -3,6 +3,13 @@
 [![Release](https://img.shields.io/github/release/jakopako/goskyr.svg)](https://github.com/jakopako/goskyr/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/jakopako/goskyr)](https://goreportcard.com/report/github.com/jakopako/goskyr)
 
+1. [Quick Start](#quick-start)
+1. [Installation](#installation)
+1. [Manual Configuration & Usage](#manual-configuration--usage)
+1. [Related Projects](#related-projects)
+1. [Build & Release](#build--release)
+1. [Naming](#naming)
+
 This project's goal is to make it easier to scrape structured data from web pages.
 This could be a list of books from an online book store, a list of plays in a public theater, a list of newspaper articles, etc. Currently, information can only be extracted from static websites. Next to [manually configuring](#manual-configuration--usage) the scraper there is a new option of (semi-)automatically generating a configuration file, see [quick start](#quick-start).
 
@@ -334,7 +341,28 @@ filters:
 
 The `field` key determines to which field the regular expression will be applied. `regex` defines the regular expression and `match` determines whether the item should be included or excluded on match. Note, that as soon as there is one match for a regular expression that has `match` set to **false** the respective item will be exlcuded from the results without looking at the other filters.
 
-## Related projects
+### Pagination
+
+If the list of items on a web page spans multiple pages pagination can be configured as follows:
+
+```yml
+paginator:
+  location:
+    selector: ".pagination .selector"
+```
+
+By default the value of the `href` key is taken as url for the next page. However, you can change this and other parameters in the paginator configuration.
+
+```yml
+paginator:
+  location:
+    selector: ".pagination .selector"
+    node_index: <number>
+    attr: <string>
+  max_pages: <number>
+```
+
+## Related Projects
 
 The main motivation to start this project was a website idea that I wanted to implement. Currently, there are four
 repositories involved in this idea. The first one is of course this one, goskyr. The other three are:
@@ -345,7 +373,7 @@ repositories involved in this idea. The first one is of course this one, goskyr.
 - [event-api](https://github.com/jakopako/event-api): an API to store and fetch concert info, that serves as backend for
   [croncert.ch](https://croncert.ch).
 
-## Build & release
+## Build & Release
 
 To build and release a new version of goskyr [Goreleaser](https://goreleaser.com/) is used, also see [Quick Start](https://goreleaser.com/quick-start/).
 
@@ -355,21 +383,25 @@ To build and release a new version of goskyr [Goreleaser](https://goreleaser.com
   goreleaser release --snapshot --rm-dist
   ```
 
-2. Export github token
+1. Export github token
 
   ```bash
   export GITHUB_TOKEN="YOUR_GH_TOKEN"
   ```
 
-3. Create a tag and push it to GitHub
+1. Create a tag and push it to GitHub
 
   ```bash
   git tag -a v0.1.5 -m "new features"
   git push origin v0.1.5
   ```
 
-4. Run GoReleaser at the root of this repository:
+1. Run GoReleaser at the root of this repository:
 
   ```bash
   goreleaser release
   ```
+
+## Naming
+
+Go Scraper > Go Scr > Go Skyr > goskyr

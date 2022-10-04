@@ -1,11 +1,14 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+
+	"github.com/chromedp/chromedp"
 )
 
-func FetchUrl(url string, userAgent string) (*http.Response, error) {
+func FetchUrl(url, userAgent string) (*http.Response, error) {
 	// NOTE: body has to be closed by caller
 	client := &http.Client{}
 
@@ -28,4 +31,17 @@ func ShortenString(s string, l int) string {
 		return fmt.Sprintf("%s...", s[:l-3])
 	}
 	return s
+}
+
+func FetchUrlChrome(url, userAgent string) {
+	// have some kind of fetcher interface
+
+	// checkout https://github.com/geziyor/geziyor/blob/738852f9321de26c193ae88a9b2fb4d6aebb6540/client/client.go#L169
+	ctx, cancel := chromedp.NewContext(context.Background())
+	defer cancel()
+
+	if err := chromedp.Run(ctx, 
+		chromedp.Navigate(url),
+		chromedp.WaitVisible(`body`),
+	)
 }

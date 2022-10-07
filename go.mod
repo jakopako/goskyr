@@ -4,6 +4,8 @@ go 1.19
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.0
+	github.com/chromedp/cdproto v0.0.0-20220930195933-357956813629
+	github.com/chromedp/chromedp v0.8.6
 	github.com/gdamore/tcell/v2 v2.5.3
 	github.com/goodsign/monday v1.0.0
 	github.com/ilyakaznacheev/cleanenv v1.3.0
@@ -16,8 +18,6 @@ require (
 require (
 	github.com/BurntSushi/toml v1.2.0 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
-	github.com/chromedp/cdproto v0.0.0-20220930195933-357956813629 // indirect
-	github.com/chromedp/chromedp v0.8.6 // indirect
 	github.com/chromedp/sysutil v1.0.0 // indirect
 	github.com/gdamore/encoding v1.0.0 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -15,6 +15,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/goodsign/monday"
 	"github.com/ilyakaznacheev/cleanenv"
+	"github.com/jakopako/goskyr/fetch"
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/utils"
 	"golang.org/x/net/html"
@@ -129,6 +130,7 @@ type Scraper struct {
 		Location ElementLocation `yaml:"location,omitempty"`
 		MaxPages int             `yaml:"max_pages,omitempty"`
 	} `yaml:"paginator,omitempty"`
+	RenderJs bool `yaml:"renderJs,omitempty"`
 }
 
 // GetItems fetches and returns all items from a website according to the
@@ -140,19 +142,23 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig) ([]map[string]interface{},
 	pageURL := c.URL
 	hasNextPage := true
 	currentPage := 0
+	var fetcher fetch.Fetcher
+	if c.RenderJs {
+		fetcher = &fetch.DynamicFetcher{
+			UserAgent: globalConfig.UserAgent,
+		}
+	} else {
+		fetcher = &fetch.StaticFetcher{
+			UserAgent: globalConfig.UserAgent,
+		}
+	}
 	for hasNextPage {
-		res, err := utils.FetchUrl(pageURL, globalConfig.UserAgent)
+		res, err := fetcher.Fetch(pageURL)
 		if err != nil {
 			return items, err
 		}
 
-		// defer res.Body.Close() // better not defer in a for loop
-
-		if res.StatusCode != 200 {
-			return items, fmt.Errorf("status code error: %d %s", res.StatusCode, res.Status)
-		}
-
-		doc, err := goquery.NewDocumentFromReader(res.Body)
+		doc, err := goquery.NewDocumentFromReader(strings.NewReader(res))
 		if err != nil {
 			return items, err
 		}
@@ -172,7 +178,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig) ([]map[string]interface{},
 				} else {
 					// handle all dynamic fields on the main page
 					if f.OnSubpage == "" {
-						err := extractField(&f, currentItem, s, c.URL, res)
+						err := extractField(&f, currentItem, s, pageURL)
 						if err != nil {
 							log.Printf("%s ERROR: error while parsing field %s: %v. Skipping item %v.", c.Name, f.Name, err, currentItem)
 							return
@@ -182,47 +188,31 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig) ([]map[string]interface{},
 			}
 
 			// handle all fields on subpages
-
-			// we store the *http.Response as value and not the *goquery.Selection
-			// to still be able to close all the response bodies afterwards
-			// UPDATE: we also store the *goquery.Document since apparently resSub.Body
-			// can only be read once.
-			subpagesResp := make(map[string]*http.Response)
-			subpagesBody := make(map[string]*goquery.Document)
+			subDocs := make(map[string]*goquery.Document)
 			for _, f := range c.Fields {
 				if f.OnSubpage != "" && f.Value == "" {
 					// check whether we fetched the page already
 					subpageURL := fmt.Sprint(currentItem[f.OnSubpage])
-					resSub, found := subpagesResp[subpageURL]
+					_, found := subDocs[subpageURL]
 					if !found {
-						resSub, err = utils.FetchUrl(subpageURL, globalConfig.UserAgent)
+						subRes, err := fetcher.Fetch(subpageURL)
 						if err != nil {
 							log.Printf("%s ERROR: %v. Skipping item %v.", c.Name, err, currentItem)
 							return
 						}
-						if resSub.StatusCode != 200 {
-							log.Printf("%s ERROR: status code error: %d %s. Skipping item %v.", c.Name, res.StatusCode, res.Status, currentItem)
-							return
-						}
-						subpagesResp[subpageURL] = resSub
-						docSub, err := goquery.NewDocumentFromReader(resSub.Body)
-
+						subDoc, err := goquery.NewDocumentFromReader(strings.NewReader(subRes))
 						if err != nil {
 							log.Printf("%s ERROR: error while reading document: %v. Skipping item %v", c.Name, err, currentItem)
 							return
 						}
-						subpagesBody[subpageURL] = docSub
+						subDocs[subpageURL] = subDoc
 					}
-					err = extractField(&f, currentItem, subpagesBody[subpageURL].Selection, c.URL, resSub)
+					err = extractField(&f, currentItem, subDocs[subpageURL].Selection, c.URL)
 					if err != nil {
 						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping item %v.", c.Name, f.Name, err, currentItem)
 						return
 					}
 				}
-			}
-			// close all the subpages
-			for _, resSub := range subpagesResp {
-				resSub.Body.Close()
 			}
 
 			// check if item should be filtered
@@ -237,14 +227,13 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig) ([]map[string]interface{},
 		})
 
 		hasNextPage = false
-		pageURL = getURLString(&c.Paginator.Location, doc.Selection, res)
+		pageURL = getURLString(&c.Paginator.Location, doc.Selection, pageURL)
 		if pageURL != "" {
 			currentPage++
 			if currentPage < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
 				hasNextPage = true
 			}
 		}
-		res.Body.Close()
 	}
 	// TODO: check if the dates make sense. Sometimes we have to guess the year since it
 	// does not appear on the website. In that case, eg. having a list of events around
@@ -292,7 +281,7 @@ func (c *Scraper) removeHiddenFields(item map[string]interface{}) map[string]int
 	return item
 }
 
-func extractField(field *Field, event map[string]interface{}, s *goquery.Selection, baseURL string, res *http.Response) error {
+func extractField(field *Field, event map[string]interface{}, s *goquery.Selection, baseURL string) error {
 	switch field.Type {
 	case "text", "": // the default, ie when type is not configured, is 'text'
 		ts, err := getTextString(&field.ElementLocation, s)
@@ -304,7 +293,7 @@ func extractField(field *Field, event map[string]interface{}, s *goquery.Selecti
 		}
 		event[field.Name] = ts
 	case "url":
-		url := getURLString(&field.ElementLocation, s, res)
+		url := getURLString(&field.ElementLocation, s, baseURL)
 		if url == "" {
 			url = baseURL
 		}
@@ -435,8 +424,9 @@ func hasAllDateParts(cdp CoveredDateParts) bool {
 	return cdp.Day && cdp.Month && cdp.Year && cdp.Time
 }
 
-func getURLString(e *ElementLocation, s *goquery.Selection, res *http.Response) string {
-	var urlVal, url string
+func getURLString(e *ElementLocation, s *goquery.Selection, baseURL string) string {
+	var urlVal, urlRes string
+	u, _ := url.Parse(baseURL)
 	if e.Attr == "" {
 		// set attr to the default if not set
 		e.Attr = "href"
@@ -459,19 +449,19 @@ func getURLString(e *ElementLocation, s *goquery.Selection, res *http.Response) 
 	if urlVal == "" {
 		return ""
 	} else if strings.HasPrefix(urlVal, "http") {
-		url = urlVal
+		urlRes = urlVal
 	} else if strings.HasPrefix(urlVal, "?") {
-		url = fmt.Sprintf("%s://%s%s%s", res.Request.URL.Scheme, res.Request.URL.Host, res.Request.URL.Path, urlVal)
+		urlRes = fmt.Sprintf("%s://%s%s%s", u.Scheme, u.Host, u.Path, urlVal)
 	} else {
-		baseURL := fmt.Sprintf("%s://%s", res.Request.URL.Scheme, res.Request.URL.Host)
+		baseURL := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 		if !strings.HasPrefix(urlVal, "/") {
 			baseURL = baseURL + "/"
 		}
-		url = fmt.Sprintf("%s%s", baseURL, urlVal)
+		urlRes = fmt.Sprintf("%s%s", baseURL, urlVal)
 	}
 
-	url = strings.TrimSpace(url)
-	return url
+	urlRes = strings.TrimSpace(urlRes)
+	return urlRes
 }
 
 func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {

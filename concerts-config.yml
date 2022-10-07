@@ -509,3 +509,32 @@ scrapers:
                 exp: "[0-9]{1,2}:[0-9]{2}"
             layout: ["15:04"]
         date_location: "Europe/Berlin"
+
+  - name: RoteFabrik
+    url: "https://rotefabrik.ch/de/programm.html#/calendar/konzert/"
+    item: ".rf-calendar-container > article"
+    renderJs: true
+    fields:
+      - name: title
+        location:
+          selector: .event-list-entry__sub-element--large > h2
+      - name: comment
+        location:
+          selector: .event-list-entry__sub-element--large > h3
+      - name: url
+        type: url
+        location:
+          selector: .rf-event-list-entry > a
+      - name: date
+        type: date
+        components:
+          - covers:
+              day: true
+              month: true
+              year: true
+              time: true
+            location:
+              selector: .event-list-entry__sub-element > time
+              attr: datetime
+            layout: ["06-01-02 15:04:05"]
+        date_location: "Europe/Berlin"

@@ -10,8 +10,8 @@
 1. [Build & Release](#build--release)
 1. [Naming](#naming)
 
-This project's goal is to make it easier to scrape structured data from web pages.
-This could be a list of books from an online book store, a list of plays in a public theater, a list of newspaper articles, etc. Since version 0.3.0 basic js rendering is supported. Next to [manually configuring](#manual-configuration--usage) the scraper there is a new option of (semi-)automatically generating a configuration file, see [quick start](#quick-start).
+This project's goal is to make it easier to **scrape structured data** from web pages.
+This could be a list of books from an online book store, a list of plays in a public theater, a list of newspaper articles, etc. Since version 0.3.0 basic **js rendering** is supported. Next to [manually configuring](#manual-configuration--usage) the scraper there is a new option of (semi-)automatically generating a configuration file, see [quick start](#quick-start).
 
 Note that there are already similar projects that might do a better job in certain cases or are more generic tools. However, on the one hand this is a personal project to make myself familiar with webscraping and Go and on the other hand goskyr supports certain features that I haven't found in any other projects. For instance, the way dates can be extracted from websites and the notion of scraping information from subpages defined by previously at runtime extracted urls.
 

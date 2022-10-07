@@ -39,6 +39,7 @@ func main() {
 	generateConfig := flag.String("g", "", "Automatically generate a config file for the given url.")
 	m := flag.Int("m", 20, "The minimum number of items on a page. This is needed to filter out noise. Works in combination with the -g flag.")
 	f := flag.Bool("f", false, "Only show fields that have varying values across the list of items. Works in combination with the -g flag.")
+	d := flag.Bool("d", false, "Render JS before generating a configuration file. Works in combination with the -g flag.")
 
 	flag.Parse()
 
@@ -49,6 +50,9 @@ func main() {
 
 	if *generateConfig != "" {
 		s := &scraper.Scraper{URL: *generateConfig}
+		if *d {
+			s.RenderJs = true
+		}
 		err := automate.GetDynamicFieldsConfig(s, *m, *f)
 		if err != nil {
 			log.Fatal(err)
@@ -105,6 +109,9 @@ func main() {
 		}
 	}
 
+	if config.Global.UserAgent == "" {
+		config.Global.UserAgent = "goskyr web scraper (github.com/jakopako/goskyr)"
+	}
 	for _, s := range config.Scrapers {
 		if *singleScraper == "" || *singleScraper == s.Name {
 			scraperWg.Add(1)

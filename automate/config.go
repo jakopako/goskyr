@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gdamore/tcell/v2"
+	"github.com/jakopako/goskyr/fetch"
 	"github.com/jakopako/goskyr/scraper"
 	"github.com/jakopako/goskyr/utils"
 	"github.com/rivo/tview"
@@ -198,14 +199,25 @@ func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields b
 		return errors.New("URL field cannot be empty")
 	}
 	s.Name = s.URL
-	res, err := utils.FetchUrl(s.URL, "")
+	// res, err := utils.FetchUrl(s.URL, "")
+	// if err != nil {
+	// 	return err
+	// }
+	// if res.StatusCode != 200 {
+	// 	return fmt.Errorf("status code error: %d %s", res.StatusCode, res.Status)
+	// }
+
+	var fetcher fetch.Fetcher
+	if s.RenderJs {
+		fetcher = &fetch.DynamicFetcher{}
+	} else {
+		fetcher = &fetch.StaticFetcher{}
+	}
+	res, err := fetcher.Fetch(s.URL)
 	if err != nil {
 		return err
 	}
-	if res.StatusCode != 200 {
-		return fmt.Errorf("status code error: %d %s", res.StatusCode, res.Status)
-	}
-	z := html.NewTokenizer(res.Body)
+	z := html.NewTokenizer(strings.NewReader(res))
 	locMan := locationManager{}
 	nrChildren := map[string]int{}
 	nodePath := []string{}

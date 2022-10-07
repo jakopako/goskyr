@@ -11,7 +11,7 @@
 1. [Naming](#naming)
 
 This project's goal is to make it easier to scrape structured data from web pages.
-This could be a list of books from an online book store, a list of plays in a public theater, a list of newspaper articles, etc. Currently, information can only be extracted from static websites. Next to [manually configuring](#manual-configuration--usage) the scraper there is a new option of (semi-)automatically generating a configuration file, see [quick start](#quick-start).
+This could be a list of books from an online book store, a list of plays in a public theater, a list of newspaper articles, etc. Since version 0.3.0 basic js rendering is supported. Next to [manually configuring](#manual-configuration--usage) the scraper there is a new option of (semi-)automatically generating a configuration file, see [quick start](#quick-start).
 
 Note that there are already similar projects that might do a better job in certain cases or are more generic tools. However, on the one hand this is a personal project to make myself familiar with webscraping and Go and on the other hand goskyr supports certain features that I haven't found in any other projects. For instance, the way dates can be extracted from websites and the notion of scraping information from subpages defined by previously at runtime extracted urls.
 
@@ -324,6 +324,10 @@ A dynamic field has a field type that can either be `text`, `url` or `date`. The
   As can be seen, a component has to define which part of the date it covers (at least one part has to be covered). Next, the location of this component has to be defined. This is done the same way as we defined the location for a text field string. Finally, we need to define a list of possible layouts where each layout is defined the 'go-way' as this scraper is written in go. For more details check out [this](https://yourbasic.org/golang/format-parse-string-time-date-example/) link or have a look at the numerous examples in the `concerts-config.yml` file. Note that a layout string is always in English although the date string on the scraped website might be in a different language. Also note that mostly the layout list only contains one element. Only in rare cases where different events on the same site have different layouts it is necessary to define more than one layout.
   
   The `date_language` key needs to correspond to the language on the website. Currently, the default is `de_DE`. Note, that this doesn't matter for dates that only contain numbers. `date_location` sets the time zone of the respective date.
+
+### JS Rendering
+
+Since version 0.3.0 basic (probably unstable) js rendering is supported. For this to work the `google-chrome` binary needs to be installed. In the configuration snippet of a scraper just add `renderJs: true` and everything will be taken care of. For now goskyr just tells chrome to fetch the page, render it, wait 5 seconds and return the rendered dom which will then be used to extract the desired data. User interactions with the page (eg scrolling) might be implemented in the future.
 
 ### Filters
 

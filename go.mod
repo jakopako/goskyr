@@ -8,7 +8,7 @@ require (
 	github.com/chromedp/chromedp v0.8.6
 	github.com/gdamore/tcell/v2 v2.5.3
 	github.com/goodsign/monday v1.0.0
-	github.com/ilyakaznacheev/cleanenv v1.3.0
+	github.com/ilyakaznacheev/cleanenv v1.3.1
 	github.com/rivo/tview v0.0.0-20220916081518-2e69b7385a37
 	golang.org/x/net v0.0.0-20220923203811-8be639271d50
 	gopkg.in/yaml.v2 v2.4.0

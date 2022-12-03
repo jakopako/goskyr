@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/gdamore/tcell/v2"
 	"github.com/jakopako/goskyr/fetch"
 	"github.com/jakopako/goskyr/scraper"
@@ -199,13 +200,6 @@ func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields b
 		return errors.New("URL field cannot be empty")
 	}
 	s.Name = s.URL
-	// res, err := utils.FetchUrl(s.URL, "")
-	// if err != nil {
-	// 	return err
-	// }
-	// if res.StatusCode != 200 {
-	// 	return fmt.Errorf("status code error: %d %s", res.StatusCode, res.Status)
-	// }
 
 	var fetcher fetch.Fetcher
 	if s.RenderJs {
@@ -217,7 +211,20 @@ func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields b
 	if err != nil {
 		return err
 	}
-	z := html.NewTokenizer(strings.NewReader(res))
+
+	// A bit hacky. But goquery seems to manipulate the html (I only know of goquery adding tbody tags if missing)
+	// so we rely on goquery to read the html for both scraping AND figuring out the scraping config.
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(res))
+	if err != nil {
+		return err
+	}
+
+	// Now we have to translate the goquery doc back into a string
+	htmlStr, err := goquery.OuterHtml(doc.Children())
+	if err != nil {
+		return err
+	}
+	z := html.NewTokenizer(strings.NewReader(htmlStr))
 	locMan := locationManager{}
 	nrChildren := map[string]int{}
 	nodePath := []string{}
@@ -235,9 +242,6 @@ parse:
 				p := pathToSelector(nodePath)
 				if len(strings.TrimSpace(text)) > 0 {
 					cI := nrChildren[p]
-					if cI > 0 {
-						cI++
-					}
 					l := scraper.ElementLocation{
 						Selector:   p,
 						ChildIndex: cI,

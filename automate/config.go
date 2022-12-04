@@ -20,9 +20,17 @@ type locationProps struct {
 	count    int
 	examples []string
 	selected bool
+	color    tcell.Color
 }
 
 type locationManager []*locationProps
+
+func (l locationManager) setColors() {
+	// todo this function should set the color depending on the proximity to other fields
+	for _, e := range l {
+		e.color = tcell.ColorPurple
+	}
+}
 
 func update(l locationManager, e scraper.ElementLocation, s string) locationManager {
 	for _, lp := range l {
@@ -317,6 +325,7 @@ parse:
 	}
 
 	locMan = filter(locMan, minOcc, removeStaticFields)
+	locMan.setColors()
 
 	if len(locMan) > 0 {
 		sort.Slice(locMan, func(p, q int) bool {
@@ -373,6 +382,7 @@ func selectFieldsTable(locMan locationManager) {
 				table.SetCell(r, c,
 					tview.NewTableCell(ss).
 						SetTextColor(color).
+						SetBackgroundColor(locMan[r-1].color).
 						SetAlign(tview.AlignCenter))
 			}
 		}

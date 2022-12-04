@@ -166,7 +166,7 @@ outer:
 		var n string
 		for j, e := range l {
 			if i >= len(selectorToPath(e.Selector)) {
-				itemSelector = pathToSelector(selectorToPath(e.Selector)[:i-1])
+				itemSelector = pathToSelector(selectorToPath(e.Selector)[:i])
 				break outer
 			}
 			if j == 0 {

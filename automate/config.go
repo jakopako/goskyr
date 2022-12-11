@@ -257,7 +257,7 @@ parse:
 				inBody = !inBody
 			}
 			if inBody {
-				// what type of token is <br /> ? Same as <br> ?
+				// br can also be self closing tag, see later case statement
 				if tnString == "br" || tnString == "input" {
 					nrChildren[pathToSelector(nodePath)] += 1
 					continue
@@ -311,6 +311,15 @@ parse:
 						nodePath = nodePath[:len(nodePath)-1]
 						depth--
 					}
+				}
+			}
+		case html.SelfClosingTagToken:
+			if inBody {
+				tn, _ := z.TagName()
+				tnString := string(tn)
+				if tnString == "br" || tnString == "input" {
+					nrChildren[pathToSelector(nodePath)] += 1
+					continue
 				}
 			}
 		}

@@ -25,7 +25,7 @@ Similar projects:
 
 ## Quick Start
 
-![2022-09-18-13-30-51](https://user-images.githubusercontent.com/26999089/190899996-506ea39d-58ef-4344-9ebd-e5258dc63755.gif)
+https://user-images.githubusercontent.com/26999089/210244250-09a11b64-0981-40d1-8f81-9fbb00e17164.mp4
 
 To reproduce what happens above [install goskyr](#installation) and then run the following steps:
 
@@ -34,8 +34,9 @@ Start the configuration generation. The configuration file is written to the def
 ```bash
 goskyr -g https://www.imdb.com/chart/top/ -f
 ```
+Note, that different colors are used to show how 'close' certain fields are to each other in the html tree. This should help when there are multiple list-like structures on a web page and you need to figure out which fields belong together.
 
-Start the scraping process. The configuration file is read from the default location `config.yml`.
+Next, start the scraping process. The configuration file is read from the default location `config.yml`.
 
 ```bash
 goskyr

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/agnivade/levenshtein"
 	"github.com/gdamore/tcell/v2"
 	"github.com/jakopako/goskyr/fetch"
 	"github.com/jakopako/goskyr/scraper"
@@ -20,9 +21,36 @@ type locationProps struct {
 	count    int
 	examples []string
 	selected bool
+	color    tcell.Color
+	distance float64
 }
 
 type locationManager []*locationProps
+
+func (l locationManager) setColors() {
+	if len(l) == 0 {
+		return
+	}
+	for i, e := range l {
+		if i != 0 {
+			e.distance = l[i-1].distance + distance(l[i-1].loc, e.loc)
+		}
+	}
+	// scale to 1 and map to rgb
+	maxDist := l[len(l)-1].distance * 1.2
+	s := 0.73
+	v := 0.96
+	for _, e := range l {
+		h := e.distance / maxDist
+		r, g, b := utils.HSVToRGB(h, s, v)
+		e.color = tcell.NewRGBColor(r, g, b)
+	}
+}
+
+func distance(loc1, loc2 scraper.ElementLocation) float64 {
+	// calculate differently? eg with nodes of html tree. eg nodes to walk to get from loc1 to loc2
+	return float64(levenshtein.ComputeDistance(loc1.Selector, loc2.Selector))
+}
 
 func update(l locationManager, e scraper.ElementLocation, s string) locationManager {
 	for _, lp := range l {
@@ -326,12 +354,9 @@ parse:
 	}
 
 	locMan = filter(locMan, minOcc, removeStaticFields)
+	locMan.setColors()
 
 	if len(locMan) > 0 {
-		sort.Slice(locMan, func(p, q int) bool {
-			return locMan[p].loc.Selector > locMan[q].loc.Selector
-		})
-
 		selectFieldsTable(locMan)
 
 		var fs []scraper.ElementLocation
@@ -381,7 +406,7 @@ func selectFieldsTable(locMan locationManager) {
 				}
 				table.SetCell(r, c,
 					tview.NewTableCell(ss).
-						SetTextColor(color).
+						SetTextColor(locMan[r-1].color).
 						SetAlign(tview.AlignCenter))
 			}
 		}
@@ -404,7 +429,7 @@ func selectFieldsTable(locMan locationManager) {
 		} else {
 			table.GetCell(row, 0).SetTextColor(tcell.ColorGreen)
 			for i := 1; i < 5; i++ {
-				table.GetCell(row, i).SetTextColor(tcell.ColorWhite)
+				table.GetCell(row, i).SetTextColor(locMan[row-1].color)
 			}
 		}
 	})

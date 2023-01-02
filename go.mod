@@ -17,6 +17,7 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.2.0 // indirect
+	github.com/agnivade/levenshtein v1.1.1
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/chromedp/sysutil v1.0.0 // indirect
 	github.com/gdamore/encoding v1.0.0 // indirect

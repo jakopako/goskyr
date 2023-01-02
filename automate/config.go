@@ -3,7 +3,6 @@ package automate
 import (
 	"errors"
 	"fmt"
-	"math"
 	"sort"
 	"strings"
 
@@ -29,15 +28,12 @@ type locationProps struct {
 type locationManager []*locationProps
 
 func (l locationManager) setColors() {
-	// todo this function should set the color depending on the proximity to other fields
+	if len(l) == 0 {
+		return
+	}
 	for i, e := range l {
 		if i != 0 {
 			e.distance = l[i-1].distance + distance(l[i-1].loc, e.loc)
-		}
-		if i%2 == 0 {
-			e.color = tcell.NewRGBColor(0, 0, 0)
-		} else {
-			e.color = tcell.NewRGBColor(100, 100, 100)
 		}
 	}
 	// scale to 1 and map to rgb
@@ -45,45 +41,9 @@ func (l locationManager) setColors() {
 	s := 0.73
 	v := 0.96
 	for _, e := range l {
-		e.distance = e.distance / maxDist
-		// from https://go.dev/play/p/9q5yBNDh3W
-		var r, g, b float64
-		h := e.distance * 6
-		i := math.Floor(h)
-		v1 := v * (1 - s)
-		v2 := v * (1 - s*(h-i))
-		v3 := v * (1 - s*(1-(h-i)))
-
-		if i == 0 {
-			r = v
-			g = v3
-			b = v1
-		} else if i == 1 {
-			r = v2
-			g = v
-			b = v1
-		} else if i == 2 {
-			r = v1
-			g = v
-			b = v3
-		} else if i == 3 {
-			r = v1
-			g = v2
-			b = v
-		} else if i == 4 {
-			r = v3
-			g = v1
-			b = v
-		} else {
-			r = v
-			g = v1
-			b = v2
-		}
-
-		r = r * 255 //RGB results from 0 to 255
-		g = g * 255
-		b = b * 255
-		e.color = tcell.NewRGBColor(int32(r), int32(g), int32(b))
+		h := e.distance / maxDist
+		r, g, b := utils.HSVToRGB(h, s, v)
+		e.color = tcell.NewRGBColor(r, g, b)
 	}
 }
 
@@ -397,10 +357,6 @@ parse:
 	locMan.setColors()
 
 	if len(locMan) > 0 {
-		// sort.Slice(locMan, func(p, q int) bool {
-		// 	return locMan[p].loc.Selector > locMan[q].loc.Selector
-		// })
-
 		selectFieldsTable(locMan)
 
 		var fs []scraper.ElementLocation
@@ -421,10 +377,7 @@ parse:
 
 func selectFieldsTable(locMan locationManager) {
 	app := tview.NewApplication()
-	// table := tview.NewTable().SetBorders(true)
-	table := tview.NewTable()
-	// table.SetBorderPadding(0, 0, 0, 0)
-	// table.SetBorder(true)
+	table := tview.NewTable().SetBorders(true)
 	cols, rows := 5, len(locMan)+1
 	for r := 0; r < rows; r++ {
 		for c := 0; c < cols; c++ {
@@ -453,8 +406,7 @@ func selectFieldsTable(locMan locationManager) {
 				}
 				table.SetCell(r, c,
 					tview.NewTableCell(ss).
-						SetTextColor(color).
-						SetBackgroundColor(locMan[r-1].color).
+						SetTextColor(locMan[r-1].color).
 						SetAlign(tview.AlignCenter))
 			}
 		}
@@ -477,7 +429,7 @@ func selectFieldsTable(locMan locationManager) {
 		} else {
 			table.GetCell(row, 0).SetTextColor(tcell.ColorGreen)
 			for i := 1; i < 5; i++ {
-				table.GetCell(row, i).SetTextColor(tcell.ColorWhite)
+				table.GetCell(row, i).SetTextColor(locMan[row-1].color)
 			}
 		}
 	})

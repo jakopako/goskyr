@@ -4,8 +4,8 @@ go 1.19
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.0
-	github.com/chromedp/cdproto v0.0.0-20220930195933-357956813629
-	github.com/chromedp/chromedp v0.8.6
+	github.com/chromedp/cdproto v0.0.0-20230109101555-6b041c6303cc
+	github.com/chromedp/chromedp v0.8.7
 	github.com/gdamore/tcell/v2 v2.5.3
 	github.com/goodsign/monday v1.0.0
 	github.com/ilyakaznacheev/cleanenv v1.4.2

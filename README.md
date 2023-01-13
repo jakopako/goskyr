@@ -52,7 +52,7 @@ Note that the feature to (semi-)automatically generate a configuration file is c
 
 ## Installation
 
-[Download](https://github.com/jakopako/goskyr/releases/latest) a prebuilt binary from [releases page](https://github.com/jakopako/goskyr/releases), unpack and run!
+[Download](https://github.com/jakopako/goskyr/releases/latest) a prebuilt binary from the [releases page](https://github.com/jakopako/goskyr/releases), unpack and run!
 
 Or if you have recent go compiler installed download goskyr by running
 

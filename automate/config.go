@@ -296,8 +296,9 @@ parse:
 					var hrefVal string
 					for moreAttr {
 						k, v, m := z.TagAttr()
-						if string(k) == "class" && string(v) != "" {
-							cls := strings.Split(string(v), " ")
+						vString := strings.TrimSpace(string(v))
+						if string(k) == "class" && vString != "" {
+							cls := strings.Split(vString, " ")
 							j := 0
 							for _, cl := range cls {
 								// for now we ignore classes that contain dots

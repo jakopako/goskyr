@@ -187,6 +187,11 @@ func removeNodesPrefix(s1 string, n int) string {
 	return pathToSelector(selectorToPath(s1)[n:])
 }
 
+func escapeColons(s string) string {
+	// https://www.itsupportguides.com/knowledge-base/website-tips/css-colon-in-id/
+	return strings.ReplaceAll(s, ":", "\\:")
+}
+
 func elementsToConfig(s *scraper.Scraper, l ...scraper.ElementLocation) {
 	var itemSelector string
 outer:
@@ -207,9 +212,10 @@ outer:
 			}
 		}
 	}
-	s.Item = itemSelector
+	s.Item = escapeColons(itemSelector)
 	for i, e := range l {
 		e.Selector = removeNodesPrefix(e.Selector, len(strings.Split(itemSelector, " > ")))
+		e.Selector = escapeColons(e.Selector)
 		fieldType := "text"
 		if e.Attr == "href" {
 			fieldType = "url"

@@ -386,6 +386,7 @@ func getDate(f *Field, s *goquery.Selection) (time.Time, error) {
 		dateTimeString += dp.stringPart + " "
 	}
 	dateTimeString = strings.Replace(dateTimeString, "Mrz", "Mär", 1) // hack for issue #47
+	dateTimeString = strings.Replace(dateTimeString, "Fév", "févr", 1) // hack for issue #172
 	for _, dateTimeLayout := range dateTimeLayouts {
 		t, err = monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
 		if err == nil {

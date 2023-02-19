@@ -276,6 +276,10 @@ To get an even better feeling for the location configuration check out the numer
 
 This key only applies to dynamic fields of type text. As the name suggests, if set to `true` there won't be an error message if the value is empty.
 
+**Key: `entire_subtree`**
+
+This key, if set to `true` causes goskyr to grab all text elements under the element defined in the location. It is useful when the target location contains inline tags, eg. `This is some text with a <strong>strong</strong> part.`
+
 **Key: `hide`**
 
 This key determines whether a field should be exlcuded from the resulting item. This can be handy when you want to filter based on a field that you don't want to include in the actual item. For more information on filters checkout the **Filters** section below.

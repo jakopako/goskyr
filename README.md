@@ -201,6 +201,8 @@ fields:
 
 **Key: `location`**
 
+*Subkey: `regex_extract`*
+
 However, it might be a bit more complex to extract the desired information. Take for instance the concert scraper configuration shown above, more specifically the config snippet for the `title` field.
 
 ```yml
@@ -213,7 +215,11 @@ fields:
         index: 0
 ```
 
-This field is implicitly of type `text`. Other types, such as `url` or `date` would have to be configured with the keyword `type`. The `location` tells the scraper where to look for the field value and how to extract it. In this case the selector on its own would not be enough to extract the desired value as we would get something like this: `Bastian Baker • Konzert`. That's why there is an extra option to define a regular expression to extract a substring. Note that in this example our extracted string would still contain a trainling space which is automatically removed by the scraper. Let's have a look at two more examples to have a better understanding of the location configuration. Let's say we want to extract "Tonhalle-Orchester Zürich" from the following html snippet.
+This field is implicitly of type `text`. Other types, such as `url` or `date` would have to be configured with the keyword `type`. The `location` tells the scraper where to look for the field value and how to extract it. In this case the selector on its own would not be enough to extract the desired value as we would get something like this: `Bastian Baker • Konzert`. That's why there is an extra option to define a regular expression to extract a substring. Note that in this example our extracted string would still contain a trainling space which is automatically removed by the scraper. Let's have a look at a few more examples to have a better understanding of the location configuration.
+
+*Subkey: `node_index`*
+
+Let's say we want to extract "Tonhalle-Orchester Zürich" from the following html snippet.
 
 ```html
 <div class="member">
@@ -235,7 +241,11 @@ location:
   node_index: 1 # This indicates that we want the second node (indexing starts at 0)
 ```
 
-Last but not least let's say we want to extract the time "20h00" from the following html snippet.
+Note that the same result can be achieved with the `:nth-child()` selector so `node_index` might be removed in the future, see issue [#119](https://github.com/jakopako/goskyr/issues/119)
+
+*Subkey: `child_index`*
+
+Next, let's say we want to extract the time "20h00" from the following html snippet.
 
 ```html
 <div class="col-sm-8 col-xs-12">
@@ -268,7 +278,11 @@ location:
     exp: "[0-9]{2}h[0-9]{2}"
 ```
 
-Here, the selector is not enough to extract the desired string and we can't go further down the tree by using different selectors. With the `child_index` we can point to the exact string we want. A `child_index` of 0 would point to the first `<strong>` node, a `child_index` of 1 would point to the string containing "19h00", a `child_index` of 2 would point to the second `<strong>` node and finally a `child_index` of 3 points to the correct string. If `child_index` is set to -1 the first child that results in a regex match will be used. This can be usefull if the `child_index` varies across different items. In the current example however, the `child_index` is always the same but the string still contains more stuff than we need which is why we use a regular expression to extract the desired substring.
+Here, the selector is not enough to extract the desired string and we can't go further down the tree by using different selectors. With the `child_index` we can point to the exact string we want. A `child_index` of 0 would point to the first `<strong>` node, a `child_index` of 1 would point to the string containing "19h00", a `child_index` of 2 would point to the second `<strong>` node and finally a `child_index` of 3 points to the correct string. If `child_index` is set to -1 the first child that results in a regex match will be used. This can be useful if the `child_index` varies across different items. In the current example however, the `child_index` is always the same but the string still contains more stuff than we need which is why we use a regular expression to extract the desired substring.
+
+*Subkey: `entire_subtree`*
+
+This subkey, if set to `true` causes goskyr to grab all text elements under the element defined in the location's selector. It is useful when the target location contains inline tags, eg. `This is some text with a <strong>strong</strong> part.`
 
 To get an even better feeling for the location configuration check out the numerous examples in the `concerts-config.yml` file.
 

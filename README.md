@@ -74,7 +74,6 @@ scrapers:
     url: "https://www.goodreads.com/quotes/tag/life"
     item: ".quote"
     fields:
-      dynamic:
         - name: "quote"
           location:
             selector: ".quoteText"
@@ -139,7 +138,7 @@ scrapers:
             location:
               selector: ".event-meta time"
               attr: "datetime"
-            layout: "2006-01-02T15:04:05-07:00"
+            layout: ["2006-01-02T15:04:05-07:00"]
         date_location: "Europe/Berlin"
     filters:
       - field: "title"

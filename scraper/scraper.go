@@ -84,12 +84,21 @@ type CoveredDateParts struct {
 	Time  bool `yaml:"time"`
 }
 
+// TransformConfig is used to replace an existing substring with some other
+// kind of string. Processing needs to happen before extracting dates.
+type TransformConfig struct {
+    TransformType string `yaml:"type,omitempty"`     // only regex-replace for now
+    RegexPattern  string `yaml:"regex,omitempty"`    // a container for the pattern
+    Replacement   string `yaml:"replace,omitempty"`  // a plain string for replacement
+}
+
 // A DateComponent is used to find a specific part of a date within
 // a html document
 type DateComponent struct {
-	Covers          CoveredDateParts `yaml:"covers"`
-	ElementLocation ElementLocation  `yaml:"location"`
-	Layout          []string         `yaml:"layout"`
+	Covers          CoveredDateParts  `yaml:"covers"`
+	ElementLocation ElementLocation   `yaml:"location"`
+	Layout          []string          `yaml:"layout"`
+	Transform	    []TransformConfig `yaml:"transform,omitempty"` 
 }
 
 // A Field contains all the information necessary to scrape
@@ -341,6 +350,12 @@ func getDate(f *Field, s *goquery.Selection) (time.Time, error) {
 			if err != nil {
 				return t, err
 			}
+            for _, tr := range c.Transform {
+                sp, err = transformString(&tr, sp);
+            }
+			if err != nil {
+				return t, err
+			}
 			if sp != "" {
 				var lp []string
 				for _, l := range c.Layout {
@@ -561,3 +576,21 @@ func extractStringRegex(rc *RegexConfig, s string) (string, error) {
 	}
 	return extractedString, nil
 }
+
+func transformString(t *TransformConfig, s string) (string, error) {
+	extractedString := s
+    switch t.TransformType {
+    case "regex-replace":
+        if t.RegexPattern != "" {
+            regex, err := regexp.Compile(t.RegexPattern)
+            if err != nil {
+                return "", err
+            }
+            extractedString = regex.ReplaceAllString(s, t.Replacement)
+        }
+    case "":
+        // do nothing
+    }
+	return extractedString, nil
+}
+

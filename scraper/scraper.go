@@ -350,9 +350,9 @@ func getDate(f *Field, s *goquery.Selection) (time.Time, error) {
 			if err != nil {
 				return t, err
 			}
-            for _, tr := range c.Transform {
-                sp, err = transformString(&tr, sp);
-            }
+			for _, tr := range c.Transform {
+				sp, err = transformString(&tr, sp);
+			}
 			if err != nil {
 				return t, err
 			}

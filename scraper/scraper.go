@@ -98,7 +98,7 @@ type DateComponent struct {
 	Covers          CoveredDateParts  `yaml:"covers"`
 	ElementLocation ElementLocation   `yaml:"location"`
 	Layout          []string          `yaml:"layout"`
-	Transform	    []TransformConfig `yaml:"transform,omitempty"` 
+	Transform       []TransformConfig `yaml:"transform,omitempty"` 
 }
 
 // A Field contains all the information necessary to scrape

@@ -484,8 +484,13 @@ func getURLString(e *ElementLocation, s *goquery.Selection, baseURL string) stri
 
 func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 	var fieldString string
+	var fieldSelection *goquery.Selection
 	var err error
-	fieldSelection := s.Find(t.Selector)
+	if t.Selector == "" {
+		fieldSelection = s
+	} else {
+		fieldSelection = s.Find(t.Selector)
+	}
 	if len(fieldSelection.Nodes) > t.NodeIndex {
 		if t.Attr == "" {
 			if t.EntireSubtree {

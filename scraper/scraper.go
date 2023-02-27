@@ -87,9 +87,9 @@ type CoveredDateParts struct {
 // TransformConfig is used to replace an existing substring with some other
 // kind of string. Processing needs to happen before extracting dates.
 type TransformConfig struct {
-    TransformType string `yaml:"type,omitempty"`     // only regex-replace for now
-    RegexPattern  string `yaml:"regex,omitempty"`    // a container for the pattern
-    Replacement   string `yaml:"replace,omitempty"`  // a plain string for replacement
+	TransformType string `yaml:"type,omitempty"`    // only regex-replace for now
+	RegexPattern  string `yaml:"regex,omitempty"`   // a container for the pattern
+	Replacement   string `yaml:"replace,omitempty"` // a plain string for replacement
 }
 
 // A DateComponent is used to find a specific part of a date within
@@ -98,7 +98,7 @@ type DateComponent struct {
 	Covers          CoveredDateParts  `yaml:"covers"`
 	ElementLocation ElementLocation   `yaml:"location"`
 	Layout          []string          `yaml:"layout"`
-	Transform       []TransformConfig `yaml:"transform,omitempty"` 
+	Transform       []TransformConfig `yaml:"transform,omitempty"`
 }
 
 // A Field contains all the information necessary to scrape
@@ -351,10 +351,12 @@ func getDate(f *Field, s *goquery.Selection) (time.Time, error) {
 				return t, err
 			}
 			for _, tr := range c.Transform {
-				sp, err = transformString(&tr, sp);
-			}
-			if err != nil {
-				return t, err
+				sp, err = transformString(&tr, sp)
+				// we have to return the error here instead of after the loop
+				// otherwise errors might be overwritten and hence ignored.
+				if err != nil {
+					return t, err
+				}
 			}
 			if sp != "" {
 				var lp []string
@@ -400,7 +402,7 @@ func getDate(f *Field, s *goquery.Selection) (time.Time, error) {
 		}
 		dateTimeString += dp.stringPart + " "
 	}
-	dateTimeString = strings.Replace(dateTimeString, "Mrz", "Mär", 1) // hack for issue #47
+	dateTimeString = strings.Replace(dateTimeString, "Mrz", "Mär", 1)  // hack for issue #47
 	dateTimeString = strings.Replace(dateTimeString, "Fév", "févr", 1) // hack for issue #172
 	for _, dateTimeLayout := range dateTimeLayouts {
 		t, err = monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
@@ -579,18 +581,19 @@ func extractStringRegex(rc *RegexConfig, s string) (string, error) {
 
 func transformString(t *TransformConfig, s string) (string, error) {
 	extractedString := s
-    switch t.TransformType {
-    case "regex-replace":
-        if t.RegexPattern != "" {
-            regex, err := regexp.Compile(t.RegexPattern)
-            if err != nil {
-                return "", err
-            }
-            extractedString = regex.ReplaceAllString(s, t.Replacement)
-        }
-    case "":
-        // do nothing
-    }
+	switch t.TransformType {
+	case "regex-replace":
+		if t.RegexPattern != "" {
+			regex, err := regexp.Compile(t.RegexPattern)
+			if err != nil {
+				return "", err
+			}
+			extractedString = regex.ReplaceAllString(s, t.Replacement)
+		}
+	case "":
+		// do nothing
+	default:
+		return "", fmt.Errorf("transform type '%s' does not exist", t.TransformType)
+	}
 	return extractedString, nil
 }
-

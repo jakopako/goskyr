@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/agnivade/levenshtein"
@@ -187,9 +188,27 @@ func removeNodesPrefix(s1 string, n int) string {
 	return pathToSelector(selectorToPath(s1)[n:])
 }
 
+func escapeCssSelector(s string) string {
+	return escapeNumber(escapeColons(s))
+}
+
 func escapeColons(s string) string {
 	// https://www.itsupportguides.com/knowledge-base/website-tips/css-colon-in-id/
 	return strings.ReplaceAll(s, ":", "\\:")
+}
+
+func escapeNumber(s string) string {
+	// https://stackoverflow.com/questions/45293534/css-class-starting-with-number-is-not-getting-applied
+	e := ""
+	sr := []rune(s)
+	for i, c := range s {
+		if unicode.IsDigit(c) && string(sr[i-1]) == "." {
+			e += fmt.Sprintf(`\3%s `, string(c))
+		} else {
+			e += string(c)
+		}
+	}
+	return e
 }
 
 func elementsToConfig(s *scraper.Scraper, l ...scraper.ElementLocation) {
@@ -212,10 +231,10 @@ outer:
 			}
 		}
 	}
-	s.Item = escapeColons(itemSelector)
+	s.Item = escapeCssSelector(itemSelector)
 	for i, e := range l {
 		e.Selector = removeNodesPrefix(e.Selector, len(strings.Split(itemSelector, " > ")))
-		e.Selector = escapeColons(e.Selector)
+		e.Selector = escapeCssSelector(e.Selector)
 		fieldType := "text"
 		if e.Attr == "href" {
 			fieldType = "url"

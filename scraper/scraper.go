@@ -143,8 +143,12 @@ type Scraper struct {
 }
 
 // GetItems fetches and returns all items from a website according to the
-// Scraper's paramaters
-func (c Scraper) GetItems(globalConfig *GlobalConfig) ([]map[string]interface{}, error) {
+// Scraper's paramaters. When rawDyn is set to true the items returned are
+// not processed according to their type but instead the raw values based
+// only on the location are returned (ignore regex_extract??). And only those
+// of dynamic fields, ie fields that don't have a predefined value and that are
+// present on the main page (not subpages). This is used by the ML feature generation.
+func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string]interface{}, error) {
 
 	var items []map[string]interface{}
 
@@ -182,12 +186,19 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig) ([]map[string]interface{},
 			currentItem := make(map[string]interface{})
 			for _, f := range c.Fields {
 				if f.Value != "" {
-					// add static fields
-					currentItem[f.Name] = f.Value
+					if !rawDyn {
+						// add static fields
+						currentItem[f.Name] = f.Value
+					}
 				} else {
 					// handle all dynamic fields on the main page
 					if f.OnSubpage == "" {
-						err := extractField(&f, currentItem, s, pageURL)
+						var err error
+						if rawDyn {
+							err = extractRawField(&f, currentItem, s, pageURL)
+						} else {
+							err = extractField(&f, currentItem, s, pageURL)
+						}
 						if err != nil {
 							log.Printf("%s ERROR: error while parsing field %s: %v. Skipping item %v.", c.Name, f.Name, err, currentItem)
 							return
@@ -197,29 +208,31 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig) ([]map[string]interface{},
 			}
 
 			// handle all fields on subpages
-			subDocs := make(map[string]*goquery.Document)
-			for _, f := range c.Fields {
-				if f.OnSubpage != "" && f.Value == "" {
-					// check whether we fetched the page already
-					subpageURL := fmt.Sprint(currentItem[f.OnSubpage])
-					_, found := subDocs[subpageURL]
-					if !found {
-						subRes, err := fetcher.Fetch(subpageURL)
+			if !rawDyn {
+				subDocs := make(map[string]*goquery.Document)
+				for _, f := range c.Fields {
+					if f.OnSubpage != "" && f.Value == "" {
+						// check whether we fetched the page already
+						subpageURL := fmt.Sprint(currentItem[f.OnSubpage])
+						_, found := subDocs[subpageURL]
+						if !found {
+							subRes, err := fetcher.Fetch(subpageURL)
+							if err != nil {
+								log.Printf("%s ERROR: %v. Skipping item %v.", c.Name, err, currentItem)
+								return
+							}
+							subDoc, err := goquery.NewDocumentFromReader(strings.NewReader(subRes))
+							if err != nil {
+								log.Printf("%s ERROR: error while reading document: %v. Skipping item %v", c.Name, err, currentItem)
+								return
+							}
+							subDocs[subpageURL] = subDoc
+						}
+						err = extractField(&f, currentItem, subDocs[subpageURL].Selection, c.URL)
 						if err != nil {
-							log.Printf("%s ERROR: %v. Skipping item %v.", c.Name, err, currentItem)
+							log.Printf("%s ERROR: error while parsing field %s: %v. Skipping item %v.", c.Name, f.Name, err, currentItem)
 							return
 						}
-						subDoc, err := goquery.NewDocumentFromReader(strings.NewReader(subRes))
-						if err != nil {
-							log.Printf("%s ERROR: error while reading document: %v. Skipping item %v", c.Name, err, currentItem)
-							return
-						}
-						subDocs[subpageURL] = subDoc
-					}
-					err = extractField(&f, currentItem, subDocs[subpageURL].Selection, c.URL)
-					if err != nil {
-						log.Printf("%s ERROR: error while parsing field %s: %v. Skipping item %v.", c.Name, f.Name, err, currentItem)
-						return
 					}
 				}
 			}
@@ -315,6 +328,44 @@ func extractField(field *Field, event map[string]interface{}, s *goquery.Selecti
 		event[field.Name] = d
 	default:
 		return fmt.Errorf("field type '%s' does not exist", field.Type)
+	}
+	return nil
+}
+
+func extractRawField(field *Field, event map[string]interface{}, s *goquery.Selection, baseURL string) error {
+	switch field.Type {
+	case "text", "":
+		ts, err := getTextString(&field.ElementLocation, s)
+		if err != nil {
+			return err
+		}
+		if !field.CanBeEmpty && ts == "" {
+			return fmt.Errorf("field %s cannot be empty", field.Name)
+		}
+		event[field.Name] = ts
+	case "url":
+		if field.ElementLocation.Attr == "" {
+			// normally we'd set the default in getUrlString
+			// but we're not using this function for the raw extraction
+			// because we don't want the url to be auto expanded
+			field.ElementLocation.Attr = "href"
+		}
+		ts, err := getTextString(&field.ElementLocation, s)
+		if err != nil {
+			return err
+		}
+		if !field.CanBeEmpty && ts == "" {
+			return fmt.Errorf("field %s cannot be empty", field.Name)
+		}
+		event[field.Name] = ts
+	case "date":
+		cs, err := getRawDateComponents(field, s)
+		if err != nil {
+			return err
+		}
+		for k, v := range cs {
+			event[k] = v
+		}
 	}
 	return nil
 }
@@ -440,6 +491,31 @@ func mergeDateParts(dpOne CoveredDateParts, dpTwo CoveredDateParts) CoveredDateP
 
 func hasAllDateParts(cdp CoveredDateParts) bool {
 	return cdp.Day && cdp.Month && cdp.Year && cdp.Time
+}
+
+func getRawDateComponents(f *Field, s *goquery.Selection) (map[string]string, error) {
+	rawComponents := map[string]string{}
+	for _, c := range f.Components {
+		ts, err := getTextString(&c.ElementLocation, s)
+		if err != nil {
+			return rawComponents, err
+		}
+		fName := "date-component"
+		if c.Covers.Day {
+			fName += "-day"
+		}
+		if c.Covers.Month {
+			fName += "-month"
+		}
+		if c.Covers.Year {
+			fName += "-year"
+		}
+		if c.Covers.Time {
+			fName += "-time"
+		}
+		rawComponents[fName] = ts
+	}
+	return rawComponents, nil
 }
 
 func getURLString(e *ElementLocation, s *goquery.Selection, baseURL string) string {

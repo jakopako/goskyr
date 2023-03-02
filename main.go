@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/jakopako/goskyr/automate"
+	"github.com/jakopako/goskyr/ml"
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/scraper"
 	"gopkg.in/yaml.v3"
@@ -20,7 +21,7 @@ func runScraper(s scraper.Scraper, itemsChannel chan map[string]interface{}, glo
 	log.Printf("scraping %s\n", s.Name)
 	// This could probably be improved. We could pass the channel to
 	// GetItems instead of waiting for the scraper to finish.
-	items, err := s.GetItems(globalConfig)
+	items, err := s.GetItems(globalConfig, false)
 	if err != nil {
 		log.Printf("%s ERROR: %s", s.Name, err)
 		return
@@ -40,6 +41,8 @@ func main() {
 	m := flag.Int("m", 20, "The minimum number of items on a page. This is needed to filter out noise. Works in combination with the -g flag.")
 	f := flag.Bool("f", false, "Only show fields that have varying values across the list of items. Works in combination with the -g flag.")
 	d := flag.Bool("d", false, "Render JS before generating a configuration file. Works in combination with the -g flag.")
+	extractFeatures := flag.String("e", "", "Extract ML features based on the given configuration file and write them to the given file in csv format.")
+	buildModel := flag.String("b", "", "Build a ML model based on the given csv features file.")
 
 	flag.Parse()
 
@@ -84,9 +87,23 @@ func main() {
 		return
 	}
 
+	if *buildModel != "" {
+		if err := ml.BuildModel(*buildModel); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
 	config, err := scraper.NewConfig(*configFile)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if *extractFeatures != "" {
+		if err := ml.ExtractFeatures(config, *extractFeatures); err != nil {
+			log.Fatal(err)
+		}
+		return
 	}
 
 	var scraperWg sync.WaitGroup

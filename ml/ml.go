@@ -16,9 +16,9 @@ import (
 )
 
 type Labler struct {
-	wordMap    map[string]bool
-	cls        *knn.KNNClassifier
-	labelsAttr base.Attribute
+	wordMap   map[string]bool
+	cls       *knn.KNNClassifier
+	classAttr *base.CategoricalAttribute
 }
 
 func LoadLabler() (*Labler, error) {
@@ -30,24 +30,35 @@ func LoadLabler() (*Labler, error) {
 	if err := cls.Load("croncert.model"); err != nil {
 		return nil, err
 	}
-	labelsAttr := new(base.CategoricalAttribute)
-	attrBytes, err := os.ReadFile("croncert.class.json")
+	classAttr := new(base.CategoricalAttribute)
+	classAttr.SetName("class")
+	file, err := os.Open("croncert.class")
 	if err != nil {
 		return nil, err
 	}
-	if err := labelsAttr.UnmarshalJSON(attrBytes); err != nil {
-		return nil, err
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		classAttr.GetSysValFromString(scanner.Text())
 	}
 
+	// attrBytes, err := os.ReadFile("croncert.class.json")
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if err := labelsAttr.UnmarshalJSON(attrBytes); err != nil {
+	// 	return nil, err
+	// }
+
 	ll := &Labler{
-		wordMap:    w,
-		cls:        cls,
-		labelsAttr: labelsAttr,
+		wordMap:   w,
+		cls:       cls,
+		classAttr: classAttr,
 	}
 	return ll, nil
 }
 
-func (ll *Labler) PredictLabel(fValue ...string) string {
+func (ll *Labler) PredictLabel(fValue ...string) (string, error) {
 	features := []*Features{}
 	for _, v := range fValue {
 		f := calculateFeatures("", v, ll.wordMap)
@@ -59,7 +70,7 @@ func (ll *Labler) PredictLabel(fValue ...string) string {
 	for i := 0; i < len(attrs)-1; i++ {
 		attrs[i] = base.NewFloatAttribute(FeatureList[i])
 	}
-	attrs[len(attrs)-1] = ll.labelsAttr
+	attrs[len(attrs)-1] = ll.classAttr
 	// attrs[len(attrs)-1] = new(base.CategoricalAttribute)
 	// catAttr, err := os.ReadFile("croncert.class.json")
 	// fmt.Println(err)
@@ -70,32 +81,55 @@ func (ll *Labler) PredictLabel(fValue ...string) string {
 	// 	attrs[len(attrs)-1].GetSysValFromString(cl)
 	// }
 
-	newInst := base.NewDenseInstances()
-	newSpecs := make([]base.AttributeSpec, len(attrs))
-	for i, a := range attrs {
-		newSpecs[i] = newInst.AddAttribute(a)
+	predictions := []string{}
+	for _, f := range features {
+		newInst := base.NewDenseInstances()
+		newSpecs := make([]base.AttributeSpec, len(attrs))
+		for i, a := range attrs {
+			newSpecs[i] = newInst.AddAttribute(a)
+		}
+		newInst.Extend(1)
+
+		// fmt.Println(newInst.AllAttributes())
+
+		newInst.AddClassAttribute(newInst.AllAttributes()[len(attrs)-1])
+
+		newInst.Set(newSpecs[0], 0, newSpecs[0].GetAttribute().GetSysValFromString(fmt.Sprint(f.digitCount)))
+		newInst.Set(newSpecs[1], 0, newSpecs[1].GetAttribute().GetSysValFromString(fmt.Sprint(f.runeCount)))
+		newInst.Set(newSpecs[2], 0, newSpecs[2].GetAttribute().GetSysValFromString(fmt.Sprint(f.dictWordsCount)))
+		newInst.Set(newSpecs[3], 0, newSpecs[3].GetAttribute().GetSysValFromString(fmt.Sprint(f.slashCount)))
+		newInst.Set(newSpecs[4], 0, newSpecs[4].GetAttribute().GetSysValFromString(fmt.Sprint(f.colonCount)))
+		newInst.Set(newSpecs[5], 0, newSpecs[5].GetAttribute().GetSysValFromString(fmt.Sprint(f.dashCount)))
+		newInst.Set(newSpecs[6], 0, newSpecs[6].GetAttribute().GetSysValFromString(fmt.Sprint(f.dotCount)))
+		newInst.Set(newSpecs[7], 0, newSpecs[7].GetAttribute().GetSysValFromString(fmt.Sprint(f.whitespaceCount)))
+		// fmt.Println(newInst)
+		pred, err := ll.cls.Predict(newInst)
+		if err != nil {
+			return "", err
+		}
+		predictions = append(predictions, pred.RowString(0))
 	}
-	newInst.Extend(1)
+	// fmt.Println(predictions)
+	pred := mostOccPred(predictions)
+	// fmt.Println(pred)
+	return pred, nil
+	// return "title"
+}
 
-	// fmt.Println(newInst.AllAttributes())
-
-	newInst.AddClassAttribute(newInst.AllAttributes()[len(attrs)-1])
-
-	newInst.Set(newSpecs[0], 0, newSpecs[0].GetAttribute().GetSysValFromString(fmt.Sprint(features[0].digitCount)))
-	newInst.Set(newSpecs[1], 0, newSpecs[1].GetAttribute().GetSysValFromString(fmt.Sprint(features[0].runeCount)))
-	newInst.Set(newSpecs[2], 0, newSpecs[2].GetAttribute().GetSysValFromString(fmt.Sprint(features[0].dictWordsCount)))
-	newInst.Set(newSpecs[3], 0, newSpecs[3].GetAttribute().GetSysValFromString(fmt.Sprint(features[0].slashCount)))
-	newInst.Set(newSpecs[4], 0, newSpecs[4].GetAttribute().GetSysValFromString(fmt.Sprint(features[0].colonCount)))
-	newInst.Set(newSpecs[5], 0, newSpecs[5].GetAttribute().GetSysValFromString(fmt.Sprint(features[0].dashCount)))
-	newInst.Set(newSpecs[6], 0, newSpecs[6].GetAttribute().GetSysValFromString(fmt.Sprint(features[0].dotCount)))
-	newInst.Set(newSpecs[7], 0, newSpecs[7].GetAttribute().GetSysValFromString(fmt.Sprint(features[0].whitespaceCount)))
-	fmt.Println(newInst)
-	pred, err := ll.cls.Predict(newInst)
-	fmt.Println(err)
-	fmt.Println(pred)
-	// fmt.Printf("\n\nPrediction: %s\n", pred.RowString(0))
-	// return pred.RowString(0)
-	return "title"
+func mostOccPred(predictions []string) string {
+	count := map[string]int{}
+	for _, pred := range predictions {
+		count[pred]++
+	}
+	pred := ""
+	maxOcc := 0
+	for p, c := range count {
+		if c > maxOcc {
+			maxOcc = c
+			pred = p
+		}
+	}
+	return pred
 }
 
 // Features contains all the relevant features and the class label
@@ -288,18 +322,24 @@ func BuildModel(filename string) error {
 	// fmt.Println(predictions)
 	fmt.Println(evaluation.GetSummary(confusionMat))
 	modelFName := "croncert.model"
-	classFName := "croncert.class.json"
+	classFName := "croncert.class"
 	log.Printf("storing model to file %s\n", modelFName)
-	jsonBytes, err := trainData.AllClassAttributes()[0].MarshalJSON()
+	if err := cls.Save(modelFName); err != nil {
+		return err
+	}
+	classValues := trainData.AllClassAttributes()[0].(*base.CategoricalAttribute).GetValues()
+	f, err := os.Create(classFName)
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(classFName, jsonBytes, 0644); err != nil {
-		return err
+	defer f.Close()
+	for _, value := range classValues {
+		fmt.Fprintln(f, value) // print values to f, one per line
 	}
+	return nil
 
 	// fmt.Println(string(jsonBytes))
-	return cls.Save(modelFName)
+	// return cls.Save(modelFName)
 }
 
 func loadWords() (map[string]bool, error) {

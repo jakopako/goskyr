@@ -58,7 +58,11 @@ func (l locationManager) findFieldNames() error {
 		return err
 	}
 	for _, e := range l {
-		e.name = ll.PredictLabel(e.examples...)
+		pred, err := ll.PredictLabel(e.examples...)
+		if err != nil {
+			return err
+		}
+		e.name = pred
 	}
 	return nil
 }
@@ -226,39 +230,39 @@ func escapeNumber(s string) string {
 	return e
 }
 
-func elementsToConfig(s *scraper.Scraper, l ...scraper.ElementLocation) {
+func elementsToConfig(s *scraper.Scraper, l ...*locationProps) {
 	// we need to get to the predicted field name here somehow
 	var itemSelector string
 outer:
 	for i := 0; ; i++ {
 		var n string
 		for j, e := range l {
-			if i >= len(selectorToPath(e.Selector)) {
-				itemSelector = pathToSelector(selectorToPath(e.Selector)[:i])
+			if i >= len(selectorToPath(e.loc.Selector)) {
+				itemSelector = pathToSelector(selectorToPath(e.loc.Selector)[:i])
 				break outer
 			}
 			if j == 0 {
-				n = selectorToPath(e.Selector)[i]
+				n = selectorToPath(e.loc.Selector)[i]
 			} else {
-				if !nodesEqual(selectorToPath(e.Selector)[i], n) {
-					itemSelector = pathToSelector(selectorToPath(e.Selector)[:i])
+				if !nodesEqual(selectorToPath(e.loc.Selector)[i], n) {
+					itemSelector = pathToSelector(selectorToPath(e.loc.Selector)[:i])
 					break outer
 				}
 			}
 		}
 	}
 	s.Item = escapeCssSelector(itemSelector)
-	for i, e := range l {
-		e.Selector = removeNodesPrefix(e.Selector, len(strings.Split(itemSelector, " > ")))
-		e.Selector = escapeCssSelector(e.Selector)
+	for _, e := range l {
+		e.loc.Selector = removeNodesPrefix(e.loc.Selector, len(strings.Split(itemSelector, " > ")))
+		e.loc.Selector = escapeCssSelector(e.loc.Selector)
 		fieldType := "text"
-		if e.Attr == "href" {
+		if e.loc.Attr == "href" {
 			fieldType = "url"
 		}
 		d := scraper.Field{
-			Name:            fmt.Sprintf("field-%d", i),
+			Name:            e.name,
 			Type:            fieldType,
-			ElementLocation: e,
+			ElementLocation: e.loc,
 		}
 		s.Fields = append(s.Fields, d)
 	}
@@ -404,15 +408,15 @@ parse:
 	if len(locMan) > 0 {
 		selectFieldsTable(locMan)
 
-		var fs []scraper.ElementLocation
+		var locPropsSel []*locationProps
 		for _, lm := range locMan {
 			if lm.selected {
-				fs = append(fs, lm.loc)
+				locPropsSel = append(locPropsSel, lm)
 			}
 		}
 
-		if len(fs) > 0 {
-			elementsToConfig(s, fs...)
+		if len(locPropsSel) > 0 {
+			elementsToConfig(s, locPropsSel...)
 			return nil
 		}
 		return fmt.Errorf("no fields selected")

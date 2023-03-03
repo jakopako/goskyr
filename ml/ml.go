@@ -15,18 +15,121 @@ import (
 	"github.com/sjwhitworth/golearn/knn"
 )
 
-type Features struct {
-	digitCount     int    `csv:"digit-count"`
-	runeCount      int    `csv:"rune-count"`
-	dictWordsCount int    `csv:"dict-words-count"`
-	slashCount     int    `csv:"slash-count"`
-	colonCount     int    `csv:"colon-count"`
-	dashCount      int    `csv:"dash-count"`
-	dotCount       int    `csv:"dot-count"`
-	class          string `csv:"class"`
+type Labler struct {
+	wordMap map[string]bool
+	cls     *knn.KNNClassifier
 }
 
-func calculateFeatures(s scraper.Scraper, featuresChan chan<- *Features, wordMap map[string]bool, globalConfig *scraper.GlobalConfig, wg *sync.WaitGroup) {
+func LoadLabler() (*Labler, error) {
+	w, err := loadWords()
+	if err != nil {
+		return nil, err
+	}
+	cls := knn.NewKnnClassifier("euclidean", "linear", 2)
+	cls.Load("croncert.model")
+	ll := &Labler{
+		wordMap: w,
+		cls:     cls,
+	}
+	return ll, nil
+}
+
+func (ll *Labler) PredictLabel(fValue ...string) string {
+	features := []*Features{}
+	for _, v := range fValue {
+		f := calculateFeatures("", v, ll.wordMap)
+		// f.class = "title"
+		features = append(features, &f)
+	}
+	// https://github.com/sjwhitworth/golearn/blob/master/examples/instances/instances.go
+	attrs := make([]base.Attribute, 8)
+	for i := 0; i < 7; i++ {
+		attrs[i] = base.NewFloatAttribute(FeatureList[i])
+	}
+	attrs[7] = new(base.CategoricalAttribute)
+	attrs[7].SetName(FeatureList[7])
+	for _, cl := range Classes {
+		attrs[7].GetSysValFromString(cl)
+	}
+
+	newInst := base.NewDenseInstances()
+	newSpecs := make([]base.AttributeSpec, len(attrs))
+	for i, a := range attrs {
+		newSpecs[i] = newInst.AddAttribute(a)
+	}
+	newInst.Extend(1)
+
+	// fmt.Println(newInst.AllAttributes())
+
+	newInst.AddClassAttribute(newInst.AllAttributes()[7])
+
+	newInst.Set(newSpecs[0], 0, newSpecs[0].GetAttribute().GetSysValFromString(fmt.Sprint(features[0].digitCount)))
+	newInst.Set(newSpecs[1], 0, newSpecs[1].GetAttribute().GetSysValFromString(fmt.Sprint(features[0].runeCount)))
+	newInst.Set(newSpecs[2], 0, newSpecs[2].GetAttribute().GetSysValFromString(fmt.Sprint(features[0].dictWordsCount)))
+	newInst.Set(newSpecs[3], 0, newSpecs[3].GetAttribute().GetSysValFromString(fmt.Sprint(features[0].slashCount)))
+	newInst.Set(newSpecs[4], 0, newSpecs[4].GetAttribute().GetSysValFromString(fmt.Sprint(features[0].colonCount)))
+	newInst.Set(newSpecs[5], 0, newSpecs[5].GetAttribute().GetSysValFromString(fmt.Sprint(features[0].dashCount)))
+	newInst.Set(newSpecs[6], 0, newSpecs[6].GetAttribute().GetSysValFromString(fmt.Sprint(features[0].dotCount)))
+	// newInst.Set(newSpecs[7], 0, newSpecs[7].GetAttribute().GetSysValFromString(fmt.Sprint(features[0].class)))
+	fmt.Println(newInst)
+	pred, _ := ll.cls.Predict(newInst)
+	// fmt.Println(err)
+	// fmt.Println(pred)
+	fmt.Printf("\n\nPrediction: %s\n", pred.RowString(0))
+	return pred.RowString(0)
+}
+
+// Features contains all the relevant features and the class label
+type Features struct {
+	digitCount     int
+	runeCount      int
+	dictWordsCount int
+	slashCount     int
+	colonCount     int
+	dashCount      int
+	dotCount       int
+	class          string
+}
+
+var FeatureList []string = []string{
+	"digit-count",
+	"rune-count",
+	"dict-words-count",
+	"slash-count",
+	"colon-count",
+	"dash-count",
+	"dot-count",
+	"class",
+}
+
+var Classes []string = []string{
+	"date-component-time",
+	"title",
+	"url",
+	"date-component-day",
+	"date-component-month",
+	"comment",
+	"date-component-day-month",
+	"date-component-day-month-year-time",
+	"date-component-day-month-year",
+	"date-component-year",
+	"date-component-day-month-time",
+	"date-component-month-year"}
+
+func calculateFeatures(fName, fValue string, wordMap map[string]bool) Features {
+	return Features{
+		digitCount:     countDigits(fValue),
+		runeCount:      countRunes(fValue),
+		dictWordsCount: countDictWords(fValue, wordMap),
+		slashCount:     countRune(fValue, []rune("/")[0]),
+		colonCount:     countRune(fValue, []rune(":")[0]),
+		dashCount:      countRune(fValue, []rune("-")[0]),
+		dotCount:       countRune(fValue, []rune(".")[0]),
+		class:          fName,
+	}
+}
+
+func calculateScraperFeatures(s scraper.Scraper, featuresChan chan<- *Features, wordMap map[string]bool, globalConfig *scraper.GlobalConfig, wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Printf("calculating features for %s\n", s.Name)
 	items, err := s.GetItems(globalConfig, true)
@@ -37,16 +140,7 @@ func calculateFeatures(s scraper.Scraper, featuresChan chan<- *Features, wordMap
 	for _, item := range items {
 		for fName, fValue := range item {
 			fValueString := fValue.(string)
-			f := Features{
-				digitCount:     countDigits(fValueString),
-				runeCount:      countRunes(fValueString),
-				dictWordsCount: countDictWords(fValueString, wordMap),
-				slashCount:     countRune(fValueString, []rune("/")[0]),
-				colonCount:     countRune(fValueString, []rune(":")[0]),
-				dashCount:      countRune(fValueString, []rune("-")[0]),
-				dotCount:       countRune(fValueString, []rune(".")[0]),
-				class:          fName,
-			}
+			f := calculateFeatures(fName, fValueString, wordMap)
 			featuresChan <- &f
 			// fmt.Printf("%+v\n", f)
 			// fmt.Println(fValueString)
@@ -97,7 +191,7 @@ func ExtractFeatures(config *scraper.Config, filename string) error {
 	go writeFeaturesToFile(filename, featuresChan, &writerWg)
 	for _, s := range config.Scrapers {
 		calcWg.Add(1)
-		go calculateFeatures(s, featuresChan, wordMap, &config.Global, &calcWg)
+		go calculateScraperFeatures(s, featuresChan, wordMap, &config.Global, &calcWg)
 	}
 	calcWg.Wait()
 	close(featuresChan)
@@ -152,6 +246,7 @@ func BuildModel(filename string) error {
 	if err != nil {
 		return err
 	}
+	fmt.Println(rawData)
 	log.Println("initializing KNN classifier")
 	cls := knn.NewKnnClassifier("euclidean", "linear", 2)
 	log.Println("performing a training-test split")
@@ -168,20 +263,28 @@ func BuildModel(filename string) error {
 	}
 	// fmt.Println(predictions)
 	fmt.Println(evaluation.GetSummary(confusionMat))
-	return nil
+	modelFName := "croncert.model"
+	log.Printf("storing model to file %s\n", modelFName)
+	return cls.Save(modelFName)
 }
 
 func loadWords() (map[string]bool, error) {
 	words := map[string]bool{}
-	file, err := os.Open("word-lists/english.dic")
-	defer file.Close()
-	if err != nil {
-		return words, err
-	}
-	scanner := bufio.NewScanner(file)
-	scanner.Split(bufio.ScanLines)
-	for scanner.Scan() {
-		words[strings.ToLower(scanner.Text())] = true
+	for _, fn := range []string{
+		"word-lists/english.dic",
+		"word-lists/francais.txt",
+		"word-lists/wordlist-german.txt",
+	} {
+		file, err := os.Open(fn)
+		if err != nil {
+			return words, err
+		}
+		scanner := bufio.NewScanner(file)
+		scanner.Split(bufio.ScanLines)
+		for scanner.Scan() {
+			words[strings.ToLower(scanner.Text())] = true
+		}
+		file.Close()
 	}
 	return words, nil
 }

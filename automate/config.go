@@ -11,6 +11,7 @@ import (
 	"github.com/agnivade/levenshtein"
 	"github.com/gdamore/tcell/v2"
 	"github.com/jakopako/goskyr/fetch"
+	"github.com/jakopako/goskyr/ml"
 	"github.com/jakopako/goskyr/scraper"
 	"github.com/jakopako/goskyr/utils"
 	"github.com/rivo/tview"
@@ -24,6 +25,7 @@ type locationProps struct {
 	selected bool
 	color    tcell.Color
 	distance float64
+	name     string
 }
 
 type locationManager []*locationProps
@@ -46,6 +48,19 @@ func (l locationManager) setColors() {
 		r, g, b := utils.HSVToRGB(h, s, v)
 		e.color = tcell.NewRGBColor(r, g, b)
 	}
+}
+
+func (l locationManager) findFieldNames() error {
+	// find possible field names based on given
+	// ml model
+	ll, err := ml.LoadLabler()
+	if err != nil {
+		return err
+	}
+	for _, e := range l {
+		e.name = ll.PredictLabel(e.examples...)
+	}
+	return nil
 }
 
 func distance(loc1, loc2 scraper.ElementLocation) float64 {
@@ -212,6 +227,7 @@ func escapeNumber(s string) string {
 }
 
 func elementsToConfig(s *scraper.Scraper, l ...scraper.ElementLocation) {
+	// we need to get to the predicted field name here somehow
 	var itemSelector string
 outer:
 	for i := 0; ; i++ {
@@ -381,6 +397,9 @@ parse:
 
 	locMan = filter(locMan, minOcc, removeStaticFields)
 	locMan.setColors()
+	if err := locMan.findFieldNames(); err != nil {
+		return err
+	}
 
 	if len(locMan) > 0 {
 		selectFieldsTable(locMan)
@@ -411,7 +430,7 @@ func selectFieldsTable(locMan locationManager) {
 			if c < 1 || r < 1 {
 				if c < 1 && r > 0 {
 					color = tcell.ColorGreen
-					table.SetCell(r, c, tview.NewTableCell(fmt.Sprintf("field [%d]", r-1)).
+					table.SetCell(r, c, tview.NewTableCell(fmt.Sprintf("[%d] %s", r-1, locMan[r-1].name)).
 						SetTextColor(color).
 						SetAlign(tview.AlignCenter))
 				} else if r == 0 && c > 0 {

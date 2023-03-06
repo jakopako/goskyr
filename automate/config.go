@@ -67,6 +67,181 @@ func (l locationManager) findFieldNames() error {
 	return nil
 }
 
+func (l locationManager) selectFieldsTable() {
+	app := tview.NewApplication()
+	table := tview.NewTable().SetBorders(true)
+	cols, rows := 5, len(l)+1
+	for r := 0; r < rows; r++ {
+		for c := 0; c < cols; c++ {
+			color := tcell.ColorWhite
+			if c < 1 || r < 1 {
+				if c < 1 && r > 0 {
+					color = tcell.ColorGreen
+					table.SetCell(r, c, tview.NewTableCell(fmt.Sprintf("[%d] %s", r-1, l[r-1].name)).
+						SetTextColor(color).
+						SetAlign(tview.AlignCenter))
+				} else if r == 0 && c > 0 {
+					color = tcell.ColorBlue
+					table.SetCell(r, c, tview.NewTableCell(fmt.Sprintf("example [%d]", c-1)).
+						SetTextColor(color).
+						SetAlign(tview.AlignCenter))
+				} else {
+					table.SetCell(r, c,
+						tview.NewTableCell("").
+							SetTextColor(color).
+							SetAlign(tview.AlignCenter))
+				}
+			} else {
+				var ss string
+				if len(l[r-1].examples) >= c {
+					ss = utils.ShortenString(l[r-1].examples[c-1], 40)
+				}
+				table.SetCell(r, c,
+					tview.NewTableCell(ss).
+						SetTextColor(l[r-1].color).
+						SetAlign(tview.AlignCenter))
+			}
+		}
+	}
+	table.SetSelectable(true, false)
+	table.Select(1, 1).SetFixed(1, 1).SetDoneFunc(func(key tcell.Key) {
+		if key == tcell.KeyEscape {
+			app.Stop()
+		}
+		if key == tcell.KeyEnter {
+			table.SetSelectable(true, false)
+		}
+	}).SetSelectedFunc(func(row int, column int) {
+		l[row-1].selected = !l[row-1].selected
+		if l[row-1].selected {
+			table.GetCell(row, 0).SetTextColor(tcell.ColorRed)
+			for i := 1; i < 5; i++ {
+				table.GetCell(row, i).SetTextColor(tcell.ColorOrange)
+			}
+		} else {
+			table.GetCell(row, 0).SetTextColor(tcell.ColorGreen)
+			for i := 1; i < 5; i++ {
+				table.GetCell(row, i).SetTextColor(l[row-1].color)
+			}
+		}
+	})
+	button := tview.NewButton("Hit Enter to generate config").SetSelectedFunc(func() {
+		app.Stop()
+	})
+
+	grid := tview.NewGrid().SetRows(-11, -1).SetColumns(-1, -1, -1).SetBorders(false).
+		AddItem(table, 0, 0, 1, 3, 0, 0, true).
+		AddItem(button, 1, 1, 1, 1, 0, 0, false)
+	grid.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyTab {
+			if button.HasFocus() {
+				app.SetFocus(table)
+			} else {
+				app.SetFocus(button)
+			}
+			return nil
+		}
+		return event
+	})
+
+	if err := app.SetRoot(grid, true).SetFocus(grid).Run(); err != nil {
+		panic(err)
+	}
+}
+
+func (l locationManager) elementsToConfig(s *scraper.Scraper) error {
+	var locPropsSel []*locationProps
+	for _, lm := range l {
+		if lm.selected {
+			locPropsSel = append(locPropsSel, lm)
+		}
+	}
+	if len(locPropsSel) == 0 {
+		return fmt.Errorf("no fields selected")
+	}
+	var itemSelector string
+outer:
+	for i := 0; ; i++ {
+		var n string
+		for j, e := range locPropsSel {
+			if i >= len(selectorToPath(e.loc.Selector)) {
+				itemSelector = pathToSelector(selectorToPath(e.loc.Selector)[:i])
+				break outer
+			}
+			if j == 0 {
+				n = selectorToPath(e.loc.Selector)[i]
+			} else {
+				if !nodesEqual(selectorToPath(e.loc.Selector)[i], n) {
+					itemSelector = pathToSelector(selectorToPath(e.loc.Selector)[:i])
+					break outer
+				}
+			}
+		}
+	}
+	s.Item = escapeCssSelector(itemSelector)
+	for _, e := range locPropsSel {
+		e.loc.Selector = removeNodesPrefix(e.loc.Selector, len(strings.Split(itemSelector, " > ")))
+		e.loc.Selector = escapeCssSelector(e.loc.Selector)
+		fieldType := "text"
+		var d scraper.Field
+		if strings.HasPrefix(e.name, "date-component") {
+			d = scraper.Field{
+				Name: e.name,
+				Type: "date",
+				Components: []scraper.DateComponent{
+					{
+						ElementLocation: e.loc,
+						Covers: scraper.CoveredDateParts{
+							Day:   strings.Contains(e.name, "day"),
+							Month: strings.Contains(e.name, "month"),
+							Year:  strings.Contains(e.name, "year"),
+							Time:  strings.Contains(e.name, "time"),
+						},
+					},
+				},
+			}
+		} else {
+			if e.loc.Attr == "href" {
+				fieldType = "url"
+			}
+			d = scraper.Field{
+				Name:            e.name,
+				Type:            fieldType,
+				ElementLocation: e.loc,
+			}
+		}
+		s.Fields = append(s.Fields, d)
+	}
+	return nil
+}
+
+func filter(l locationManager, minCount int, removeStaticFields bool) locationManager {
+	// remove if count is smaller than minCount
+	// or if the examples are all the same (if removeStaticFields is true)
+	i := 0
+	for _, p := range l {
+		if p.count >= minCount {
+			if removeStaticFields {
+				eqEx := true
+				for _, ex := range p.examples {
+					if ex != p.examples[0] {
+						eqEx = false
+						break
+					}
+				}
+				if !eqEx {
+					l[i] = p
+					i++
+				}
+			} else {
+				l[i] = p
+				i++
+			}
+		}
+	}
+	return l[:i]
+}
+
 func distance(loc1, loc2 scraper.ElementLocation) float64 {
 	// calculate differently? eg with nodes of html tree. eg nodes to walk to get from loc1 to loc2
 	return float64(levenshtein.ComputeDistance(loc1.Selector, loc2.Selector))
@@ -144,33 +319,6 @@ func checkAndUpdatePath(a, b *scraper.ElementLocation) bool {
 	return false
 }
 
-func filter(l locationManager, minCount int, removeStaticFields bool) locationManager {
-	// remove if count is smaller than minCount
-	// or if the examples are all the same (if removeStaticFields is true)
-	i := 0
-	for _, p := range l {
-		if p.count >= minCount {
-			if removeStaticFields {
-				eqEx := true
-				for _, ex := range p.examples {
-					if ex != p.examples[0] {
-						eqEx = false
-						break
-					}
-				}
-				if !eqEx {
-					l[i] = p
-					i++
-				}
-			} else {
-				l[i] = p
-				i++
-			}
-		}
-	}
-	return l[:i]
-}
-
 func pathToSelector(pathSlice []string) string {
 	return strings.Join(pathSlice, " > ")
 }
@@ -228,44 +376,6 @@ func escapeNumber(s string) string {
 		}
 	}
 	return e
-}
-
-func elementsToConfig(s *scraper.Scraper, l ...*locationProps) {
-	// we need to get to the predicted field name here somehow
-	var itemSelector string
-outer:
-	for i := 0; ; i++ {
-		var n string
-		for j, e := range l {
-			if i >= len(selectorToPath(e.loc.Selector)) {
-				itemSelector = pathToSelector(selectorToPath(e.loc.Selector)[:i])
-				break outer
-			}
-			if j == 0 {
-				n = selectorToPath(e.loc.Selector)[i]
-			} else {
-				if !nodesEqual(selectorToPath(e.loc.Selector)[i], n) {
-					itemSelector = pathToSelector(selectorToPath(e.loc.Selector)[:i])
-					break outer
-				}
-			}
-		}
-	}
-	s.Item = escapeCssSelector(itemSelector)
-	for _, e := range l {
-		e.loc.Selector = removeNodesPrefix(e.loc.Selector, len(strings.Split(itemSelector, " > ")))
-		e.loc.Selector = escapeCssSelector(e.loc.Selector)
-		fieldType := "text"
-		if e.loc.Attr == "href" {
-			fieldType = "url"
-		}
-		d := scraper.Field{
-			Name:            e.name,
-			Type:            fieldType,
-			ElementLocation: e.loc,
-		}
-		s.Fields = append(s.Fields, d)
-	}
 }
 
 func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool) error {
@@ -406,102 +516,8 @@ parse:
 	}
 
 	if len(locMan) > 0 {
-		selectFieldsTable(locMan)
-
-		var locPropsSel []*locationProps
-		for _, lm := range locMan {
-			if lm.selected {
-				locPropsSel = append(locPropsSel, lm)
-			}
-		}
-
-		if len(locPropsSel) > 0 {
-			elementsToConfig(s, locPropsSel...)
-			return nil
-		}
-		return fmt.Errorf("no fields selected")
+		locMan.selectFieldsTable()
+		return locMan.elementsToConfig(s)
 	}
 	return fmt.Errorf("no fields found")
-}
-
-func selectFieldsTable(locMan locationManager) {
-	app := tview.NewApplication()
-	table := tview.NewTable().SetBorders(true)
-	cols, rows := 5, len(locMan)+1
-	for r := 0; r < rows; r++ {
-		for c := 0; c < cols; c++ {
-			color := tcell.ColorWhite
-			if c < 1 || r < 1 {
-				if c < 1 && r > 0 {
-					color = tcell.ColorGreen
-					table.SetCell(r, c, tview.NewTableCell(fmt.Sprintf("[%d] %s", r-1, locMan[r-1].name)).
-						SetTextColor(color).
-						SetAlign(tview.AlignCenter))
-				} else if r == 0 && c > 0 {
-					color = tcell.ColorBlue
-					table.SetCell(r, c, tview.NewTableCell(fmt.Sprintf("example [%d]", c-1)).
-						SetTextColor(color).
-						SetAlign(tview.AlignCenter))
-				} else {
-					table.SetCell(r, c,
-						tview.NewTableCell("").
-							SetTextColor(color).
-							SetAlign(tview.AlignCenter))
-				}
-			} else {
-				var ss string
-				if len(locMan[r-1].examples) >= c {
-					ss = utils.ShortenString(locMan[r-1].examples[c-1], 40)
-				}
-				table.SetCell(r, c,
-					tview.NewTableCell(ss).
-						SetTextColor(locMan[r-1].color).
-						SetAlign(tview.AlignCenter))
-			}
-		}
-	}
-	table.SetSelectable(true, false)
-	table.Select(1, 1).SetFixed(1, 1).SetDoneFunc(func(key tcell.Key) {
-		if key == tcell.KeyEscape {
-			app.Stop()
-		}
-		if key == tcell.KeyEnter {
-			table.SetSelectable(true, false)
-		}
-	}).SetSelectedFunc(func(row int, column int) {
-		locMan[row-1].selected = !locMan[row-1].selected
-		if locMan[row-1].selected {
-			table.GetCell(row, 0).SetTextColor(tcell.ColorRed)
-			for i := 1; i < 5; i++ {
-				table.GetCell(row, i).SetTextColor(tcell.ColorOrange)
-			}
-		} else {
-			table.GetCell(row, 0).SetTextColor(tcell.ColorGreen)
-			for i := 1; i < 5; i++ {
-				table.GetCell(row, i).SetTextColor(locMan[row-1].color)
-			}
-		}
-	})
-	button := tview.NewButton("Hit Enter to generate config").SetSelectedFunc(func() {
-		app.Stop()
-	})
-
-	grid := tview.NewGrid().SetRows(-11, -1).SetColumns(-1, -1, -1).SetBorders(false).
-		AddItem(table, 0, 0, 1, 3, 0, 0, true).
-		AddItem(button, 1, 1, 1, 1, 0, 0, false)
-	grid.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyTab {
-			if button.HasFocus() {
-				app.SetFocus(table)
-			} else {
-				app.SetFocus(button)
-			}
-			return nil
-		}
-		return event
-	})
-
-	if err := app.SetRoot(grid, true).SetFocus(grid).Run(); err != nil {
-		panic(err)
-	}
 }

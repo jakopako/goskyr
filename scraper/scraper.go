@@ -78,10 +78,10 @@ type ElementLocation struct {
 // CoveredDateParts is used to determine what parts of a date a
 // DateComponent covers
 type CoveredDateParts struct {
-	Day   bool `yaml:"day"`
-	Month bool `yaml:"month"`
-	Year  bool `yaml:"year"`
-	Time  bool `yaml:"time"`
+	Day   bool `yaml:"day,omitempty"`
+	Month bool `yaml:"month,omitempty"`
+	Year  bool `yaml:"year,omitempty"`
+	Time  bool `yaml:"time,omitempty"`
 }
 
 // TransformConfig is used to replace an existing substring with some other

@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/jakopako/goskyr/automate"
+	"github.com/jakopako/goskyr/ml"
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/scraper"
 	"gopkg.in/yaml.v3"
@@ -20,7 +21,7 @@ func runScraper(s scraper.Scraper, itemsChannel chan map[string]interface{}, glo
 	log.Printf("scraping %s\n", s.Name)
 	// This could probably be improved. We could pass the channel to
 	// GetItems instead of waiting for the scraper to finish.
-	items, err := s.GetItems(globalConfig)
+	items, err := s.GetItems(globalConfig, false)
 	if err != nil {
 		log.Printf("%s ERROR: %s", s.Name, err)
 		return
@@ -40,6 +41,10 @@ func main() {
 	m := flag.Int("m", 20, "The minimum number of items on a page. This is needed to filter out noise. Works in combination with the -g flag.")
 	f := flag.Bool("f", false, "Only show fields that have varying values across the list of items. Works in combination with the -g flag.")
 	d := flag.Bool("d", false, "Render JS before generating a configuration file. Works in combination with the -g flag.")
+	extractFeatures := flag.String("e", "", "Extract ML features based on the given configuration file (-c) and write them to the given file in csv format.")
+	wordsDir := flag.String("w", "word-lists", "The directory that contains a number of files containing words of different languages. This is needed for the ML part (use with -e or -b).")
+	buildModel := flag.String("t", "", "Train a ML model based on the given csv features file. This will generate 2 files, goskyr.model and goskyr.class")
+	modelPath := flag.String("model", "", "Use a pre-trained ML model to infer names of extracted fields. Works in combination with the -g flag.")
 
 	flag.Parse()
 
@@ -53,7 +58,7 @@ func main() {
 		if *d {
 			s.RenderJs = true
 		}
-		err := automate.GetDynamicFieldsConfig(s, *m, *f)
+		err := automate.GetDynamicFieldsConfig(s, *m, *f, *modelPath, *wordsDir)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -84,9 +89,23 @@ func main() {
 		return
 	}
 
+	if *buildModel != "" {
+		if err := ml.TrainModel(*buildModel); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
 	config, err := scraper.NewConfig(*configFile)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if *extractFeatures != "" {
+		if err := ml.ExtractFeatures(config, *extractFeatures, *wordsDir); err != nil {
+			log.Fatal(err)
+		}
+		return
 	}
 
 	var scraperWg sync.WaitGroup

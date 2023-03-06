@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/PuerkitoBio/goquery"
@@ -50,19 +51,23 @@ func (l locationManager) setColors() {
 	}
 }
 
-func (l locationManager) findFieldNames() error {
-	// find possible field names based on given
-	// ml model
-	ll, err := ml.LoadLabler()
-	if err != nil {
-		return err
-	}
-	for _, e := range l {
-		pred, err := ll.PredictLabel(e.examples...)
+func (l locationManager) findFieldNames(modelName, wordsDir string) error {
+	if modelName != "" {
+		ll, err := ml.LoadLabler(modelName, wordsDir)
 		if err != nil {
 			return err
 		}
-		e.name = pred
+		for _, e := range l {
+			pred, err := ll.PredictLabel(e.examples...)
+			if err != nil {
+				return err
+			}
+			e.name = pred
+		}
+	} else {
+		for i, e := range l {
+			e.name = fmt.Sprintf("field-%d", i)
+		}
 	}
 	return nil
 }
@@ -185,6 +190,8 @@ outer:
 		fieldType := "text"
 		var d scraper.Field
 		if strings.HasPrefix(e.name, "date-component") {
+			t := time.Now()
+			zone, _ := t.Zone()
 			d = scraper.Field{
 				Name: e.name,
 				Type: "date",
@@ -199,6 +206,7 @@ outer:
 						},
 					},
 				},
+				DateLocation: zone,
 			}
 		} else {
 			if e.loc.Attr == "href" {
@@ -378,7 +386,7 @@ func escapeNumber(s string) string {
 	return e
 }
 
-func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool) error {
+func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool, modelName, wordsDir string) error {
 	if s.URL == "" {
 		return errors.New("URL field cannot be empty")
 	}
@@ -511,7 +519,7 @@ parse:
 
 	locMan = filter(locMan, minOcc, removeStaticFields)
 	locMan.setColors()
-	if err := locMan.findFieldNames(); err != nil {
+	if err := locMan.findFieldNames(modelName, wordsDir); err != nil {
 		return err
 	}
 

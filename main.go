@@ -44,6 +44,7 @@ func main() {
 	extractFeatures := flag.String("e", "", "Extract ML features based on the given configuration file (-c) and write them to the given file in csv format.")
 	wordsDir := flag.String("w", "word-lists", "The directory that contains a number of files containing words of different languages. This is needed for the ML part (use with -e or -b).")
 	buildModel := flag.String("t", "", "Train a ML model based on the given csv features file. This will generate 2 files, goskyr.model and goskyr.class")
+	modelPath := flag.String("model", "", "Use a pre-trained ML model to infer names of extracted fields. Works in combination with the -g flag.")
 
 	flag.Parse()
 
@@ -57,7 +58,7 @@ func main() {
 		if *d {
 			s.RenderJs = true
 		}
-		err := automate.GetDynamicFieldsConfig(s, *m, *f)
+		err := automate.GetDynamicFieldsConfig(s, *m, *f, *modelPath, *wordsDir)
 		if err != nil {
 			log.Fatal(err)
 		}

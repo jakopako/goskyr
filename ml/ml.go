@@ -16,11 +16,6 @@ import (
 	"github.com/sjwhitworth/golearn/knn"
 )
 
-const (
-	modelFilename   = "goskyr.model"
-	classesFileName = "goskyr.class"
-)
-
 //////////////////////
 // Feature Extraction
 //////////////////////
@@ -50,20 +45,6 @@ var FeatureList []string = []string{
 	"whitespace-count",
 	"class",
 }
-
-// var Classes []string = []string{
-// 	"date-component-time",
-// 	"title",
-// 	"url",
-// 	"date-component-day",
-// 	"date-component-month",
-// 	"comment",
-// 	"date-component-day-month",
-// 	"date-component-day-month-year-time",
-// 	"date-component-day-month-year",
-// 	"date-component-year",
-// 	"date-component-day-month-time",
-// 	"date-component-month-year"}
 
 // ExtractFeatures extracts features based on a given configuration and a directory
 // containing words of different languages. Those features can then be used to train
@@ -233,6 +214,8 @@ func TrainModel(filename string) error {
 		return err
 	}
 	fmt.Println(evaluation.GetSummary(confusionMat))
+	modelFilename := "goskyr.model"
+	classesFileName := "goskyr.class"
 	log.Printf("storing model to files %s and %s\n", modelFilename, classesFileName)
 	if err := cls.Save(modelFilename); err != nil { // no idea why cls.Save prints this line 'writer: ...'
 		return err
@@ -259,18 +242,20 @@ type Labler struct {
 	classAttr *base.CategoricalAttribute
 }
 
-func LoadLabler() (*Labler, error) {
-	w, err := loadWords("word-lists")
+func LoadLabler(modelName, wordListsDir string) (*Labler, error) {
+	w, err := loadWords(wordListsDir)
 	if err != nil {
 		return nil, err
 	}
 	cls := knn.NewKnnClassifier("euclidean", "linear", 2)
-	if err := cls.Load(modelFilename); err != nil {
+	modelFname := fmt.Sprintf("%s.model", modelName)
+	if err := cls.Load(modelFname); err != nil {
 		return nil, err
 	}
 	classAttr := new(base.CategoricalAttribute)
 	classAttr.SetName("class")
-	file, err := os.Open(classesFileName)
+	classFname := fmt.Sprintf("%s.class", modelName)
+	file, err := os.Open(classFname)
 	if err != nil {
 		return nil, err
 	}

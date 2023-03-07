@@ -10,7 +10,7 @@ writer:
   # uri: "http://localhost:5000/api/events"
   # user: "croncert"
   # password: "croncert"
-  filepath: "/home/dhondt/repos/goskyr/test-file.json"
+  filepath: "test-file.json"
 
 # Scraper configs are grouped by city and cities are sorted alphabetically.
 scrapers:

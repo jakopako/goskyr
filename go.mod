@@ -21,13 +21,13 @@ require (
 	github.com/gonum/blas v0.0.0-20181208220705-f22b278b28ac // indirect
 	github.com/gonum/lapack v0.0.0-20181123203213-e4cdc5a0bff9 // indirect
 	github.com/gonum/matrix v0.0.0-20181209220409-c518dec07be9 // indirect
-	github.com/google/go-cmp v0.4.0 // indirect
+	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/guptarohit/asciigraph v0.5.1 // indirect
 	github.com/olekukonko/tablewriter v0.0.4 // indirect
 	github.com/rocketlaunchr/dataframe-go v0.0.0-20201007021539-67b046771f0b // indirect
-	golang.org/x/exp v0.0.0-20200331195152-e8c3332aa8e5 // indirect
-	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
-	gonum.org/v1/gonum v0.8.1 // indirect
+	golang.org/x/exp v0.0.0-20230304125523-9ff063c70017 // indirect
+	golang.org/x/sync v0.1.0 // indirect
+	gonum.org/v1/gonum v0.12.0 // indirect
 )
 
 require (
@@ -47,6 +47,6 @@ require (
 	github.com/rivo/uniseg v0.4.3 // indirect
 	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/term v0.5.0 // indirect
-	golang.org/x/text v0.7.0 // indirect
+	golang.org/x/text v0.8.0 // indirect
 	olympos.io/encoding/edn v0.0.0-20201019073823-d3554ca0b0a3 // indirect
 )

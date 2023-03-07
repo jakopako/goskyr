@@ -410,13 +410,9 @@ func getDate(f *Field, s *goquery.Selection) (time.Time, error) {
 				}
 			}
 			if sp != "" {
-				var lp []string
-				for _, l := range c.Layout {
-					lp = append(lp, strings.Replace(l, "p.m.", "pm", 1))
-				}
 				dateParts = append(dateParts, datePart{
-					stringPart:  strings.Replace(sp, "p.m.", "pm", 1),
-					layoutParts: lp,
+					stringPart:  sp,
+					layoutParts: c.Layout,
 				})
 				combinedParts = mergeDateParts(combinedParts, c.Covers)
 			}
@@ -453,8 +449,6 @@ func getDate(f *Field, s *goquery.Selection) (time.Time, error) {
 		}
 		dateTimeString += dp.stringPart + " "
 	}
-	dateTimeString = strings.Replace(dateTimeString, "Mrz", "Mär", 1)  // hack for issue #47
-	dateTimeString = strings.Replace(dateTimeString, "Fév", "févr", 1) // hack for issue #172
 	for _, dateTimeLayout := range dateTimeLayouts {
 		t, err = monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
 		if err == nil {

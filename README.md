@@ -7,7 +7,9 @@
 
 1. [Quick Start](#quick-start)
 1. [Installation](#installation)
+1. [Semi-Automatic Configuration](#semi-automatic-configuration)
 1. [Manual Configuration & Usage](#manual-configuration--usage)
+1. [Build ML Model for Improved Auto-Config](#build-ml-model-for-improved-auto-config)
 1. [Related Projects](#related-projects)
 1. [Build & Release](#build--release)
 1. [Naming](#naming)
@@ -64,6 +66,21 @@ go install github.com/jakopako/goskyr@latest
 
 Or clone the repository and then run with `go run main.go ...` or build it yourself.
 
+## Semi-Automatic Configuration
+
+As shown under [Quick Start](#quick-start) goskyr can be used to automatically extract a configuration for a given url. A number of different options are available.
+
+- `-g`: Pass the url you want to extract data from to this flag.
+- `-f`: Only show fields that have varying values across the list of items.
+- `-m`: The minimum number of items on a page. This is needed to filter out noise. The default is 20.
+- `-d`: Render JS before starting to extract the configuration.
+- `-model`: This option is new since `v0.4.0`. You can pass a reference to a ML model that suggests names for the extracted fields. Note that the model currently consists of two files that have to be named exactly the same except for the ending. The string that you have to pass to the `-model` flag has to be the filename without the ending. Check out the section on [building a ML model](#build-ml-model-for-improved-auto-config).
+- `-w`: Works in combination with `-model`. This flag is used to pass a the name of a directory that contains a bunch of text files with dictionary words. This is needed for feature extraction for the ML stuff. This repository contains an example of such a directory, `word-lists`, although the lists are pretty limited. Default is `word-lists`.
+
+Note that when using machine learning, the auto configuration is capable of determining what fields could be a date and what date components they contain. The only thing that is currently still missing is the date format for proper parsing when later scraping based on the generated configuration. This has to be done manually for now.
+
+Also note that the machine learning feature is rather new and might not always work well.
+
 ## Manual Configuration & Usage
 
 Despite the option to automatically generate a configuration file for goskyr there are a lot more options that can be configured manually.
@@ -72,7 +89,7 @@ A very simple configuration would look something like this:
 
 ```yml
 scrapers:
-  - name: LifeQuotes # The name is only for logging and scraper selection (with -single) and does not appear in the json output.
+  - name: LifeQuotes # The name is only for logging and scraper selection (with -s) and does not appear in the json output.
     url: "https://www.goodreads.com/quotes/tag/life"
     item: ".quote"
     fields:
@@ -177,7 +194,7 @@ The result should look something like this:
 ]
 ```
 
-Basically, a config file contains a list of scrapers that each may have static and / or dynamic fields. Additionally, items can be filtered based on regular expressions and pagination is also supported. The resulting array of items is return to stdout as json string. TODO: support writing other outputs, e.g. mongodb.
+Basically, a config file contains a list of scrapers that each may have static and / or dynamic fields. Additionally, items can be filtered based on regular expressions and pagination is also supported. The resulting array of items is written to stdout or a file, as json string.
 
 ### Static fields
 
@@ -345,7 +362,7 @@ A dynamic field has a field type that can either be `text`, `url` or `date`. The
 
 ### JS Rendering
 
-Since version 0.3.0 basic (probably unstable) js rendering is supported. For this to work the `google-chrome` binary needs to be installed. In the configuration snippet of a scraper just add `renderJs: true` and everything will be taken care of. For now goskyr just tells chrome to fetch the page, render it, wait 5 seconds and return the rendered dom which will then be used to extract the desired data. User interactions with the page (eg scrolling) might be implemented in the future.
+Since version 0.3.0 js rendering is supported. For this to work the `google-chrome` binary needs to be installed. In the configuration snippet of a scraper just add `renderJs: true` and everything will be taken care of. For now goskyr just tells chrome to fetch the page, render it, wait 5 seconds and return the rendered dom which will then be used to extract the desired data. User interactions with the page (eg scrolling) might be implemented in the future.
 
 ### Filters
 
@@ -383,6 +400,37 @@ paginator:
     attr: <string>
   max_pages: <number>
 ```
+
+### Output
+
+Currently, the scraped data can either be written to stdout or to a file. If you don't explicitely configure the output in the configuration file the data is written to stdout. Otherwise you have to add the following snippet to your configuration file.
+
+```yaml
+writer:
+  type: file
+  filepath: test-file.json
+```
+
+
+## Build ML Model for Improved Auto-Config
+
+In order for the auto configuration feature to find suitable names for the extracted fields, since `v0.4.0` machine learning can be used. Goskyr allows you to extract a fixed set of features based on an existing goskyr configuration. Basically, goskyr scrapes all the websites you configured, extracts the raw text values based on the configured fields per site and then calculates the features for each extracted value, labeling the resulting vector with the field name you defined in the configuration. Currently, all features are based on the extracted text only, ie not on the location within the website. Checkout the `Features` struct in the `ml/ml.go` file if you want to know what exactly those features are. Extraction command:
+
+```bash
+goskyr -e features.csv -w word-lists -c some-goskyr-config.yml
+```
+
+Note that `-w` and `-c` are optional. The respective defaults are `word-lists` and `config.yml`. The resulting csv file can optionally be edited (eg if you want to remove or replace some labels) and consequently be used to build a ML model, like so:
+
+```bash
+goskyr -t features.csv
+```
+
+Currently, a KNN classifier is used. The output of the above command shows the result of the training. Additionally, two files are generated, `goskyr.model` and `goskyr.class`. Both together define the model that can be used for labeling fields during auto configuration, see [Semi-Automatic Configuration](#semi-automatic-configuration).
+
+Note that the classification will probably get better the more data you have to extract your features from. Also there might very well be cases where even a huge number of training data doesn't improve the classification results. This entire ML feature is rather experimental for now and time will tell how well it works and what needs to be improved or changed.
+
+A real life example can be found in the [jakopako/croncert-config](https://github.com/jakopako/croncert-config) repository.
 
 ## Related Projects
 

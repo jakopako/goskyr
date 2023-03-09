@@ -259,7 +259,7 @@ func update(l locationManager, e scraper.ElementLocation, s string) locationMana
 	for _, lp := range l {
 		if checkAndUpdatePath(&lp.loc, &e) {
 			lp.count++
-			if lp.count <= 4 {
+			if lp.count <= 8 {
 				lp.examples = append(lp.examples, s)
 			}
 			return l

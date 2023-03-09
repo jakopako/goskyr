@@ -277,24 +277,13 @@ func (ll *Labler) PredictLabel(fValue ...string) (string, error) {
 	features := []*Features{}
 	for _, v := range fValue {
 		f := calculateFeatures("", v, ll.wordMap)
-		// f.class = "title"
 		features = append(features, &f)
 	}
-	// https://github.com/sjwhitworth/golearn/blob/master/examples/instances/instances.go
 	attrs := make([]base.Attribute, len(FeatureList))
 	for i := 0; i < len(attrs)-1; i++ {
 		attrs[i] = base.NewFloatAttribute(FeatureList[i])
 	}
 	attrs[len(attrs)-1] = ll.classAttr
-	// attrs[len(attrs)-1] = new(base.CategoricalAttribute)
-	// catAttr, err := os.ReadFile("croncert.class.json")
-	// fmt.Println(err)
-	// err = attrs[len(attrs)-1].UnmarshalJSON(catAttr)
-	// fmt.Println(err)
-	// attrs[len(attrs)-1].SetName(FeatureList[len(attrs)-1])
-	// for _, cl := range Classes {
-	// 	attrs[len(attrs)-1].GetSysValFromString(cl)
-	// }
 
 	predictions := []string{}
 	for _, f := range features {
@@ -304,8 +293,6 @@ func (ll *Labler) PredictLabel(fValue ...string) (string, error) {
 			newSpecs[i] = newInst.AddAttribute(a)
 		}
 		newInst.Extend(1)
-
-		// fmt.Println(newInst.AllAttributes())
 
 		newInst.AddClassAttribute(newInst.AllAttributes()[len(attrs)-1])
 
@@ -317,18 +304,14 @@ func (ll *Labler) PredictLabel(fValue ...string) (string, error) {
 		newInst.Set(newSpecs[5], 0, newSpecs[5].GetAttribute().GetSysValFromString(fmt.Sprint(f.dashCount)))
 		newInst.Set(newSpecs[6], 0, newSpecs[6].GetAttribute().GetSysValFromString(fmt.Sprint(f.dotCount)))
 		newInst.Set(newSpecs[7], 0, newSpecs[7].GetAttribute().GetSysValFromString(fmt.Sprint(f.whitespaceCount)))
-		// fmt.Println(newInst)
 		pred, err := ll.cls.Predict(newInst)
 		if err != nil {
 			return "", err
 		}
 		predictions = append(predictions, pred.RowString(0))
 	}
-	// fmt.Println(predictions)
 	pred := mostOccPred(predictions)
-	// fmt.Println(pred)
 	return pred, nil
-	// return "title"
 }
 
 func mostOccPred(predictions []string) string {

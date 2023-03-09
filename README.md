@@ -19,6 +19,8 @@ This could be a list of books from an online book store, a list of plays in a pu
 
 Since version 0.3.0 basic **js rendering** is supported. Next to [manually configuring](#manual-configuration--usage) the scraper there is a new option of (semi-)automatically generating a configuration file, see [quick start](#quick-start).
 
+Since version 0.4.0 **machine learning** can be leveraged to predict field names more or less accurately. For more details check out the sections [Semi-Automatic Configuration](#semi-automatic-configuration) and [Build ML Model for Improved Auto-Config](#build-ml-model-for-improved-auto-config).
+
 Note that there are already similar projects that might do a better job in certain cases or are more generic tools. However, on the one hand this is a personal project to make myself familiar with webscraping and Go and on the other hand goskyr supports certain features that I haven't found in any other projects. For instance, the way dates can be extracted from websites and the notion of scraping information from subpages defined by previously at runtime extracted urls.
 
 Similar projects:

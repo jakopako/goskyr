@@ -12,6 +12,7 @@
 1. [Build ML Model for Improved Auto-Config](#build-ml-model-for-improved-auto-config)
 1. [Related Projects](#related-projects)
 1. [Build & Release](#build--release)
+1. [Contributing](#contributing)
 1. [Naming](#naming)
 
 This project's goal is to make it easier to **scrape structured data** from web pages.
@@ -473,6 +474,10 @@ To build and release a new version of goskyr [Goreleaser](https://goreleaser.com
   ```bash
   make release
   ```
+
+## Contributing
+
+Feel free to contribute in any way you want! Help is always welcome.
 
 ## Naming
 

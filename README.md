@@ -18,7 +18,7 @@
 This project's goal is to make it easier to **scrape structured data** from web pages.
 This could be a list of books from an online book store, a list of plays in a public theater, a list of newspaper articles, etc. Currently, the biggest use-case that I know of is [croncert](https://github.com/jakopako/croncert-config) which is also the main motivation behind this project.
 
-Since version 0.3.0 basic **js rendering** is supported. Next to [manually configuring](#manual-configuration--usage) the scraper there is a new option of (semi-)automatically generating a configuration file, see [quick start](#quick-start).
+Since version 0.3.0 basic **js rendering** is supported. Additionally, next to [manually configuring](#manual-configuration--usage) the scraper there is an option of (semi-)automatically generating a configuration file, see [quick start](#quick-start) and [Semi-Automatic Configuration](#semi-automatic-configuration).
 
 Since version 0.4.0 **machine learning** can be leveraged to predict field names more or less accurately. For more details check out the sections [Semi-Automatic Configuration](#semi-automatic-configuration) and [Build ML Model for Improved Auto-Config](#build-ml-model-for-improved-auto-config).
 

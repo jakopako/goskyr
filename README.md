@@ -219,9 +219,28 @@ fields:
 
 **Key: `location`**
 
+There are two options on how to use the `location` key. Either you define a bunch of subkeys directly under `location` or you define a list of items each containing those subkeys. The latter is useful if you want the value of a field to be juxtaposition of multiple nodes in the html tree. The `separator` key will be used to join the strings. A very simple (imaginary) example could look something like this.
+
+```yaml
+fields:
+  - name: artist
+    location:
+      - selector: div.artist
+      - selector: div.country
+    separator: ", "
+```
+
+The result may look like this.
+
+```json
+[...
+{"artist": "Jacob Collier, UK"},
+...]
+```
+
 *Subkey: `regex_extract`*
 
-However, it might be a bit more complex to extract the desired information. Take for instance the concert scraper configuration shown above, more specifically the config snippet for the `title` field.
+It might be a bit more complex to extract the desired information. Take for instance the concert scraper configuration for "Kaufleuten", shown above, more specifically the config snippet for the `title` field.
 
 ```yml
 fields:
@@ -301,6 +320,39 @@ Here, the selector is not enough to extract the desired string and we can't go f
 *Subkey: `entire_subtree`*
 
 This subkey, if set to `true` causes goskyr to grab all text elements under the element defined in the location's selector. It is useful when the target location contains inline tags, eg. `This is some text with a <strong>strong</strong> part.`
+
+*Subkey: `all_nodes`*
+
+This subkey, if set to `true` joins together all strings having the given selector. The subkey `separator` will be used as separator string. If not defined the separator is an empty string. Example:
+
+```html
+<div class="header">
+  <h3 class="artist"><span class="name">Anja Schneider</span><span class="artist-info"></h3>
+  <h3 class="artist"><span class="name">Steve Bug</span><span class="artist-info"></h3>
+  <h3 class="artist"><span class="name">Dirty Flav</span><span class="artist-info">&nbsp;(WAD, D! Club - CH)</h3>
+</div>
+```
+
+Config:
+
+```yaml
+fields:
+  - name: title
+    location:
+      selector: .artist .name
+      all_nodes: true
+      separator: ", "
+```
+
+Resulting json:
+
+```json
+[...
+{"title": "Anja Schneider, Steve Bug, Dirty Flav"},
+...]
+```
+
+
 
 To get an even better feeling for the location configuration check out the numerous examples in the `concerts-config.yml` file.
 

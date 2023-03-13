@@ -58,8 +58,8 @@ type ElementLocation struct {
 	Attr          string      `yaml:"attr,omitempty"`
 	MaxLength     int         `yaml:"max_length,omitempty"`
 	EntireSubtree bool        `yaml:"entire_subtree,omitempty"`
-	AllNodes      bool        `yaml:"all_nodes"`
-	Separator     string      `yaml:"separator"`
+	AllNodes      bool        `yaml:"all_nodes,omitempty"`
+	Separator     string      `yaml:"separator,omitempty"`
 }
 
 // CoveredDateParts is used to determine what parts of a date a
@@ -92,55 +92,22 @@ type DateComponent struct {
 // a dynamic field from a website, ie a field who's value changes
 // for each item
 type Field struct {
-	Name  string `yaml:"name"`
-	Value string `yaml:"value,omitempty"`
-	Type  string `yaml:"type,omitempty"` // can currently be text, url or date
+	Name             string           `yaml:"name"`
+	Value            string           `yaml:"value,omitempty"`
+	Type             string           `yaml:"type,omitempty"`     // can currently be text, url or date
+	ElementLocations ElementLocations `yaml:"location,omitempty"` // elements are string joined using the given Separator
+	Separator        string           `yaml:"separator,omitempty"`
 	// If a field can be found on a subpage the following variable has to contain a field name of
 	// a field of type 'url' that is located on the main page.
-	// ElementLocation  ElementLocation  `yaml:"location,omitempty"`
-	ElementLocations ElementLocations `yaml:"location,omitempty"` // elements are string joined using the given Separator
-	Separator        string           `yaml:"separator"`
-	OnSubpage        string           `yaml:"on_subpage,omitempty"`    // applies to text, url, date
-	CanBeEmpty       bool             `yaml:"can_be_empty,omitempty"`  // applies to text, url
-	Components       []DateComponent  `yaml:"components,omitempty"`    // applies to date
-	DateLocation     string           `yaml:"date_location,omitempty"` // applies to date
-	DateLanguage     string           `yaml:"date_language,omitempty"` // applies to date
-	Hide             bool             `yaml:"hide,omitempty"`          // appliess to text, url, date
+	OnSubpage    string          `yaml:"on_subpage,omitempty"`    // applies to text, url, date
+	CanBeEmpty   bool            `yaml:"can_be_empty,omitempty"`  // applies to text, url
+	Components   []DateComponent `yaml:"components,omitempty"`    // applies to date
+	DateLocation string          `yaml:"date_location,omitempty"` // applies to date
+	DateLanguage string          `yaml:"date_language,omitempty"` // applies to date
+	Hide         bool            `yaml:"hide,omitempty"`          // appliess to text, url, date
 }
 
 type ElementLocations []ElementLocation
-
-// func (c *Field) UnmarshalYAML(unmarshal func(interface{}) error) error {
-// 	mstr := make(map[string]ElementLocation)
-// 	if err := unmarshal(&mstr); err == nil {
-// 		if el, ok := mstr["locations"]; ok {
-// 			c.ElementLocations = []ElementLocation{el}
-// 			// return nil
-// 		}
-
-// 		// return errors.New("no value for field 'locations'")
-// 		return nil
-// 	}
-
-// 	miface := make(map[interface{}]interface{})
-// 	if err := unmarshal(&miface); err == nil {
-// 		ell := make([]ElementLocation, 0)
-// 		if val, ok := miface["locations"]; ok {
-// 			for _, v := range val.([]interface{}) {
-// 				if el, ok := v.(ElementLocation); ok {
-// 					ell = append(ell, el)
-// 				}
-// 			}
-
-// 			c.ElementLocations = ell
-// 			// return nil
-// 		}
-// 		return nil
-// 		// return errors.New("no value for field 'locations'")
-// 	}
-
-// 	return errors.New("invalid value for field 'locations'")
-// }
 
 func (e *ElementLocations) UnmarshalYAML(value *yaml.Node) error {
 	var multi []ElementLocation
@@ -402,15 +369,6 @@ func extractRawField(field *Field, event map[string]interface{}, s *goquery.Sele
 			return fmt.Errorf("field %s cannot be empty", field.Name)
 		}
 		event[field.Name] = t
-
-		// ts, err := getTextString(&field.ElementLocation, s)
-		// if err != nil {
-		// 	return err
-		// }
-		// if !field.CanBeEmpty && ts == "" {
-		// 	return fmt.Errorf("field %s cannot be empty", field.Name)
-		// }
-		// event[field.Name] = ts
 	case "url":
 		if len(field.ElementLocations) != 1 {
 			return fmt.Errorf("a field of type 'url' must exactly have one location")
@@ -627,7 +585,6 @@ func getURLString(e *ElementLocation, s *goquery.Selection, baseURL string) stri
 func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 	var fieldStrings []string
 	var fieldSelection *goquery.Selection
-	var err error
 	if t.Selector == "" {
 		fieldSelection = s
 	} else {
@@ -678,17 +635,11 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 				}
 				for _, fieldNode := range fieldNodes {
 					currentChildIndex := 0
-					var fieldString string
 					for fieldNode != nil {
 						if currentChildIndex == t.ChildIndex {
 							if fieldNode.Type == html.TextNode {
-								fieldString, err = extractStringRegex(&t.RegexExtract, fieldNode.Data)
-								if err != nil {
-									return "", err
-								} else {
-									fieldStrings = append(fieldStrings, fieldString)
-									break
-								}
+								fieldStrings = append(fieldStrings, fieldNode.Data)
+								break
 							}
 						}
 						fieldNode = fieldNode.NextSibling

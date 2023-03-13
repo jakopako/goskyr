@@ -213,9 +213,9 @@ outer:
 				fieldType = "url"
 			}
 			d = scraper.Field{
-				Name:            e.name,
-				Type:            fieldType,
-				ElementLocation: e.loc,
+				Name:             e.name,
+				Type:             fieldType,
+				ElementLocations: []scraper.ElementLocation{e.loc},
 			}
 		}
 		s.Fields = append(s.Fields, d)

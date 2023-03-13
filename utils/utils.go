@@ -6,8 +6,8 @@ import (
 )
 
 func ShortenString(s string, l int) string {
-	if len(s) > l {
-		return fmt.Sprintf("%s...", s[:l-3])
+	if len(s) > l && l != 0 {
+		return fmt.Sprintf("%s...", s[:l])
 	}
 	return s
 }

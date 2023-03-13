@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -19,7 +18,7 @@ import (
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/utils"
 	"golang.org/x/net/html"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // GlobalConfig is used for storing global configuration parameters that
@@ -39,22 +38,8 @@ type Config struct {
 
 func NewConfig(configPath string) (*Config, error) {
 	var config Config
-
 	err := cleanenv.ReadConfig(configPath, &config)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	file, err := os.Open(configPath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	d := yaml.NewDecoder(file)
-	if err := d.Decode(&config); err != nil {
-		return nil, err
-	}
-	return &config, nil
+	return &config, err
 }
 
 // RegexConfig is used for extracting a substring from a string based on the
@@ -73,6 +58,8 @@ type ElementLocation struct {
 	Attr          string      `yaml:"attr,omitempty"`
 	MaxLength     int         `yaml:"max_length,omitempty"`
 	EntireSubtree bool        `yaml:"entire_subtree,omitempty"`
+	AllNodes      bool        `yaml:"all_nodes"`
+	Separator     string      `yaml:"separator"`
 }
 
 // CoveredDateParts is used to determine what parts of a date a
@@ -110,14 +97,69 @@ type Field struct {
 	Type  string `yaml:"type,omitempty"` // can currently be text, url or date
 	// If a field can be found on a subpage the following variable has to contain a field name of
 	// a field of type 'url' that is located on the main page.
-	ElementLocation ElementLocation `yaml:"location,omitempty"`
-	OnSubpage       string          `yaml:"on_subpage,omitempty"`    // applies to text, url, date
-	CanBeEmpty      bool            `yaml:"can_be_empty,omitempty"`  // applies to text, url
-	Components      []DateComponent `yaml:"components,omitempty"`    // applies to date
-	DateLocation    string          `yaml:"date_location,omitempty"` // applies to date
-	DateLanguage    string          `yaml:"date_language,omitempty"` // applies to date
-	Hide            bool            `yaml:"hide,omitempty"`          // appliess to text, url, date
+	// ElementLocation  ElementLocation  `yaml:"location,omitempty"`
+	ElementLocations ElementLocations `yaml:"location,omitempty"` // elements are string joined using the given Separator
+	Separator        string           `yaml:"separator"`
+	OnSubpage        string           `yaml:"on_subpage,omitempty"`    // applies to text, url, date
+	CanBeEmpty       bool             `yaml:"can_be_empty,omitempty"`  // applies to text, url
+	Components       []DateComponent  `yaml:"components,omitempty"`    // applies to date
+	DateLocation     string           `yaml:"date_location,omitempty"` // applies to date
+	DateLanguage     string           `yaml:"date_language,omitempty"` // applies to date
+	Hide             bool             `yaml:"hide,omitempty"`          // appliess to text, url, date
 }
+
+type ElementLocations []ElementLocation
+
+// func (c *Field) UnmarshalYAML(unmarshal func(interface{}) error) error {
+// 	mstr := make(map[string]ElementLocation)
+// 	if err := unmarshal(&mstr); err == nil {
+// 		if el, ok := mstr["locations"]; ok {
+// 			c.ElementLocations = []ElementLocation{el}
+// 			// return nil
+// 		}
+
+// 		// return errors.New("no value for field 'locations'")
+// 		return nil
+// 	}
+
+// 	miface := make(map[interface{}]interface{})
+// 	if err := unmarshal(&miface); err == nil {
+// 		ell := make([]ElementLocation, 0)
+// 		if val, ok := miface["locations"]; ok {
+// 			for _, v := range val.([]interface{}) {
+// 				if el, ok := v.(ElementLocation); ok {
+// 					ell = append(ell, el)
+// 				}
+// 			}
+
+// 			c.ElementLocations = ell
+// 			// return nil
+// 		}
+// 		return nil
+// 		// return errors.New("no value for field 'locations'")
+// 	}
+
+// 	return errors.New("invalid value for field 'locations'")
+// }
+
+func (e *ElementLocations) UnmarshalYAML(value *yaml.Node) error {
+	var multi []ElementLocation
+	err := value.Decode(&multi)
+	if err != nil {
+		var single ElementLocation
+		err := value.Decode(&single)
+		if err != nil {
+			return err
+		}
+		*e = []ElementLocation{single}
+	} else {
+		*e = multi
+	}
+	return nil
+}
+
+// also have a marshal func for the config generation? so that if the ElementLocations list
+// is of length one we output the value in the yaml as ElementLocation and not list of ElementLocations
 
 // A Filter is used to filter certain items from the result list
 type Filter struct {
@@ -306,16 +348,26 @@ func (c *Scraper) removeHiddenFields(item map[string]interface{}) map[string]int
 func extractField(field *Field, event map[string]interface{}, s *goquery.Selection, baseURL string) error {
 	switch field.Type {
 	case "text", "": // the default, ie when type is not configured, is 'text'
-		ts, err := getTextString(&field.ElementLocation, s)
-		if err != nil {
-			return err
+		parts := []string{}
+		for _, p := range field.ElementLocations {
+			ts, err := getTextString(&p, s)
+			if err != nil {
+				return err
+			}
+			if ts != "" {
+				parts = append(parts, ts)
+			}
 		}
-		if !field.CanBeEmpty && ts == "" {
+		t := strings.Join(parts, field.Separator)
+		if !field.CanBeEmpty && t == "" {
 			return fmt.Errorf("field %s cannot be empty", field.Name)
 		}
-		event[field.Name] = ts
+		event[field.Name] = t
 	case "url":
-		url := getURLString(&field.ElementLocation, s, baseURL)
+		if len(field.ElementLocations) != 1 {
+			return fmt.Errorf("a field of type 'url' must exactly have one location")
+		}
+		url := getURLString(&field.ElementLocations[0], s, baseURL)
 		if url == "" {
 			url = baseURL
 		}
@@ -335,22 +387,41 @@ func extractField(field *Field, event map[string]interface{}, s *goquery.Selecti
 func extractRawField(field *Field, event map[string]interface{}, s *goquery.Selection, baseURL string) error {
 	switch field.Type {
 	case "text", "":
-		ts, err := getTextString(&field.ElementLocation, s)
-		if err != nil {
-			return err
+		parts := []string{}
+		for _, p := range field.ElementLocations {
+			ts, err := getTextString(&p, s)
+			if err != nil {
+				return err
+			}
+			if ts != "" {
+				parts = append(parts, ts)
+			}
 		}
-		if !field.CanBeEmpty && ts == "" {
+		t := strings.Join(parts, field.Separator)
+		if !field.CanBeEmpty && t == "" {
 			return fmt.Errorf("field %s cannot be empty", field.Name)
 		}
-		event[field.Name] = ts
+		event[field.Name] = t
+
+		// ts, err := getTextString(&field.ElementLocation, s)
+		// if err != nil {
+		// 	return err
+		// }
+		// if !field.CanBeEmpty && ts == "" {
+		// 	return fmt.Errorf("field %s cannot be empty", field.Name)
+		// }
+		// event[field.Name] = ts
 	case "url":
-		if field.ElementLocation.Attr == "" {
+		if len(field.ElementLocations) != 1 {
+			return fmt.Errorf("a field of type 'url' must exactly have one location")
+		}
+		if field.ElementLocations[0].Attr == "" {
 			// normally we'd set the default in getUrlString
 			// but we're not using this function for the raw extraction
 			// because we don't want the url to be auto expanded
-			field.ElementLocation.Attr = "href"
+			field.ElementLocations[0].Attr = "href"
 		}
-		ts, err := getTextString(&field.ElementLocation, s)
+		ts, err := getTextString(&field.ElementLocations[0], s)
 		if err != nil {
 			return err
 		}
@@ -554,7 +625,7 @@ func getURLString(e *ElementLocation, s *goquery.Selection, baseURL string) stri
 }
 
 func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
-	var fieldString string
+	var fieldStrings []string
 	var fieldSelection *goquery.Selection
 	var err error
 	if t.Selector == "" {
@@ -579,55 +650,76 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 						}
 					}
 				}
-				f(fieldSelection.Get(t.NodeIndex))
-				fieldString = buf.String()
+				if t.AllNodes {
+					for _, node := range fieldSelection.Nodes {
+						f(node)
+						fieldStrings = append(fieldStrings, buf.String())
+						buf.Reset()
+					}
+				} else {
+					f(fieldSelection.Get(t.NodeIndex))
+					fieldStrings = append(fieldStrings, buf.String())
+				}
 			} else {
-				fieldNode := fieldSelection.Get(t.NodeIndex).FirstChild
-				currentChildIndex := 0
-				for fieldNode != nil {
-					// for the case where we want to find the correct string
-					// by regex (checking all the children and taking the first one that matches the regex)
-					// the ChildIndex has to be set to -1 to
-					// distinguish from the default case 0. So when we explicitly set ChildIndex to -1 it means
-					// check _all_ of the children.
-					if currentChildIndex == t.ChildIndex || t.ChildIndex == -1 {
-						if fieldNode.Type == html.TextNode {
-							fieldString, err = extractStringRegex(&t.RegexExtract, fieldNode.Data)
-							if err == nil {
-								fieldString = strings.TrimSpace(fieldString)
-								if t.MaxLength > 0 {
-									fieldString = utils.ShortenString(fieldString, t.MaxLength)
-								}
-								return fieldString, nil
-							} else if t.ChildIndex != -1 {
-								// only in case we do not (ab)use the regex to search across all children
-								// we want to return the err. Also, we still return the fieldString as
-								// this might be useful for narrowing down the reason for the error.
-								return fieldString, err
-							}
+
+				var fieldNodes []*html.Node
+				if t.AllNodes {
+					for _, node := range fieldSelection.Nodes {
+						fieldNode := node.FirstChild
+						if fieldNode != nil {
+							fieldNodes = append(fieldNodes, fieldNode)
 						}
 					}
-					fieldNode = fieldNode.NextSibling
-					currentChildIndex++
+				} else {
+					fieldNode := fieldSelection.Get(t.NodeIndex).FirstChild
+					if fieldNode != nil {
+						fieldNodes = append(fieldNodes, fieldNode)
+					}
+				}
+				for _, fieldNode := range fieldNodes {
+					currentChildIndex := 0
+					var fieldString string
+					for fieldNode != nil {
+						if currentChildIndex == t.ChildIndex {
+							if fieldNode.Type == html.TextNode {
+								fieldString, err = extractStringRegex(&t.RegexExtract, fieldNode.Data)
+								if err != nil {
+									return "", err
+								} else {
+									fieldStrings = append(fieldStrings, fieldString)
+									break
+								}
+							}
+						}
+						fieldNode = fieldNode.NextSibling
+						currentChildIndex++
+					}
 				}
 			}
 		} else {
 			// WRONG
 			// It could be the case that there are multiple nodes that match the selector
 			// and we don't want the attr of the first node...
-			fieldString = fieldSelection.AttrOr(t.Attr, "")
+			fieldStrings = append(fieldStrings, fieldSelection.AttrOr(t.Attr, ""))
 		}
 	}
 	// automatically trimming whitespaces might be confusing in some cases...
-	fieldString = strings.TrimSpace(fieldString)
-	fieldString, err = extractStringRegex(&t.RegexExtract, fieldString)
-	if err != nil {
-		return fieldString, err
+	for i, f := range fieldStrings {
+		fieldStrings[i] = strings.TrimSpace(f)
 	}
-	if t.MaxLength > 0 && t.MaxLength < len(fieldString) {
-		fieldString = fieldString[:t.MaxLength] + "..."
+	// regex extract
+	for i, f := range fieldStrings {
+		fieldString, err := extractStringRegex(&t.RegexExtract, f)
+		if err != nil {
+			return "", err
+		}
+		fieldStrings[i] = fieldString
 	}
-	return fieldString, nil
+	// shortening
+	for i, f := range fieldStrings {
+		fieldStrings[i] = utils.ShortenString(f, t.MaxLength)
+	}
+	return strings.Join(fieldStrings, t.Separator), nil
 }
 
 func extractStringRegex(rc *RegexConfig, s string) (string, error) {

@@ -5,13 +5,12 @@ go 1.19
 require (
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/chromedp/cdproto v0.0.0-20230220211738-2b1ec77315c9
-	github.com/chromedp/chromedp v0.8.8
+	github.com/chromedp/chromedp v0.9.1
 	github.com/gdamore/tcell/v2 v2.6.0
 	github.com/goodsign/monday v1.0.0
 	github.com/ilyakaznacheev/cleanenv v1.4.2
 	github.com/rivo/tview v0.0.0-20220916081518-2e69b7385a37
 	golang.org/x/net v0.8.0
-	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

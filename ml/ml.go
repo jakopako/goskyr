@@ -22,19 +22,20 @@ import (
 
 // Features contains all the relevant features and the class label
 type Features struct {
-	digitCount      int
-	runeCount       int
-	dictWordsCount  int
-	slashCount      int
-	colonCount      int
-	dashCount       int
-	dotCount        int
-	whitespaceCount int
-	class           string
+	letterFrequencies []int
+	digitCount        int
+	runeCount         int
+	dictWordsCount    int
+	slashCount        int
+	colonCount        int
+	dashCount         int
+	dotCount          int
+	whitespaceCount   int
+	class             string
 }
 
-// FeatureList contains a list of strings representing the Features
-var FeatureList []string = []string{
+// NonAlphaFeatureList contains a list of strings representing the Features excluding the letter frequencies
+var NonAlphaFeatureList []string = []string{
 	"digit-count",
 	"rune-count",
 	"dict-words-count",
@@ -107,9 +108,19 @@ func writeFeaturesToFile(filename string, featuresChan <-chan *Features, wg *syn
 	}
 	defer featuresFile.Close()
 	writer := bufio.NewWriter(featuresFile)
-	writer.WriteString(fmt.Sprintf("%s\n", strings.Join(FeatureList, ", ")))
+	alphabet := []string{}
+	for r := 'a'; r <= 'z'; r++ {
+		alphabet = append(alphabet, string(r))
+	}
+	writer.WriteString(fmt.Sprintf("%s, %s\n", strings.Join(alphabet, ", "), strings.Join(NonAlphaFeatureList, ", ")))
 	for f := range featuresChan {
-		writer.WriteString(fmt.Sprintf("%d, %d, %d, %d, %d, %d, %d, %d, %s\n",
+		lfStrings := []string{}
+		for _, lf := range f.letterFrequencies {
+			lfStrings = append(lfStrings, fmt.Sprintf("%d", lf))
+		}
+
+		writer.WriteString(fmt.Sprintf("%s, %d, %d, %d, %d, %d, %d, %d, %d, %s\n",
+			strings.Join(lfStrings, ", "),
 			f.digitCount,
 			f.runeCount,
 			f.dictWordsCount,
@@ -142,16 +153,28 @@ func calculateScraperFeatures(s scraper.Scraper, featuresChan chan<- *Features, 
 
 func calculateFeatures(fName, fValue string, wordMap map[string]bool) Features {
 	return Features{
-		digitCount:      countDigits(fValue),
-		runeCount:       countRunes(fValue),
-		dictWordsCount:  countDictWords(fValue, wordMap),
-		slashCount:      countRune(fValue, []rune("/")[0]),
-		colonCount:      countRune(fValue, []rune(":")[0]),
-		dashCount:       countRune(fValue, []rune("-")[0]),
-		dotCount:        countRune(fValue, []rune(".")[0]),
-		whitespaceCount: countRune(fValue, []rune(" ")[0]),
-		class:           fName,
+		letterFrequencies: countLetterFrequencies(fValue),
+		digitCount:        countDigits(fValue),
+		runeCount:         countRunes(fValue),
+		dictWordsCount:    countDictWords(fValue, wordMap),
+		slashCount:        countRune(fValue, []rune("/")[0]),
+		colonCount:        countRune(fValue, []rune(":")[0]),
+		dashCount:         countRune(fValue, []rune("-")[0]),
+		dotCount:          countRune(fValue, []rune(".")[0]),
+		whitespaceCount:   countRune(fValue, []rune(" ")[0]),
+		class:             fName,
 	}
+}
+
+func countLetterFrequencies(s string) []int {
+	fs := make([]int, 26)
+	for _, r := range s {
+		rl := unicode.ToLower(r)
+		if rl >= 'a' && rl <= 'z' {
+			fs[int(rl)-97]++
+		}
+	}
+	return fs
 }
 
 func countDigits(s string) int {
@@ -274,19 +297,22 @@ func LoadLabler(modelName, wordListsDir string) (*Labler, error) {
 }
 
 func (ll *Labler) PredictLabel(fValue ...string) (string, error) {
-	features := []*Features{}
+	featVectors := []*Features{}
 	for _, v := range fValue {
 		f := calculateFeatures("", v, ll.wordMap)
-		features = append(features, &f)
+		featVectors = append(featVectors, &f)
 	}
-	attrs := make([]base.Attribute, len(FeatureList))
-	for i := 0; i < len(attrs)-1; i++ {
-		attrs[i] = base.NewFloatAttribute(FeatureList[i])
+	attrs := make([]base.Attribute, len(NonAlphaFeatureList)+26)
+	for r := 'a'; r <= 'z'; r++ {
+		attrs[int(r)-97] = base.NewFloatAttribute(string(r))
+	}
+	for i := 26; i < len(attrs)-1; i++ {
+		attrs[i] = base.NewFloatAttribute(NonAlphaFeatureList[i-26])
 	}
 	attrs[len(attrs)-1] = ll.classAttr
 
 	predictions := []string{}
-	for _, f := range features {
+	for _, f := range featVectors {
 		newInst := base.NewDenseInstances()
 		newSpecs := make([]base.AttributeSpec, len(attrs))
 		for i, a := range attrs {
@@ -296,14 +322,17 @@ func (ll *Labler) PredictLabel(fValue ...string) (string, error) {
 
 		newInst.AddClassAttribute(newInst.AllAttributes()[len(attrs)-1])
 
-		newInst.Set(newSpecs[0], 0, newSpecs[0].GetAttribute().GetSysValFromString(fmt.Sprint(f.digitCount)))
-		newInst.Set(newSpecs[1], 0, newSpecs[1].GetAttribute().GetSysValFromString(fmt.Sprint(f.runeCount)))
-		newInst.Set(newSpecs[2], 0, newSpecs[2].GetAttribute().GetSysValFromString(fmt.Sprint(f.dictWordsCount)))
-		newInst.Set(newSpecs[3], 0, newSpecs[3].GetAttribute().GetSysValFromString(fmt.Sprint(f.slashCount)))
-		newInst.Set(newSpecs[4], 0, newSpecs[4].GetAttribute().GetSysValFromString(fmt.Sprint(f.colonCount)))
-		newInst.Set(newSpecs[5], 0, newSpecs[5].GetAttribute().GetSysValFromString(fmt.Sprint(f.dashCount)))
-		newInst.Set(newSpecs[6], 0, newSpecs[6].GetAttribute().GetSysValFromString(fmt.Sprint(f.dotCount)))
-		newInst.Set(newSpecs[7], 0, newSpecs[7].GetAttribute().GetSysValFromString(fmt.Sprint(f.whitespaceCount)))
+		for i := 0; i < 26; i++ {
+			newInst.Set(newSpecs[i], 0, newSpecs[i].GetAttribute().GetSysValFromString(fmt.Sprint(f.letterFrequencies[i])))
+		}
+		newInst.Set(newSpecs[26], 0, newSpecs[26].GetAttribute().GetSysValFromString(fmt.Sprint(f.digitCount)))
+		newInst.Set(newSpecs[27], 0, newSpecs[27].GetAttribute().GetSysValFromString(fmt.Sprint(f.runeCount)))
+		newInst.Set(newSpecs[28], 0, newSpecs[28].GetAttribute().GetSysValFromString(fmt.Sprint(f.dictWordsCount)))
+		newInst.Set(newSpecs[29], 0, newSpecs[29].GetAttribute().GetSysValFromString(fmt.Sprint(f.slashCount)))
+		newInst.Set(newSpecs[30], 0, newSpecs[30].GetAttribute().GetSysValFromString(fmt.Sprint(f.colonCount)))
+		newInst.Set(newSpecs[31], 0, newSpecs[31].GetAttribute().GetSysValFromString(fmt.Sprint(f.dashCount)))
+		newInst.Set(newSpecs[32], 0, newSpecs[32].GetAttribute().GetSysValFromString(fmt.Sprint(f.dotCount)))
+		newInst.Set(newSpecs[33], 0, newSpecs[33].GetAttribute().GetSysValFromString(fmt.Sprint(f.whitespaceCount)))
 		pred, err := ll.cls.Predict(newInst)
 		if err != nil {
 			return "", err

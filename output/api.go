@@ -45,8 +45,12 @@ func (f *APIWriter) Write(items chan map[string]interface{}, wg *sync.WaitGroup)
 		if _, found := deletedSources[currentSrc]; !found {
 			deletedSources[currentSrc] = true
 			// delete all items from the given source
-			firstDate := item["date"].(time.Time).UTC().Format("2006-01-02 15:04")
-			deleteURL := fmt.Sprintf("%s?sourceUrl=%s&datetime=%s", apiURL, url.QueryEscape(currentSrc), url.QueryEscape(firstDate))
+			firstDate, ok := item["date"].(time.Time)
+			if !ok {
+				log.Fatalf("error while trying to cast the date field of item %v to time.Time", item)
+			}
+			firstDateUTCF := firstDate.UTC().Format("2006-01-02 15:04")
+			deleteURL := fmt.Sprintf("%s?sourceUrl=%s&datetime=%s", apiURL, url.QueryEscape(currentSrc), url.QueryEscape(firstDateUTCF))
 			req, _ := http.NewRequest("DELETE", deleteURL, nil)
 			req.SetBasicAuth(apiUser, apiPassword)
 			resp, err := client.Do(req)

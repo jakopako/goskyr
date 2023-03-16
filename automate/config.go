@@ -204,6 +204,7 @@ outer:
 							Year:  strings.Contains(e.name, "year"),
 							Time:  strings.Contains(e.name, "time"),
 						},
+						Layout: []string{getDateFormatString(e.examples)},
 					},
 				},
 				DateLocation: zone,
@@ -221,6 +222,11 @@ outer:
 		s.Fields = append(s.Fields, d)
 	}
 	return nil
+}
+
+func getDateFormatString(dates []string) string {
+	// figure out sth smarter
+	return "replace with format string"
 }
 
 func filter(l locationManager, minCount int, removeStaticFields bool) locationManager {

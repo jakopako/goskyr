@@ -3,8 +3,6 @@ package date
 import (
 	"errors"
 	"strings"
-
-	"github.com/jakopako/goskyr/utils"
 )
 
 // CoveredDateParts is used to determine what parts of a date a
@@ -45,9 +43,9 @@ func HasAllDateParts(cdp CoveredDateParts) bool {
 	return cdp.Day && cdp.Month && cdp.Year && cdp.Time
 }
 
-func GetDateFormat(dates []string, parts *CoveredDateParts) (string, string) {
+func GetDateFormat(date string, parts *CoveredDateParts) (string, string) {
 	defaultFormat, defaultLanguage := "unknown format. please specify manually", ""
-	if len(dates) == 0 {
+	if len(date) == 0 {
 		return defaultFormat, defaultLanguage
 	}
 	// only day
@@ -56,21 +54,8 @@ func GetDateFormat(dates []string, parts *CoveredDateParts) (string, string) {
 	}
 	// only month
 	if parts.Month && !parts.Day && !parts.Year && !parts.Time {
-		long := []bool{} // If majority is true then 'January' else 'Jan'
-		lang := []string{}
-		for _, d := range dates {
-			lo, la := findFormatAndLangMonth(d)
-			long = append(long, lo)
-			lang = append(lang, la)
-		}
-		isLongFormat := utils.MostOcc(long)
-		var monthFormat string
-		if isLongFormat {
-			monthFormat = "January"
-		} else {
-			monthFormat = "Jan"
-		}
-		return monthFormat, utils.MostOcc(lang)
+		format, language := findFormatAndLangMonth(date)
+		return format, language
 	}
 	// only year
 	// if parts.Year && !parts.Day && !parts.Month && !parts.Time {
@@ -78,33 +63,37 @@ func GetDateFormat(dates []string, parts *CoveredDateParts) (string, string) {
 	// }
 	// only time
 	if parts.Time && !parts.Day && !parts.Month && !parts.Year {
-		if strings.Count(dates[0], ":") == 1 {
+		if strings.Count(date, ":") == 1 {
 			return "15:04", ""
 		}
 	}
 
 	// day, month and time
-	if parts.Day && parts.Month && parts.Time && !parts.Year {
+	// if parts.Day && parts.Month && parts.Time && !parts.Year {
 
-	}
+	// }
+	// day, month, year and time
+	// if parts.Day && parts.Month && parts.Year && parts.Time {
+
+	// }
 
 	return defaultFormat, defaultLanguage
 }
 
-func findFormatAndLangMonth(date string) (bool, string) {
+func findFormatAndLangMonth(date string) (string, string) {
 	for l, m := range longMonthNames {
 		for n := range m {
 			if date == n {
-				return true, l
+				return "January", l
 			}
 		}
 	}
 	for l, m := range shortMonthNames {
 		for n := range m {
 			if date == n {
-				return false, l
+				return "Jan", l
 			}
 		}
 	}
-	return true, ""
+	return "January", ""
 }

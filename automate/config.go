@@ -199,7 +199,7 @@ outer:
 				Year:  strings.Contains(e.name, "year"),
 				Time:  strings.Contains(e.name, "time"),
 			}
-			format, lang := date.GetDateFormat(e.examples, &cd)
+			format, lang := date.GetDateFormat(e.examples[0], &cd) // TODO base the format on multiple examples to ensure it's correct
 			d = scraper.Field{
 				Name: e.name,
 				Type: "date",

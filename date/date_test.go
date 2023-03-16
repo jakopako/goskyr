@@ -54,6 +54,12 @@ func TestGetDateFormat(t *testing.T) {
 			language:     "de_DE",
 		},
 		{
+			input:        []string{"Samedi 18 mars 2023", "Vendredi 24 mars 2023", "Samedi 25 mars 2023", "Dimanche 26 mars 2023"},
+			coveredParts: CoveredDateParts{Day: true, Month: true, Year: true},
+			formatString: "Mon. 2. Jan. 2006",
+			language:     "de_DE",
+		},
+		{
 			input:        []string{"ab 23 Uhr", "ab 21 Uhr"},
 			coveredParts: CoveredDateParts{Time: true},
 			formatString: "ab 15 Uhr",

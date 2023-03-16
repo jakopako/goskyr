@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/jakopako/goskyr/date"
 )
 
 const (
@@ -347,7 +348,7 @@ func TestExtractFieldDate(t *testing.T) {
 		Type: "date",
 		Components: []DateComponent{
 			{
-				Covers: CoveredDateParts{
+				Covers: date.CoveredDateParts{
 					Day:   true,
 					Month: true,
 					Year:  true,
@@ -393,7 +394,7 @@ func TestExtractFieldDateTransform(t *testing.T) {
 		Type: "date",
 		Components: []DateComponent{
 			{
-				Covers: CoveredDateParts{
+				Covers: date.CoveredDateParts{
 					Day:   true,
 					Month: true,
 					Year:  true,

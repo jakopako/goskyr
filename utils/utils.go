@@ -52,3 +52,19 @@ func HSVToRGB(h, s, v float64) (int32, int32, int32) {
 	b = b * 255
 	return int32(r), int32(g), int32(b)
 }
+
+func MostOcc[T comparable](predictions []T) T {
+	count := map[T]int{}
+	for _, pred := range predictions {
+		count[pred]++
+	}
+	var pred T
+	maxOcc := 0
+	for p, c := range count {
+		if c > maxOcc {
+			maxOcc = c
+			pred = p
+		}
+	}
+	return pred
+}

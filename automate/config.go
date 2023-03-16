@@ -62,7 +62,7 @@ func (l locationManager) findFieldNames(modelName, wordsDir string) error {
 			if err != nil {
 				return err
 			}
-			e.name = pred
+			e.name = pred // TODO: if label has occured already, add index (eg text-1, text-2...)
 		}
 	} else {
 		for i, e := range l {

@@ -226,7 +226,7 @@ outer:
 
 func getDateFormatString(dates []string) string {
 	// figure out sth smarter
-	return "replace with format string"
+	return fmt.Sprintf("%s (replace)", dates[0])
 }
 
 func filter(l locationManager, minCount int, removeStaticFields bool) locationManager {

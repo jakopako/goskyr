@@ -11,6 +11,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/agnivade/levenshtein"
 	"github.com/gdamore/tcell/v2"
+	"github.com/jakopako/goskyr/date"
 	"github.com/jakopako/goskyr/fetch"
 	"github.com/jakopako/goskyr/ml"
 	"github.com/jakopako/goskyr/scraper"
@@ -192,22 +193,25 @@ outer:
 		if strings.HasPrefix(e.name, "date-component") {
 			t := time.Now()
 			zone, _ := t.Zone()
+			cd := date.CoveredDateParts{
+				Day:   strings.Contains(e.name, "day"),
+				Month: strings.Contains(e.name, "month"),
+				Year:  strings.Contains(e.name, "year"),
+				Time:  strings.Contains(e.name, "time"),
+			}
+			format, lang := date.GetDateFormatMulti(e.examples, cd)
 			d = scraper.Field{
 				Name: e.name,
 				Type: "date",
 				Components: []scraper.DateComponent{
 					{
 						ElementLocation: e.loc,
-						Covers: scraper.CoveredDateParts{
-							Day:   strings.Contains(e.name, "day"),
-							Month: strings.Contains(e.name, "month"),
-							Year:  strings.Contains(e.name, "year"),
-							Time:  strings.Contains(e.name, "time"),
-						},
-						Layout: []string{getDateFormatString(e.examples)},
+						Covers:          cd,
+						Layout:          []string{format},
 					},
 				},
 				DateLocation: zone,
+				DateLanguage: lang,
 			}
 		} else {
 			if e.loc.Attr == "href" {
@@ -222,11 +226,6 @@ outer:
 		s.Fields = append(s.Fields, d)
 	}
 	return nil
-}
-
-func getDateFormatString(dates []string) string {
-	// figure out sth smarter
-	return fmt.Sprintf("%s (replace)", dates[0])
 }
 
 func filter(l locationManager, minCount int, removeStaticFields bool) locationManager {

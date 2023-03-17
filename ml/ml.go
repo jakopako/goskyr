@@ -11,6 +11,7 @@ import (
 	"unicode"
 
 	"github.com/jakopako/goskyr/scraper"
+	"github.com/jakopako/goskyr/utils"
 	"github.com/sjwhitworth/golearn/base"
 	"github.com/sjwhitworth/golearn/evaluation"
 	"github.com/sjwhitworth/golearn/knn"
@@ -339,22 +340,6 @@ func (ll *Labler) PredictLabel(fValue ...string) (string, error) {
 		}
 		predictions = append(predictions, pred.RowString(0))
 	}
-	pred := mostOccPred(predictions)
+	pred := utils.MostOcc(predictions)
 	return pred, nil
-}
-
-func mostOccPred(predictions []string) string {
-	count := map[string]int{}
-	for _, pred := range predictions {
-		count[pred]++
-	}
-	pred := ""
-	maxOcc := 0
-	for p, c := range count {
-		if c > maxOcc {
-			maxOcc = c
-			pred = p
-		}
-	}
-	return pred
 }

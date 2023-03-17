@@ -14,6 +14,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/goodsign/monday"
 	"github.com/ilyakaznacheev/cleanenv"
+	"github.com/jakopako/goskyr/date"
 	"github.com/jakopako/goskyr/fetch"
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/utils"
@@ -62,15 +63,6 @@ type ElementLocation struct {
 	Separator     string      `yaml:"separator,omitempty"`
 }
 
-// CoveredDateParts is used to determine what parts of a date a
-// DateComponent covers
-type CoveredDateParts struct {
-	Day   bool `yaml:"day,omitempty"`
-	Month bool `yaml:"month,omitempty"`
-	Year  bool `yaml:"year,omitempty"`
-	Time  bool `yaml:"time,omitempty"`
-}
-
 // TransformConfig is used to replace an existing substring with some other
 // kind of string. Processing needs to happen before extracting dates.
 type TransformConfig struct {
@@ -82,10 +74,10 @@ type TransformConfig struct {
 // A DateComponent is used to find a specific part of a date within
 // a html document
 type DateComponent struct {
-	Covers          CoveredDateParts  `yaml:"covers"`
-	ElementLocation ElementLocation   `yaml:"location"`
-	Layout          []string          `yaml:"layout"`
-	Transform       []TransformConfig `yaml:"transform,omitempty"`
+	Covers          date.CoveredDateParts `yaml:"covers"`
+	ElementLocation ElementLocation       `yaml:"location"`
+	Layout          []string              `yaml:"layout"`
+	Transform       []TransformConfig     `yaml:"transform,omitempty"`
 }
 
 // A Field contains all the information necessary to scrape
@@ -420,10 +412,10 @@ func getDate(f *Field, s *goquery.Selection) (time.Time, error) {
 
 	// collect all the date parts
 	dateParts := []datePart{}
-	combinedParts := CoveredDateParts{}
+	combinedParts := date.CoveredDateParts{}
 	for _, c := range f.Components {
-		if !hasAllDateParts(combinedParts) {
-			if err := checkForDoubleDateParts(c.Covers, combinedParts); err != nil {
+		if !date.HasAllDateParts(combinedParts) {
+			if err := date.CheckForDoubleDateParts(c.Covers, combinedParts); err != nil {
 				return t, err
 			}
 			sp, err := getTextString(&c.ElementLocation, s)
@@ -443,7 +435,7 @@ func getDate(f *Field, s *goquery.Selection) (time.Time, error) {
 					stringPart:  sp,
 					layoutParts: c.Layout,
 				})
-				combinedParts = mergeDateParts(combinedParts, c.Covers)
+				combinedParts = date.MergeDateParts(combinedParts, c.Covers)
 			}
 		}
 	}
@@ -485,35 +477,6 @@ func getDate(f *Field, s *goquery.Selection) (time.Time, error) {
 		}
 	}
 	return t, err
-}
-
-func checkForDoubleDateParts(dpOne CoveredDateParts, dpTwo CoveredDateParts) error {
-	if dpOne.Day && dpTwo.Day {
-		return errors.New("date parsing error: 'day' covered at least twice")
-	}
-	if dpOne.Month && dpTwo.Month {
-		return errors.New("date parsing error: 'month' covered at least twice")
-	}
-	if dpOne.Year && dpTwo.Year {
-		return errors.New("date parsing error: 'year' covered at least twice")
-	}
-	if dpOne.Time && dpTwo.Time {
-		return errors.New("date parsing error: 'time' covered at least twice")
-	}
-	return nil
-}
-
-func mergeDateParts(dpOne CoveredDateParts, dpTwo CoveredDateParts) CoveredDateParts {
-	return CoveredDateParts{
-		Day:   dpOne.Day || dpTwo.Day,
-		Month: dpOne.Month || dpTwo.Month,
-		Year:  dpOne.Year || dpTwo.Year,
-		Time:  dpOne.Time || dpTwo.Time,
-	}
-}
-
-func hasAllDateParts(cdp CoveredDateParts) bool {
-	return cdp.Day && cdp.Month && cdp.Year && cdp.Time
 }
 
 func getRawDateComponents(f *Field, s *goquery.Selection) (map[string]string, error) {

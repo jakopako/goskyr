@@ -52,3 +52,46 @@ func HSVToRGB(h, s, v float64) (int32, int32, int32) {
 	b = b * 255
 	return int32(r), int32(g), int32(b)
 }
+
+func MostOcc[T comparable](predictions []T) T {
+	count := map[T]int{}
+	for _, pred := range predictions {
+		count[pred]++
+	}
+	var pred T
+	maxOcc := 0
+	for p, c := range count {
+		if c > maxOcc {
+			maxOcc = c
+			pred = p
+		}
+	}
+	return pred
+}
+
+func RuneIsOneOf(r rune, rs []rune) bool {
+	for _, ru := range rs {
+		if r == ru {
+			return true
+		}
+	}
+	return false
+}
+
+func ContainsDigits(s string) bool {
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			return true
+		}
+	}
+	return false
+}
+
+func OnlyContainsDigits(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}

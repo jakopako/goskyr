@@ -1,13 +1,38 @@
 package date
 
-var longMonthNames = map[string]map[string]bool{
-	"en_US": longMonthNamesEnUS,
-	"de_DE": longMonthNamesDeDE,
+type langMap struct {
+	lang     string
+	namesMap map[string]bool
 }
 
-var shortMonthNames = map[string]map[string]bool{
-	"en_US": shortMonthNamesEnUS,
-	"de_DE": shortMonthNamesDeDE,
+var longMonthNames = []langMap{
+	{
+		lang:     "en_US",
+		namesMap: longMonthNamesEnUS,
+	},
+	{
+		lang:     "de_DE",
+		namesMap: longMonthNamesDeDE,
+	},
+	{
+		lang:     "fr_FR",
+		namesMap: longMonthNamesFrFR,
+	},
+}
+
+var shortMonthNames = []langMap{
+	{
+		lang:     "en_US",
+		namesMap: shortMonthNamesEnUS,
+	},
+	{
+		lang:     "de_DE",
+		namesMap: shortMonthNamesDeDE,
+	},
+	{
+		lang:     "fr_FR",
+		namesMap: shortMonthNamesFrFR,
+	},
 }
 
 var shortMonthNamesEnUS = map[string]bool{
@@ -68,4 +93,34 @@ var longMonthNamesDeDE = map[string]bool{
 	"Oktober":   true,
 	"November":  true,
 	"Dezember":  true,
+}
+
+var shortMonthNamesFrFR = map[string]bool{
+	"janv": true,
+	"févr": true,
+	"mars": true,
+	"avr":  true,
+	"mai":  true,
+	"juin": true,
+	"juil": true,
+	"août": true,
+	"sept": true,
+	"oct":  true,
+	"nov":  true,
+	"déc":  true,
+}
+
+var longMonthNamesFrFR = map[string]bool{
+	"janvier":   true,
+	"février":   true,
+	"mars":      true,
+	"avril":     true,
+	"mai":       true,
+	"juin":      true,
+	"juillet":   true,
+	"août":      true,
+	"septembre": true,
+	"octobre":   true,
+	"novembre":  true,
+	"décembre":  true,
 }

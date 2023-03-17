@@ -68,3 +68,30 @@ func MostOcc[T comparable](predictions []T) T {
 	}
 	return pred
 }
+
+func RuneIsOneOf(r rune, rs []rune) bool {
+	for _, ru := range rs {
+		if r == ru {
+			return true
+		}
+	}
+	return false
+}
+
+func ContainsDigits(s string) bool {
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			return true
+		}
+	}
+	return false
+}
+
+func OnlyContainsDigits(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}

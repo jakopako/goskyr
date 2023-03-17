@@ -1,13 +1,43 @@
 package date
 
-var longDayNames = map[string]map[string]bool{
-	"en_US": longDayNamesEnUS,
-	"de_DE": longDayNamesDeDE,
+var longDayNames = []langMap{
+	{
+		lang:     "en_US",
+		namesMap: longDayNamesEnUS,
+	},
+	{
+		lang:     "de_DE",
+		namesMap: longDayNamesDeDE,
+	},
+	{
+		lang:     "fr_FR",
+		namesMap: longDayNamesFrFR,
+	},
 }
 
-var shortDayNames = map[string]map[string]bool{
-	"en_US": shortDayNamesEnUS,
-	"de_DE": shortDayNamesDeDE,
+var shortDayNames = []langMap{
+	{
+		lang:     "en_US",
+		namesMap: shortDayNamesEnUS,
+	},
+	{
+		lang:     "de_DE",
+		namesMap: shortDayNamesDeDE,
+	},
+	{
+		lang:     "fr_FR",
+		namesMap: shortDayNamesFrFR,
+	},
+}
+
+var shortDayNamesEnUS = map[string]bool{
+	"Sun": true,
+	"Mon": true,
+	"Tue": true,
+	"Wed": true,
+	"Thu": true,
+	"Fri": true,
+	"Sat": true,
 }
 
 var longDayNamesEnUS = map[string]bool{
@@ -20,16 +50,6 @@ var longDayNamesEnUS = map[string]bool{
 	"Saturday":  true,
 }
 
-var longDayNamesDeDE = map[string]bool{
-	"Sonntag":    true,
-	"Montag":     true,
-	"Dienstag":   true,
-	"Mittwoch":   true,
-	"Donnerstag": true,
-	"Freitag":    true,
-	"Samstag":    true,
-}
-
 var shortDayNamesDeDE = map[string]bool{
 	"So": true,
 	"Mo": true,
@@ -40,12 +60,32 @@ var shortDayNamesDeDE = map[string]bool{
 	"Sa": true,
 }
 
-var shortDayNamesEnUS = map[string]bool{
-	"Sun": true,
-	"Mon": true,
-	"Tue": true,
-	"Wed": true,
-	"Thu": true,
-	"Fri": true,
-	"Sat": true,
+var longDayNamesDeDE = map[string]bool{
+	"Sonntag":    true,
+	"Montag":     true,
+	"Dienstag":   true,
+	"Mittwoch":   true,
+	"Donnerstag": true,
+	"Freitag":    true,
+	"Samstag":    true,
+}
+
+var shortDayNamesFrFR = map[string]bool{
+	"dim": true,
+	"lun": true,
+	"mar": true,
+	"mer": true,
+	"jeu": true,
+	"ven": true,
+	"sam": true,
+}
+
+var longDayNamesFrFR = map[string]bool{
+	"dimanche": true,
+	"lundi":    true,
+	"mardi":    true,
+	"mercredi": true,
+	"jeudi":    true,
+	"vendredi": true,
+	"samedi":   true,
 }

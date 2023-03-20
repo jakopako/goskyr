@@ -185,14 +185,20 @@ outer:
 		}
 	}
 	s.Item = escapeCssSelector(itemSelector)
+	// for now we assume that there will only be one date field
+	t := time.Now()
+	zone, _ := t.Zone()
+	dateField := scraper.Field{
+		Name:         "date",
+		Type:         "date",
+		DateLocation: zone,
+	}
 	for _, e := range locPropsSel {
 		e.loc.Selector = removeNodesPrefix(e.loc.Selector, len(strings.Split(itemSelector, " > ")))
 		e.loc.Selector = escapeCssSelector(e.loc.Selector)
 		fieldType := "text"
 		var d scraper.Field
 		if strings.HasPrefix(e.name, "date-component") {
-			t := time.Now()
-			zone, _ := t.Zone()
 			cd := date.CoveredDateParts{
 				Day:   strings.Contains(e.name, "day"),
 				Month: strings.Contains(e.name, "month"),
@@ -200,18 +206,14 @@ outer:
 				Time:  strings.Contains(e.name, "time"),
 			}
 			format, lang := date.GetDateFormatMulti(e.examples, cd)
-			d = scraper.Field{
-				Name: e.name,
-				Type: "date",
-				Components: []scraper.DateComponent{
-					{
-						ElementLocation: e.loc,
-						Covers:          cd,
-						Layout:          []string{format},
-					},
-				},
-				DateLocation: zone,
-				DateLanguage: lang,
+			dateField.Components = append(dateField.Components, scraper.DateComponent{
+				ElementLocation: e.loc,
+				Covers:          cd,
+				Layout:          []string{format},
+			})
+			if dateField.DateLanguage == "" {
+				// first lang wins
+				dateField.DateLanguage = lang
 			}
 		} else {
 			if e.loc.Attr == "href" {
@@ -222,9 +224,10 @@ outer:
 				Type:             fieldType,
 				ElementLocations: []scraper.ElementLocation{e.loc},
 			}
+			s.Fields = append(s.Fields, d)
 		}
-		s.Fields = append(s.Fields, d)
 	}
+	s.Fields = append(s.Fields, dateField)
 	return nil
 }
 

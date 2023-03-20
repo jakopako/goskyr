@@ -6,3 +6,4 @@ config.yml
 goskyr.class
 goskyr.model
 .release-env
+.local-env

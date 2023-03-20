@@ -36,6 +36,7 @@ func (f *APIWriter) Write(items chan map[string]interface{}, wg *sync.WaitGroup)
 
 	deletedSources := map[string]bool{}
 	nrItems := 0
+	batch := []map[string]interface{}{}
 
 	// This code assumes that within one source, items are ordered
 	// by date ascending.
@@ -66,27 +67,38 @@ func (f *APIWriter) Write(items chan map[string]interface{}, wg *sync.WaitGroup)
 			}
 			resp.Body.Close()
 		}
-		concertJSON, err := json.Marshal(item)
-		if err != nil {
-			log.Fatal(err)
+		batch = append(batch, item)
+		if len(batch) == 100 {
+			postBatch(client, batch, apiURL, apiUser, apiPassword)
+			batch = []map[string]interface{}{}
 		}
-		req, _ := http.NewRequest("POST", apiURL, bytes.NewBuffer(concertJSON))
-		req.Header = map[string][]string{
-			"Content-Type": {"application/json"},
-		}
-		req.SetBasicAuth(apiUser, apiPassword)
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if resp.StatusCode != 201 {
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				log.Fatal(err)
-			}
-			log.Fatalf("something went wrong while adding a new event. Status Code: %d Response: %s", resp.StatusCode, body)
-		}
-		resp.Body.Close()
 	}
+	postBatch(client, batch, apiURL, apiUser, apiPassword)
+
 	log.Printf("wrote %d items from %d sources to the api", nrItems, len(deletedSources))
+}
+
+func postBatch(client *http.Client, batch []map[string]interface{}, apiURL, apiUser, apiPassword string) {
+	concertJSON, err := json.Marshal(batch)
+	if err != nil {
+		log.Fatal(err)
+	}
+	req, _ := http.NewRequest("POST", apiURL, bytes.NewBuffer(concertJSON))
+	req.Header = map[string][]string{
+		"Content-Type": {"application/json"},
+	}
+	req.SetBasicAuth(apiUser, apiPassword)
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if resp.StatusCode != 201 {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Fatalf("something went wrong while adding new events. Status Code: %d Response: %s", resp.StatusCode, body)
+	}
+	resp.Body.Close()
+
 }

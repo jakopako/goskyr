@@ -316,3 +316,32 @@ func TestGetDateFormat10(t *testing.T) {
 		}
 	}
 }
+
+func TestGetDateFormat11(t *testing.T) {
+	dateFormats := []formatTestStruct{
+		{
+			input:        "2.1.2012 Beginn: 15:04 Uhr",
+			coveredParts: CoveredDateParts{Day: true, Month: true, Year: true, Time: true},
+			formatString: "2.1.2006 Beginn: 15:04 Uhr",
+		},
+		{
+			input:        "30.11.2022 Beginn: 11:30 Uhr",
+			coveredParts: CoveredDateParts{Day: true, Month: true, Year: true, Time: true},
+			formatString: "2.1.2006 Beginn: 15:04 Uhr",
+		},
+		{
+			input:        "2.5.1994 Beginn: 6:13 Uhr",
+			coveredParts: CoveredDateParts{Day: true, Month: true, Year: true, Time: true},
+			formatString: "2.1.2006 Beginn: 15:04 Uhr",
+		},
+	}
+	for _, df := range dateFormats {
+		f, l := GetDateFormat(df.input, df.coveredParts)
+		if f != df.formatString {
+			log.Fatalf("expected %s but got %s", df.formatString, f)
+		}
+		if l != df.language {
+			log.Fatalf("expected date language %s but got %s", df.language, l)
+		}
+	}
+}

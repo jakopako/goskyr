@@ -227,7 +227,9 @@ outer:
 			s.Fields = append(s.Fields, d)
 		}
 	}
-	s.Fields = append(s.Fields, dateField)
+	if len(dateField.Components) > 0 {
+		s.Fields = append(s.Fields, dateField)
+	}
 	return nil
 }
 

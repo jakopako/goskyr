@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -59,7 +59,7 @@ func (f *APIWriter) Write(items chan map[string]interface{}, wg *sync.WaitGroup)
 				log.Fatal(err)
 			}
 			if resp.StatusCode != 200 {
-				body, err := ioutil.ReadAll(resp.Body)
+				body, err := io.ReadAll(resp.Body)
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -93,7 +93,7 @@ func postBatch(client *http.Client, batch []map[string]interface{}, apiURL, apiU
 		log.Fatal(err)
 	}
 	if resp.StatusCode != 201 {
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			log.Fatal(err)
 		}

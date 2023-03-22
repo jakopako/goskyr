@@ -3,6 +3,7 @@ package automate
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -92,15 +93,16 @@ func (p path) distanceTo(p2 path) float64 {
 }
 
 type locationProps struct {
-	path      path
-	attr      string
-	textIndex int // this will translate into child index within scraper.ElementLocation
-	count     int
-	examples  []string
-	selected  bool
-	color     tcell.Color
-	distance  float64
-	name      string
+	path       path
+	attr       string
+	textIndex  int // this will translate into child index within scraper.ElementLocation
+	count      int
+	examples   []string
+	selected   bool
+	color      tcell.Color
+	distance   float64
+	name       string
+	stripIndex int // this is needed for the squashLocationManager function
 }
 
 type locationManager []*locationProps
@@ -330,52 +332,64 @@ func squashLocationManager(l locationManager, minOcc int) locationManager {
 	// This function will try to merge different locationProps into one
 	// based on their similarity. The tricky question is 'when are two
 	// locationProps close enough to be merged into one?'
-	return nil
+	squashed := locationManager{}
+	for i := len(l) - 1; i >= 0; i-- {
+		lp := l[i]
+		updated := false
+		for _, sp := range squashed {
+			// we need a 'stripIndex' to know which nth-childs we can remove
+			// when trying to merge locationProps
+			updated = checkAndUpdateLocProps(sp, lp)
+			if updated {
+				break
+			}
+		}
+		if !updated {
+			// TODO smartly remove nth-child based on minOcc
+			stripNthChild(lp, minOcc)
+			squashed = append(squashed, lp)
+		}
+	}
+	return squashed
 }
 
-func filter(l locationManager, minCount int, removeStaticFields bool) locationManager {
-	// remove if count is smaller than minCount
-	// or if the examples are all the same (if removeStaticFields is true)
-	i := 0
-	for _, p := range l {
-		if p.count >= minCount {
-			if removeStaticFields {
-				eqEx := true
-				for _, ex := range p.examples {
-					if ex != p.examples[0] {
-						eqEx = false
-						break
-					}
-				}
-				if !eqEx {
-					l[i] = p
-					i++
-				}
-			} else {
-				l[i] = p
-				i++
+func stripNthChild(lp *locationProps, minOcc int) {
+	borderI := 0
+	for i := len(lp.path) - 1; i >= 0; i-- {
+		if i < borderI {
+			lp.path[i].pseudoClasses = []string{}
+		} else if len(lp.path[i].pseudoClasses) > 0 {
+			// nth-child(x)
+			nc, _ := strconv.Atoi(strings.Replace(strings.Split(lp.path[i].pseudoClasses[0], "(")[1], ")", "", 1))
+			if nc >= minOcc {
+				lp.path[i].pseudoClasses = []string{}
+				borderI = i
+				lp.stripIndex = i
 			}
 		}
 	}
-	return l[:i]
 }
 
-func checkAndUpdatePath(old, new *locationProps) bool {
+func checkAndUpdateLocProps(old, new *locationProps) bool {
 	// returns true if the paths overlap and the rest of the
 	// element location is identical. If true is returned
 	// the Selector of a will be updated if necessary.
 	if old.textIndex == new.textIndex && old.attr == new.attr {
-		newPath := path{}
 		if len(old.path) != len(new.path) {
 			return false
 		}
+		newPath := path{}
 		for i, on := range old.path {
 			if on.tagName == new.path[i].tagName {
+				pseudoClassesTmp := []string{}
+				if i > old.stripIndex {
+					pseudoClassesTmp = new.path[i].pseudoClasses
+				}
 				// the following checks are not complete yet but suffice for now
 				// with nth-child being our only pseudo class
-				if len(on.pseudoClasses) == len(new.path[i].pseudoClasses) {
+				if len(on.pseudoClasses) == len(pseudoClassesTmp) {
 					if len(on.pseudoClasses) == 1 {
-						if on.pseudoClasses[0] != new.path[i].pseudoClasses[0] {
+						if on.pseudoClasses[0] != pseudoClassesTmp[0] {
 							return false
 						}
 					}
@@ -403,10 +417,42 @@ func checkAndUpdatePath(old, new *locationProps) bool {
 		}
 		// if we get until here there is an overlapping path
 		old.path = newPath
+		old.count++
+		old.examples = append(old.examples, new.examples...)
 		return true
 
 	}
 	return false
+}
+
+func filter(l locationManager, minCount int, removeStaticFields bool) locationManager {
+	// remove if count is smaller than minCount
+	// or if the examples are all the same (if removeStaticFields is true)
+	i := 0
+	for _, p := range l {
+		if p.count >= minCount {
+			// first reverse the examples list and only take the first x
+			utils.ReverseSlice(p.examples)
+			p.examples = p.examples[:minCount]
+			if removeStaticFields {
+				eqEx := true
+				for _, ex := range p.examples {
+					if ex != p.examples[0] {
+						eqEx = false
+						break
+					}
+				}
+				if !eqEx {
+					l[i] = p
+					i++
+				}
+			} else {
+				l[i] = p
+				i++
+			}
+		}
+	}
+	return l[:i]
 }
 
 func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool, modelName, wordsDir string) error {

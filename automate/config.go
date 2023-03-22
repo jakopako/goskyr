@@ -3,7 +3,7 @@ package automate
 import (
 	"errors"
 	"fmt"
-	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -20,14 +20,65 @@ import (
 	"golang.org/x/net/html"
 )
 
+type node struct {
+	tagName       string
+	classes       []string
+	pseudoClasses []string
+}
+
+func (n node) string() string {
+	nodeString := n.tagName
+	for _, cl := range n.classes {
+		// https://www.itsupportguides.com/knowledge-base/website-tips/css-colon-in-id/
+		cl = strings.ReplaceAll(cl, ":", "\\:")
+		// https://stackoverflow.com/questions/45293534/css-class-starting-with-number-is-not-getting-applied
+		if unicode.IsDigit(rune(cl[0])) {
+			cl = fmt.Sprintf(`\3%s `, string(cl[1:]))
+		}
+		nodeString += fmt.Sprintf(".%s", cl)
+	}
+	if len(n.pseudoClasses) > 0 {
+		nodeString += fmt.Sprintf(":%s", strings.Join(n.pseudoClasses, ":"))
+	}
+	return nodeString
+}
+
+func (n node) equals(n2 node) bool {
+	if n.tagName == n2.tagName {
+		if utils.SliceEquals(n.classes, n2.classes) {
+			if utils.SliceEquals(n.pseudoClasses, n2.pseudoClasses) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+type path []node
+
+func (p path) string() string {
+	nodeStrings := []string{}
+	for _, n := range p {
+		nodeStrings = append(nodeStrings, n.string())
+	}
+	return strings.Join(nodeStrings, " > ")
+}
+
+func (p path) distanceTo(p2 path) float64 {
+	return float64(levenshtein.ComputeDistance(p.string(), p2.string()))
+}
+
 type locationProps struct {
-	loc      scraper.ElementLocation
-	count    int
-	examples []string
-	selected bool
-	color    tcell.Color
-	distance float64
-	name     string
+	path       path
+	attr       string
+	textIndex  int // this will translate into child index within scraper.ElementLocation
+	count      int
+	examples   []string
+	selected   bool
+	color      tcell.Color
+	distance   float64
+	name       string
+	stripIndex int // this is needed for the squashLocationManager function
 }
 
 type locationManager []*locationProps
@@ -38,7 +89,7 @@ func (l locationManager) setColors() {
 	}
 	for i, e := range l {
 		if i != 0 {
-			e.distance = l[i-1].distance + distance(l[i-1].loc, e.loc)
+			e.distance = l[i-1].distance + l[i-1].path.distanceTo(e.path)
 		}
 	}
 	// scale to 1 and map to rgb
@@ -165,26 +216,26 @@ func (l locationManager) elementsToConfig(s *scraper.Scraper) error {
 	if len(locPropsSel) == 0 {
 		return fmt.Errorf("no fields selected")
 	}
-	var itemSelector string
+	var rootSelector path
 outer:
 	for i := 0; ; i++ {
-		var n string
+		var n node
 		for j, e := range locPropsSel {
-			if i >= len(selectorToPath(e.loc.Selector)) {
-				itemSelector = pathToSelector(selectorToPath(e.loc.Selector)[:i])
+			if i >= len(e.path) {
+				rootSelector = e.path[:i]
 				break outer
 			}
 			if j == 0 {
-				n = selectorToPath(e.loc.Selector)[i]
+				n = e.path[i]
 			} else {
-				if !nodesEqual(selectorToPath(e.loc.Selector)[i], n) {
-					itemSelector = pathToSelector(selectorToPath(e.loc.Selector)[:i])
+				if !n.equals(e.path[i]) {
+					rootSelector = e.path[:i]
 					break outer
 				}
 			}
 		}
 	}
-	s.Item = escapeCssSelector(itemSelector)
+	s.Item = rootSelector.string()
 	// for now we assume that there will only be one date field
 	t := time.Now()
 	zone, _ := t.Zone()
@@ -194,8 +245,11 @@ outer:
 		DateLocation: zone,
 	}
 	for _, e := range locPropsSel {
-		e.loc.Selector = removeNodesPrefix(e.loc.Selector, len(strings.Split(itemSelector, " > ")))
-		e.loc.Selector = escapeCssSelector(e.loc.Selector)
+		loc := scraper.ElementLocation{
+			Selector:   e.path[len(rootSelector):].string(),
+			ChildIndex: e.textIndex,
+			Attr:       e.attr,
+		}
 		fieldType := "text"
 		var d scraper.Field
 		if strings.HasPrefix(e.name, "date-component") {
@@ -207,7 +261,7 @@ outer:
 			}
 			format, lang := date.GetDateFormatMulti(e.examples, cd)
 			dateField.Components = append(dateField.Components, scraper.DateComponent{
-				ElementLocation: e.loc,
+				ElementLocation: loc,
 				Covers:          cd,
 				Layout:          []string{format},
 			})
@@ -216,13 +270,13 @@ outer:
 				dateField.DateLanguage = lang
 			}
 		} else {
-			if e.loc.Attr == "href" {
+			if loc.Attr == "href" {
 				fieldType = "url"
 			}
 			d = scraper.Field{
 				Name:             e.name,
 				Type:             fieldType,
-				ElementLocations: []scraper.ElementLocation{e.loc},
+				ElementLocations: []scraper.ElementLocation{loc},
 			}
 			s.Fields = append(s.Fields, d)
 		}
@@ -233,12 +287,120 @@ outer:
 	return nil
 }
 
+func squashLocationManager(l locationManager, minOcc int) locationManager {
+	// This function merges different locationProps into one
+	// based on their similarity. The tricky question is 'when are two
+	// locationProps close enough to be merged into one?'
+	squashed := locationManager{}
+	for i := len(l) - 1; i >= 0; i-- {
+		lp := l[i]
+		updated := false
+		for _, sp := range squashed {
+			// we need a 'stripIndex' to know which nth-childs we can remove
+			// when trying to merge locationProps
+			updated = checkAndUpdateLocProps(sp, lp)
+			if updated {
+				break
+			}
+		}
+		if !updated {
+			stripNthChild(lp, minOcc)
+			squashed = append(squashed, lp)
+		}
+	}
+	return squashed
+}
+
+func stripNthChild(lp *locationProps, minOcc int) {
+	borderI := 0
+	// a bit arbitrary (and probably not always correct) but
+	// for now we assume that borderI cannot be len(lp.path)-1
+	// not correct for https://huxleysneuewelt.com/shows
+	// but needed for http://www.bar-laparenthese.ch/
+	// very hacky:
+	sub := 1
+	// when minOcc is too small we'd risk stripping the wrong nth-child pseudo classes
+	if minOcc < 6 {
+		sub = 2
+	}
+	for i := len(lp.path) - sub; i >= 0; i-- {
+		if i < borderI {
+			lp.path[i].pseudoClasses = []string{}
+		} else if len(lp.path[i].pseudoClasses) > 0 {
+			// nth-child(x)
+			nc, _ := strconv.Atoi(strings.Replace(strings.Split(lp.path[i].pseudoClasses[0], "(")[1], ")", "", 1))
+			if nc >= minOcc {
+				lp.path[i].pseudoClasses = []string{}
+				borderI = i
+				lp.stripIndex = i
+			}
+		}
+	}
+}
+
+func checkAndUpdateLocProps(old, new *locationProps) bool {
+	// returns true if the paths overlap and the rest of the
+	// element location is identical. If true is returned
+	// the Selector of a will be updated if necessary.
+	if old.textIndex == new.textIndex && old.attr == new.attr {
+		if len(old.path) != len(new.path) {
+			return false
+		}
+		newPath := path{}
+		for i, on := range old.path {
+			if on.tagName == new.path[i].tagName {
+				pseudoClassesTmp := []string{}
+				if i > old.stripIndex {
+					pseudoClassesTmp = new.path[i].pseudoClasses
+				}
+				// the following checks are not complete yet but suffice for now
+				// with nth-child being our only pseudo class
+				if len(on.pseudoClasses) == len(pseudoClassesTmp) {
+					if len(on.pseudoClasses) == 1 {
+						if on.pseudoClasses[0] != pseudoClassesTmp[0] {
+							return false
+						}
+					}
+					newNode := node{
+						tagName:       on.tagName,
+						pseudoClasses: on.pseudoClasses,
+					}
+					if len(on.classes) == 0 && len(new.path[i].classes) == 0 {
+						newPath = append(newPath, newNode)
+						continue
+					}
+					ovClasses := utils.IntersectionSlices(on.classes, new.path[i].classes)
+					// if nodes have more than 0 classes there has to be at least 1 overlapping class
+					// does this make sense?
+					if len(ovClasses) > 0 {
+						newNode.classes = ovClasses
+						newPath = append(newPath, newNode)
+						continue
+					}
+				}
+			}
+			return false
+
+		}
+		// if we get until here there is an overlapping path
+		old.path = newPath
+		old.count++
+		old.examples = append(old.examples, new.examples...)
+		return true
+
+	}
+	return false
+}
+
 func filter(l locationManager, minCount int, removeStaticFields bool) locationManager {
 	// remove if count is smaller than minCount
 	// or if the examples are all the same (if removeStaticFields is true)
 	i := 0
 	for _, p := range l {
 		if p.count >= minCount {
+			// first reverse the examples list and only take the first x
+			utils.ReverseSlice(p.examples)
+			p.examples = p.examples[:minCount]
 			if removeStaticFields {
 				eqEx := true
 				for _, ex := range p.examples {
@@ -258,142 +420,6 @@ func filter(l locationManager, minCount int, removeStaticFields bool) locationMa
 		}
 	}
 	return l[:i]
-}
-
-func distance(loc1, loc2 scraper.ElementLocation) float64 {
-	// calculate differently? eg with nodes of html tree. eg nodes to walk to get from loc1 to loc2
-	return float64(levenshtein.ComputeDistance(loc1.Selector, loc2.Selector))
-}
-
-func update(l locationManager, e scraper.ElementLocation, s string) locationManager {
-	for _, lp := range l {
-		if checkAndUpdatePath(&lp.loc, &e) {
-			lp.count++
-			if lp.count <= 8 {
-				lp.examples = append(lp.examples, s)
-			}
-			return l
-		}
-	}
-	return append(l, &locationProps{loc: e, count: 1, examples: []string{s}})
-}
-
-func checkAndUpdatePath(a, b *scraper.ElementLocation) bool {
-	// returns true if the paths overlap and the rest of the
-	// element location is identical. If true is returned
-	// the Selector of a will be updated if necessary.
-	if a.NodeIndex == b.NodeIndex && a.ChildIndex == b.ChildIndex && a.Attr == b.Attr {
-		if a.Selector == b.Selector {
-			return true
-		} else {
-			ap := selectorToPath(a.Selector)
-			bp := selectorToPath(b.Selector)
-			np := []string{}
-			if len(ap) != len(bp) {
-				return false
-			}
-			for i, an := range ap {
-				ae, be := strings.Split(an, "."), strings.Split(bp[i], ".")
-				at, bt := ae[0], be[0]
-				if at == bt {
-					if len(ae) == 1 && len(be) == 1 {
-						np = append(np, an)
-						continue
-					}
-					ac, bc := ae[1:], be[1:]
-					sort.Strings(ac)
-					sort.Strings(bc)
-
-					cc := []string{}
-					// find overlapping classes
-					for j, k := 0, 0; j < len(ac) && k < len(bc); {
-						if ac[j] == bc[k] {
-							cc = append(cc, ac[j])
-							j++
-							k++
-						} else if ac[j] > bc[k] {
-							k++
-						} else {
-							j++
-						}
-					}
-
-					if len(cc) > 0 {
-						nnl := append([]string{at}, cc...)
-						nn := strings.Join(nnl, ".")
-						np = append(np, nn)
-						continue
-					}
-
-				}
-				return false
-
-			}
-			// if we get until here there is an overlapping path
-			a.Selector = pathToSelector(np)
-			return true
-		}
-	}
-	return false
-}
-
-func pathToSelector(pathSlice []string) string {
-	return strings.Join(pathSlice, " > ")
-}
-
-func selectorToPath(s string) []string {
-	return strings.Split(s, " > ")
-}
-
-func nodesEqual(n1, n2 string) bool {
-	if n1 == n2 {
-		return true
-	}
-	nl1, nl2 := strings.Split(n1, "."), strings.Split(n2, ".")
-	if nl1[0] == nl2[0] {
-		lnl1, lnl2 := len(nl1), len(nl2)
-		if lnl1 == lnl2 {
-			if lnl1 > 1 {
-				cn1, cn2 := nl1[1:], nl2[1:]
-				sort.Strings(cn1)
-				sort.Strings(cn2)
-				for i := 0; i < len(cn1); i++ {
-					if cn1[i] != cn2[i] {
-						return false
-					}
-				}
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func removeNodesPrefix(s1 string, n int) string {
-	return pathToSelector(selectorToPath(s1)[n:])
-}
-
-func escapeCssSelector(s string) string {
-	return escapeNumber(escapeColons(s))
-}
-
-func escapeColons(s string) string {
-	// https://www.itsupportguides.com/knowledge-base/website-tips/css-colon-in-id/
-	return strings.ReplaceAll(s, ":", "\\:")
-}
-
-func escapeNumber(s string) string {
-	// https://stackoverflow.com/questions/45293534/css-class-starting-with-number-is-not-getting-applied
-	e := ""
-	sr := []rune(s)
-	for i, c := range s {
-		if unicode.IsDigit(c) && string(sr[i-1]) == "." {
-			e += fmt.Sprintf(`\3%s `, string(c))
-		} else {
-			e += string(c)
-		}
-	}
-	return e
 }
 
 func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool, modelName, wordsDir string) error {
@@ -427,8 +453,9 @@ func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields b
 	}
 	z := html.NewTokenizer(strings.NewReader(htmlStr))
 	locMan := locationManager{}
-	nrChildren := map[string]int{}
-	nodePath := []string{}
+	allChildren := map[string]int{}    // the nr of children including non-html-tag nodes (ie text)
+	tagChildren := map[string][]node{} // the children at the specified nodePath; used for :nth-child() logic
+	nodePath := path{}
 	depth := 0
 	inBody := false
 parse:
@@ -440,16 +467,20 @@ parse:
 		case html.TextToken:
 			if inBody {
 				text := string(z.Text())
-				p := pathToSelector(nodePath)
-				if len(strings.TrimSpace(text)) > 0 {
-					cI := nrChildren[p]
-					l := scraper.ElementLocation{
-						Selector:   p,
-						ChildIndex: cI,
+				p := nodePath.string()
+				textTrimmed := strings.TrimSpace(text)
+				if len(textTrimmed) > 0 {
+					ti := allChildren[p]
+					lp := locationProps{
+						path:      make([]node, len(nodePath)),
+						examples:  []string{textTrimmed},
+						textIndex: ti,
+						count:     1,
 					}
-					locMan = update(locMan, l, strings.TrimSpace(text))
+					copy(lp.path, nodePath)
+					locMan = append(locMan, &lp)
 				}
-				nrChildren[p] += 1
+				allChildren[p] += 1
 			}
 		case html.StartTagToken, html.EndTagToken:
 			tn, _ := z.TagName()
@@ -460,18 +491,21 @@ parse:
 			if inBody {
 				// br can also be self closing tag, see later case statement
 				if tnString == "br" || tnString == "input" {
-					nrChildren[pathToSelector(nodePath)] += 1
+					allChildren[nodePath.string()] += 1
+					tagChildren[nodePath.string()] = append(tagChildren[nodePath.string()], node{tagName: tnString})
 					continue
 				}
 				if tt == html.StartTagToken {
-					nrChildren[pathToSelector(nodePath)] += 1
+					allChildren[nodePath.string()] += 1
+					tagChildren[nodePath.string()] = append(tagChildren[nodePath.string()], node{tagName: tnString})
 					moreAttr := true
 					var hrefVal string
+					var cls []string
 					for moreAttr {
 						k, v, m := z.TagAttr()
 						vString := strings.TrimSpace(string(v))
 						if string(k) == "class" && vString != "" {
-							cls := strings.Split(vString, " ")
+							cls = strings.Split(vString, " ")
 							j := 0
 							for _, cl := range cls {
 								// for now we ignore classes that contain dots
@@ -481,35 +515,51 @@ parse:
 								}
 							}
 							cls = cls[:j]
-							tnString += fmt.Sprintf(".%s", strings.Join(cls, "."))
 						}
 						if string(k) == "href" {
 							hrefVal = string(v)
 						}
 						moreAttr = m
 					}
-					nodePath = append(nodePath, tnString)
-					nrChildren[pathToSelector(nodePath)] = 0
-					depth++
-					if (strings.HasPrefix(tnString, "a.") || tnString == "a") && hrefVal != "" {
-						p := pathToSelector(nodePath)
-						l := scraper.ElementLocation{
-							Selector:   p,
-							ChildIndex: nrChildren[p],
-							Attr:       "href",
+					var pCls []string
+					// only add nth-child if there has been another node before at the same
+					// level with same tag
+					for i := 0; i < len(tagChildren[nodePath.string()])-1; i++ { // the last element is skipped because it's the current node itself
+						cn := tagChildren[nodePath.string()][i]
+						if cn.tagName == tnString {
+							pCls = []string{fmt.Sprintf("nth-child(%d)", len(tagChildren[nodePath.string()]))}
 						}
-						locMan = update(locMan, l, hrefVal)
+
+					}
+					newNode := node{
+						tagName:       tnString,
+						classes:       cls,
+						pseudoClasses: pCls,
+					}
+					nodePath = append(nodePath, newNode)
+					depth++
+					tagChildren[nodePath.string()] = []node{}
+					if tnString == "a" && hrefVal != "" {
+						lp := locationProps{
+							path:     make([]node, len(nodePath)),
+							examples: []string{hrefVal},
+							attr:     "href",
+							count:    1,
+						}
+						copy(lp.path, nodePath)
+						locMan = append(locMan, &lp)
 					}
 				} else {
 					n := true
 					for n && depth > 0 {
-						if strings.Split(nodePath[len(nodePath)-1], ".")[0] == tnString {
+						if nodePath[len(nodePath)-1].tagName == tnString {
 							if tnString == "body" {
 								break parse
 							}
 							n = false
 						}
-						delete(nrChildren, pathToSelector(nodePath))
+						delete(allChildren, nodePath.string())
+						delete(tagChildren, nodePath.string())
 						nodePath = nodePath[:len(nodePath)-1]
 						depth--
 					}
@@ -519,14 +569,16 @@ parse:
 			if inBody {
 				tn, _ := z.TagName()
 				tnString := string(tn)
-				if tnString == "br" || tnString == "input" {
-					nrChildren[pathToSelector(nodePath)] += 1
+				if tnString == "br" || tnString == "input" || tnString == "img" || tnString == "link" {
+					allChildren[nodePath.string()] += 1
+					tagChildren[nodePath.string()] = append(tagChildren[nodePath.string()], node{tagName: tnString})
 					continue
 				}
 			}
 		}
 	}
 
+	locMan = squashLocationManager(locMan, minOcc)
 	locMan = filter(locMan, minOcc, removeStaticFields)
 	locMan.setColors()
 	if err := locMan.findFieldNames(modelName, wordsDir); err != nil {

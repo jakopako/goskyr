@@ -241,7 +241,10 @@ func getTimeFormatPart(index int, sepTokens []string, tokens []string) (string, 
 			}
 		}
 	} else {
-		// one of 15u04, 15h04
+		// one of 04h, 15u04, 15h04
+		if strings.HasSuffix(tokens[index], "h") {
+			return "04h", nil
+		}
 		if strings.Contains(tokens[index], "u") {
 			return "15u04", nil
 		}

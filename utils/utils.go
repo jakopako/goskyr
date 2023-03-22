@@ -3,6 +3,9 @@ package utils
 import (
 	"fmt"
 	"math"
+	"sort"
+
+	"golang.org/x/exp/constraints"
 )
 
 func ShortenString(s string, l int) string {
@@ -94,4 +97,48 @@ func OnlyContainsDigits(s string) bool {
 		}
 	}
 	return true
+}
+
+func SortSlice[T constraints.Ordered](s []T) {
+	sort.Slice(s, func(i, j int) bool {
+		return s[i] < s[j]
+	})
+}
+
+func IntersectionSlices[T constraints.Ordered](a, b []T) []T {
+	SortSlice(a)
+	SortSlice(b)
+	result := []T{}
+	for j, k := 0, 0; j < len(a) && k < len(b); {
+		if a[j] == b[k] {
+			result = append(result, a[j])
+			j++
+			k++
+		} else if a[j] > b[k] {
+			k++
+		} else {
+			j++
+		}
+	}
+	return result
+}
+
+func SliceEquals[T constraints.Ordered](a, b []T) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	SortSlice(a)
+	SortSlice(b)
+	for i := 0; i < len(a); i++ {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func ReverseSlice[T any](s []T) {
+	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+		s[i], s[j] = s[j], s[i]
+	}
 }

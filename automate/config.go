@@ -64,30 +64,6 @@ func (p path) string() string {
 	return strings.Join(nodeStrings, " > ")
 }
 
-// func (p path) pruneNthChild() {
-// 	// we remove all nth-child except the ones close to the leave (the end of the nodePath slice)
-// 	for i := 0; i < len(p); i++ {
-// 		// does this work? chosing a fixed value here?
-// 		// hardcoding this does not really work. Already encountered one example where we'd need 1 (http://www.bar-laparenthese.ch/)
-// 		// and on where we'd need 2 (https://www.dachstock.ch/events)
-// 		// somewhat arbitrary right now... let's see how this behaves with new cases...
-// 		// b := len(p) / 5
-// 		// this doesn't work. we need to somehow afterward merge the different paths based on the nr of children...
-// 		b := 0
-// 		if i > b {
-// 			j := len(p) - i - 1
-// 			k := 0
-// 			for _, pc := range p[j].pseudoClasses {
-// 				if !strings.HasPrefix(pc, "nth-child") {
-// 					p[j].pseudoClasses[k] = pc
-// 					k++
-// 				}
-// 			}
-// 			p[j].pseudoClasses = p[j].pseudoClasses[:k]
-// 		}
-// 	}
-// }
-
 func (p path) distanceTo(p2 path) float64 {
 	return float64(levenshtein.ComputeDistance(p.string(), p2.string()))
 }
@@ -311,25 +287,8 @@ outer:
 	return nil
 }
 
-// func updateLocationManager(l locationManager, newLp locationProps) locationManager {
-// 	// newLp.path.pruneNthChild()
-// 	// update the locationProps accordingly
-// 	for _, lp := range l {
-// 		if checkAndUpdatePath(lp, &newLp) {
-// 			// every path should be unique now so shouldn't get here...
-// 			lp.count++
-// 			if lp.count <= 8 {
-// 				lp.examples = append(lp.examples, newLp.examples...)
-// 			}
-// 			return l
-// 		}
-// 	}
-// 	return append(l, &newLp)
-// }
-
 func squashLocationManager(l locationManager, minOcc int) locationManager {
-	// TODO
-	// This function will try to merge different locationProps into one
+	// This function merges different locationProps into one
 	// based on their similarity. The tricky question is 'when are two
 	// locationProps close enough to be merged into one?'
 	squashed := locationManager{}
@@ -345,7 +304,6 @@ func squashLocationManager(l locationManager, minOcc int) locationManager {
 			}
 		}
 		if !updated {
-			// TODO smartly remove nth-child based on minOcc
 			stripNthChild(lp, minOcc)
 			squashed = append(squashed, lp)
 		}
@@ -355,7 +313,17 @@ func squashLocationManager(l locationManager, minOcc int) locationManager {
 
 func stripNthChild(lp *locationProps, minOcc int) {
 	borderI := 0
-	for i := len(lp.path) - 1; i >= 0; i-- {
+	// a bit arbitrary (and probably not always correct) but
+	// for now we assume that borderI cannot be len(lp.path)-1
+	// not correct for https://huxleysneuewelt.com/shows
+	// but needed for http://www.bar-laparenthese.ch/
+	// very hacky:
+	sub := 1
+	// when minOcc is too small we'd risk stripping the wrong nth-child pseudo classes
+	if minOcc < 6 {
+		sub = 2
+	}
+	for i := len(lp.path) - sub; i >= 0; i-- {
 		if i < borderI {
 			lp.path[i].pseudoClasses = []string{}
 		} else if len(lp.path[i].pseudoClasses) > 0 {
@@ -394,8 +362,7 @@ func checkAndUpdateLocProps(old, new *locationProps) bool {
 						}
 					}
 					newNode := node{
-						tagName: on.tagName,
-						// classes:       ovClasses,
+						tagName:       on.tagName,
 						pseudoClasses: on.pseudoClasses,
 					}
 					if len(on.classes) == 0 && len(new.path[i].classes) == 0 {
@@ -486,8 +453,8 @@ func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields b
 	}
 	z := html.NewTokenizer(strings.NewReader(htmlStr))
 	locMan := locationManager{}
-	allChildren := map[string]int{} // the nr of children including non-html-tag nodes (ie text)
-	tagChildren := map[string]int{} // the nr of children used for :nth-child()
+	allChildren := map[string]int{}    // the nr of children including non-html-tag nodes (ie text)
+	tagChildren := map[string][]node{} // the children at the specified nodePath; used for :nth-child() logic
 	nodePath := path{}
 	depth := 0
 	inBody := false
@@ -512,7 +479,6 @@ parse:
 					}
 					copy(lp.path, nodePath)
 					locMan = append(locMan, &lp)
-					// locMan = updateLocationManager(locMan, lp)
 				}
 				allChildren[p] += 1
 			}
@@ -526,12 +492,12 @@ parse:
 				// br can also be self closing tag, see later case statement
 				if tnString == "br" || tnString == "input" {
 					allChildren[nodePath.string()] += 1
-					tagChildren[nodePath.string()] += 1
+					tagChildren[nodePath.string()] = append(tagChildren[nodePath.string()], node{tagName: tnString})
 					continue
 				}
 				if tt == html.StartTagToken {
 					allChildren[nodePath.string()] += 1
-					tagChildren[nodePath.string()] += 1
+					tagChildren[nodePath.string()] = append(tagChildren[nodePath.string()], node{tagName: tnString})
 					moreAttr := true
 					var hrefVal string
 					var cls []string
@@ -556,8 +522,14 @@ parse:
 						moreAttr = m
 					}
 					var pCls []string
-					if tagChildren[nodePath.string()] > 1 {
-						pCls = []string{fmt.Sprintf("nth-child(%d)", tagChildren[nodePath.string()])}
+					// only add nth-child if there has been another node before at the same
+					// level with same tag
+					for i := 0; i < len(tagChildren[nodePath.string()])-1; i++ { // the last element is skipped because it's the current node itself
+						cn := tagChildren[nodePath.string()][i]
+						if cn.tagName == tnString {
+							pCls = []string{fmt.Sprintf("nth-child(%d)", len(tagChildren[nodePath.string()]))}
+						}
+
 					}
 					newNode := node{
 						tagName:       tnString,
@@ -566,6 +538,7 @@ parse:
 					}
 					nodePath = append(nodePath, newNode)
 					depth++
+					tagChildren[nodePath.string()] = []node{}
 					if tnString == "a" && hrefVal != "" {
 						lp := locationProps{
 							path:     make([]node, len(nodePath)),
@@ -575,7 +548,6 @@ parse:
 						}
 						copy(lp.path, nodePath)
 						locMan = append(locMan, &lp)
-						// locMan = updateLocationManager(locMan, lp)
 					}
 				} else {
 					n := true
@@ -599,7 +571,7 @@ parse:
 				tnString := string(tn)
 				if tnString == "br" || tnString == "input" || tnString == "img" || tnString == "link" {
 					allChildren[nodePath.string()] += 1
-					tagChildren[nodePath.string()] += 1
+					tagChildren[nodePath.string()] = append(tagChildren[nodePath.string()], node{tagName: tnString})
 					continue
 				}
 			}

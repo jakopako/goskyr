@@ -13,6 +13,10 @@ var longDayNames = []langMap{
 		lang:     "fr_FR",
 		namesMap: longDayNamesFrFR,
 	},
+	{
+		lang:     "nl_BE",
+		namesMap: longDayNamesNlBE,
+	},
 }
 
 var shortDayNames = []langMap{
@@ -27,6 +31,10 @@ var shortDayNames = []langMap{
 	{
 		lang:     "fr_FR",
 		namesMap: shortDayNamesFrFR,
+	},
+	{
+		lang:     "nl_BE",
+		namesMap: shortDayNamesNlBE,
 	},
 }
 
@@ -88,4 +96,24 @@ var longDayNamesFrFR = map[string]bool{
 	"jeudi":    true,
 	"vendredi": true,
 	"samedi":   true,
+}
+
+var shortDayNamesNlBE = map[string]bool{
+	"zo": true,
+	"ma": true,
+	"di": true,
+	"wo": true,
+	"do": true,
+	"vr": true,
+	"za": true,
+}
+
+var longDayNamesNlBE = map[string]bool{
+	"zondag":    true,
+	"maandag":   true,
+	"dinsdag":   true,
+	"woensdag":  true,
+	"donderdag": true,
+	"vrijdag":   true,
+	"zaterdag":  true,
 }

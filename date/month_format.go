@@ -18,6 +18,10 @@ var longMonthNames = []langMap{
 		lang:     "fr_FR",
 		namesMap: longMonthNamesFrFR,
 	},
+	{
+		lang:     "nl_BE",
+		namesMap: longMonthNamesNlBE,
+	},
 }
 
 var shortMonthNames = []langMap{
@@ -32,6 +36,10 @@ var shortMonthNames = []langMap{
 	{
 		lang:     "fr_FR",
 		namesMap: shortMonthNamesFrFR,
+	},
+	{
+		lang:     "nl_BE",
+		namesMap: shortMonthNamesNlBE,
 	},
 }
 
@@ -123,4 +131,34 @@ var longMonthNamesFrFR = map[string]bool{
 	"octobre":   true,
 	"novembre":  true,
 	"décembre":  true,
+}
+
+var shortMonthNamesNlBE = map[string]bool{
+	"jan": true,
+	"feb": true,
+	"mrt": true,
+	"apr": true,
+	"mei": true,
+	"jun": true,
+	"jul": true,
+	"aug": true,
+	"sep": true,
+	"okt": true,
+	"nov": true,
+	"dec": true,
+}
+
+var longMonthNamesNlBE = map[string]bool{
+	"januari":   true,
+	"februari":  true,
+	"maart":     true,
+	"april":     true,
+	"mei":       true,
+	"juni":      true,
+	"juli":      true,
+	"augustus":  true,
+	"september": true,
+	"oktober":   true,
+	"november":  true,
+	"december":  true,
 }

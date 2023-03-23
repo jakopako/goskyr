@@ -98,7 +98,7 @@ func GetDateFormat(date string, parts CoveredDateParts) (string, string) {
 		sepTokens = append(sepTokens, "")
 	}
 
-	language := ""
+	potLangs := [][]string{}
 	formatTokens := []string{}
 	for i, token := range tokens {
 		if token == "" {
@@ -109,9 +109,7 @@ func GetDateFormat(date string, parts CoveredDateParts) (string, string) {
 			if parts.Month {
 				if m, l, err := getFormatAndLangMonthLetters(token); err == nil {
 					formatTokens = append(formatTokens, m)
-					if language == "" {
-						language = l
-					}
+					potLangs = append(potLangs, l)
 					parts.Month = false // so that we know that we had month already
 					continue
 				}
@@ -119,9 +117,7 @@ func GetDateFormat(date string, parts CoveredDateParts) (string, string) {
 			if parts.Day {
 				if d, l, err := getFormatAndLangDayLetters(token); err == nil {
 					formatTokens = append(formatTokens, d)
-					if language == "" {
-						language = l
-					}
+					potLangs = append(potLangs, l)
 					// in contrast to month we don't do this with day because it happens
 					// that day occurs as number _and_ as word in a single date
 					// parts.Day = false
@@ -167,45 +163,72 @@ func GetDateFormat(date string, parts CoveredDateParts) (string, string) {
 		finalFormat += sepTokens[i]
 	}
 
+	// finding the correct language
+	language := ""
+	if len(potLangs) > 1 {
+		intersection := potLangs[0]
+		for i := 1; i < len(potLangs) && len(intersection) > 0; i++ {
+			intersection = utils.IntersectionSlices(intersection, potLangs[i])
+		}
+		if len(intersection) > 0 {
+			language = intersection[0]
+		}
+	} else if len(potLangs) > 0 {
+		language = potLangs[0][0]
+	}
 	return finalFormat, language
 }
 
-func getFormatAndLangMonthLetters(month string) (string, string, error) {
+func getFormatAndLangMonthLetters(month string) (string, []string, error) {
+	potLangs := []string{}
 	monthTmp := strings.ToLower(month)
 	for _, m := range longMonthNames {
 		for n := range m.namesMap {
 			if monthTmp == strings.ToLower(n) {
-				return "January", m.lang, nil
+				potLangs = append(potLangs, m.lang)
 			}
 		}
+	}
+	if len(potLangs) > 0 {
+		return "January", potLangs, nil
 	}
 	for _, m := range shortMonthNames {
 		for n := range m.namesMap {
 			if monthTmp == strings.ToLower(n) {
-				return "Jan", m.lang, nil
+				potLangs = append(potLangs, m.lang)
 			}
 		}
 	}
-	return "", "", fmt.Errorf("%s is not a month", month)
+	if len(potLangs) > 0 {
+		return "Jan", potLangs, nil
+	}
+	return "", potLangs, fmt.Errorf("%s is not a month", month)
 }
 
-func getFormatAndLangDayLetters(day string) (string, string, error) {
+func getFormatAndLangDayLetters(day string) (string, []string, error) {
+	potLangs := []string{} // there might be multiple matches for a certain day string
 	dayTmp := strings.ToLower(day)
 	for _, m := range longDayNames {
 		for n := range m.namesMap {
 			if dayTmp == strings.ToLower(n) {
-				return "Monday", m.lang, nil
+				potLangs = append(potLangs, m.lang)
 			}
 		}
+	}
+	if len(potLangs) > 0 {
+		return "Monday", potLangs, nil
 	}
 	for _, m := range shortDayNames {
 		for n := range m.namesMap {
 			if dayTmp == strings.ToLower(n) {
-				return "Mon", m.lang, nil
+				potLangs = append(potLangs, m.lang)
 			}
 		}
 	}
-	return "", "", fmt.Errorf("%s is not a day", day)
+	if len(potLangs) > 0 {
+		return "Mon", potLangs, nil
+	}
+	return "", potLangs, fmt.Errorf("%s is not a day", day)
 }
 
 func isDayNumber(number string) bool {

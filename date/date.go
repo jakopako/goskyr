@@ -248,14 +248,25 @@ func isMonthNumber(number string) bool {
 
 func getTimeFormatPart(index int, sepTokens []string, tokens []string) (string, error) {
 	if len(tokens[index]) <= 2 {
-		if sepTokens[index] == ":" {
+		if sepTokens[index] == ":" || sepTokens[index] == "." {
 			// hour
 			return "15", nil
 		}
 		if index > 0 {
-			if sepTokens[index-1] == ":" {
+			if sepTokens[index-1] == ":" || sepTokens[index-1] == "." {
 				// minute (could also be second but haven't encountered it so far. Adapt when necessary)
+				// if utils.OnlyContainsDigits(tokens[index]) {
 				return "04", nil
+				// }
+				// 7.30pm -> [7, 30pm] -> 30pm
+				// m := "04"
+				// for _, r := range tokens[index] {
+				// 	// not very generic, but works for now and can be adapted as soon as there are new cases
+				// 	if !unicode.IsDigit(r) {
+				// 		m += string(r)
+				// 	}
+				// }
+				// return m, nil
 			}
 		}
 		if len(tokens) > index+1 {
@@ -267,6 +278,14 @@ func getTimeFormatPart(index int, sepTokens []string, tokens []string) (string, 
 		// one of 04h, 15u04, 15h04
 		if strings.HasSuffix(tokens[index], "h") {
 			return "04h", nil
+		}
+		if strings.HasSuffix(tokens[index], "pm") {
+			if index > 0 {
+				if sepTokens[index-1] != " " {
+					return "04pm", nil
+				}
+			}
+			return "15pm", nil
 		}
 		if strings.Contains(tokens[index], "u") {
 			return "15u04", nil

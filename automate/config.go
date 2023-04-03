@@ -240,6 +240,7 @@ outer:
 	// for now we assume that there will only be one date field
 	t := time.Now()
 	zone, _ := t.Zone()
+	zone = strings.Replace(zone, "CEST", "CET", 1) // quick hack for issue #209
 	dateField := scraper.Field{
 		Name:         "date",
 		Type:         "date",

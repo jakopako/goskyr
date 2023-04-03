@@ -255,18 +255,7 @@ func getTimeFormatPart(index int, sepTokens []string, tokens []string) (string, 
 		if index > 0 {
 			if sepTokens[index-1] == ":" || sepTokens[index-1] == "." {
 				// minute (could also be second but haven't encountered it so far. Adapt when necessary)
-				// if utils.OnlyContainsDigits(tokens[index]) {
 				return "04", nil
-				// }
-				// 7.30pm -> [7, 30pm] -> 30pm
-				// m := "04"
-				// for _, r := range tokens[index] {
-				// 	// not very generic, but works for now and can be adapted as soon as there are new cases
-				// 	if !unicode.IsDigit(r) {
-				// 		m += string(r)
-				// 	}
-				// }
-				// return m, nil
 			}
 		}
 		if len(tokens) > index+1 {
@@ -275,7 +264,7 @@ func getTimeFormatPart(index int, sepTokens []string, tokens []string) (string, 
 			}
 		}
 	} else {
-		// one of 04h, 15u04, 15h04
+		// one of 04h, 15u04, 15h04, 04pm, 15pm
 		if strings.HasSuffix(tokens[index], "h") {
 			return "04h", nil
 		}

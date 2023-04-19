@@ -68,30 +68,26 @@ func GetDateFormat(date string, parts CoveredDateParts) (string, string) {
 	sepTokens := []string{}
 
 	currToken := ""
-	currSepToken := ""
+	// split date into tokens. Tokens are strings of characters, separators are single separator characters.
 	for _, c := range date {
 		if utils.RuneIsOneOf(c, separators) {
 			if currToken != "" || len(tokens) == 0 {
 				// previous c was no separator
 				tokens = append(tokens, currToken)
 				currToken = ""
+				sepTokens = append(sepTokens, string(c))
+			} else {
+				// previous c was also a separator or we are at the beginning
+				tokens = append(tokens, "")
+				sepTokens = append(sepTokens, string(c))
 			}
-			currSepToken += string(c)
 		} else {
-			if currSepToken != "" {
-				// previous c was a separator
-				sepTokens = append(sepTokens, currSepToken)
-				currSepToken = ""
-			}
 			currToken += string(c)
 		}
 	}
 	// push last tokens to respective arrays
 	if currToken != "" {
 		tokens = append(tokens, currToken)
-	}
-	if currSepToken != "" {
-		sepTokens = append(sepTokens, currSepToken)
 	}
 	// make sure both arrays have the same length
 	if len(sepTokens) < len(tokens) {
@@ -268,13 +264,19 @@ func getTimeFormatPart(index int, sepTokens []string, tokens []string) (string, 
 		if strings.HasSuffix(tokens[index], "h") {
 			return "04h", nil
 		}
-		if strings.HasSuffix(tokens[index], "pm") {
+		if strings.HasSuffix(strings.ToLower(tokens[index]), "pm") || strings.HasSuffix(strings.ToLower(tokens[index]), "am") {
+			suffix := tokens[index][len(tokens[index])-2:]
+			isUpper := suffix == "PM" || suffix == "AM"
+			suffixFormatted := "pm"
+			if isUpper {
+				suffixFormatted = "PM"
+			}
 			if index > 0 {
 				if sepTokens[index-1] != " " {
-					return "04pm", nil
+					return fmt.Sprintf("04%s", suffixFormatted), nil
 				}
 			}
-			return "15pm", nil
+			return fmt.Sprintf("15%s", suffixFormatted), nil
 		}
 		if strings.Contains(tokens[index], "u") {
 			return "15u04", nil

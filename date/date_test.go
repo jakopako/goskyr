@@ -449,3 +449,32 @@ func TestGetDateFormat15(t *testing.T) {
 		}
 	}
 }
+
+func TestGetDateFormat16(t *testing.T) {
+	dateFormats := []formatTestStruct{
+		{
+			input:        "DOORS: 7:30PM",
+			coveredParts: CoveredDateParts{Time: true},
+			formatString: "DOORS: 15:04PM",
+		},
+		{
+			input:        "DOORS: 5AM",
+			coveredParts: CoveredDateParts{Time: true},
+			formatString: "DOORS: 15PM",
+		},
+		{
+			input:        "DOORS: 11:00AM",
+			coveredParts: CoveredDateParts{Time: true},
+			formatString: "DOORS: 15:04PM",
+		},
+	}
+	for _, df := range dateFormats {
+		f, l := GetDateFormat(df.input, df.coveredParts)
+		if f != df.formatString {
+			log.Fatalf("expected %s but got %s", df.formatString, f)
+		}
+		if l != df.language {
+			log.Fatalf("expected date language %s but got %s", df.language, l)
+		}
+	}
+}

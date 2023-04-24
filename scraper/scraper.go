@@ -533,12 +533,17 @@ func getURLString(e *ElementLocation, s *goquery.Selection, baseURL string) stri
 	} else if strings.HasPrefix(urlVal, "?") || strings.HasPrefix(urlVal, ".?") {
 		urlVal = strings.TrimLeft(urlVal, ".")
 		urlRes = fmt.Sprintf("%s://%s%s%s", u.Scheme, u.Host, u.Path, urlVal)
-	} else {
+	} else if strings.HasPrefix(urlVal, "/") {
 		baseURL := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
-		if !strings.HasPrefix(urlVal, "/") {
-			baseURL = baseURL + "/"
-		}
 		urlRes = fmt.Sprintf("%s%s", baseURL, urlVal)
+	} else {
+		idx := strings.LastIndex(u.Path, "/")
+		if idx > 0 {
+			path := u.Path[:idx]
+			urlRes = fmt.Sprintf("%s://%s%s/%s", u.Scheme, u.Host, path, urlVal)
+		} else {
+			urlRes = fmt.Sprintf("%s://%s/%s", u.Scheme, u.Host, urlVal)
+		}
 	}
 
 	urlRes = strings.TrimSpace(urlRes)

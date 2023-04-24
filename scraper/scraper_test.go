@@ -67,6 +67,16 @@ const (
 			<span>Di. | 03.05.2022</span><span>Heinz Rudolf Kunze &amp; Verstärkung
 				&#8211; ABGESAGT</span> </a>
 	</h2>`
+	htmlString4 = `
+	<div class="text">
+		<a href="programm.php?m=4&j=2023&vid=4378">
+			<div class="reihe">Treffpunkt</div>
+			<div class="titel">Kreativ-Workshop: "My message to the world"
+				<span class="supportband">— Творча майстерня: "Моє послання до світу"</span>
+			</div>
+			<div class="beschreibung"><em>Osterferienprogramm Ukrainehilfe / ПРОГРАМА ПАСХАЛЬНИХ КАНІКУЛ ПІДТРИМКА УКРАЇНЦІВ</em></div>
+		</a>
+	</div>`
 )
 
 func TestFilterItemMatchTrue(t *testing.T) {
@@ -332,6 +342,35 @@ func TestExtractFieldUrlQuery(t *testing.T) {
 		t.Fatal("event doesn't contain the expected url field")
 	} else {
 		expected := "https://www.eventfabrik-muenchen.de/events?bli=bla"
+		if v != expected {
+			t.Fatalf("expected '%s' for url but got '%s'", expected, v)
+		}
+	}
+}
+
+func TestExtractFieldUrlFile(t *testing.T) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString4))
+	if err != nil {
+		t.Fatalf("unexpected error while reading html string: %v", err)
+	}
+	f := &Field{
+		Name: "url",
+		Type: "url",
+		ElementLocations: []ElementLocation{
+			{
+				Selector: "div > a",
+			},
+		},
+	}
+	event := map[string]interface{}{}
+	err = extractField(f, event, doc.Selection, "https://www.roxy.ulm.de/programm/programm.php")
+	if err != nil {
+		t.Fatalf("unexpected error while extracting the time field: %v", err)
+	}
+	if v, ok := event["url"]; !ok {
+		t.Fatal("event doesn't contain the expected url field")
+	} else {
+		expected := "https://www.roxy.ulm.de/programm/programm.php?m=4&j=2023&vid=4378"
 		if v != expected {
 			t.Fatalf("expected '%s' for url but got '%s'", expected, v)
 		}

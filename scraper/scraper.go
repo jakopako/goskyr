@@ -177,6 +177,8 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 			return items, err
 		}
 
+		baseUrl := getBaseURL(pageURL, doc)
+
 		doc.Find(c.Item).Each(func(i int, s *goquery.Selection) {
 			for _, excludeSelector := range c.ExcludeWithSelector {
 				if s.Find(excludeSelector).Length() > 0 || s.Is(excludeSelector) {
@@ -196,9 +198,9 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 					if f.OnSubpage == "" {
 						var err error
 						if rawDyn {
-							err = extractRawField(&f, currentItem, s, pageURL)
+							err = extractRawField(&f, currentItem, s, baseUrl)
 						} else {
-							err = extractField(&f, currentItem, s, pageURL)
+							err = extractField(&f, currentItem, s, baseUrl)
 						}
 						if err != nil {
 							log.Printf("%s ERROR: error while parsing field %s: %v. Skipping item %v.", c.Name, f.Name, err, currentItem)
@@ -229,7 +231,8 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 							}
 							subDocs[subpageURL] = subDoc
 						}
-						err = extractField(&f, currentItem, subDocs[subpageURL].Selection, c.URL)
+						baseURLSubpage := getBaseURL(subpageURL, subDocs[subpageURL])
+						err = extractField(&f, currentItem, subDocs[subpageURL].Selection, baseURLSubpage)
 						if err != nil {
 							log.Printf("%s ERROR: error while parsing field %s: %v. Skipping item %v.", c.Name, f.Name, err, currentItem)
 							return
@@ -250,7 +253,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 		})
 
 		hasNextPage = false
-		pageURL = getURLString(&c.Paginator.Location, doc.Selection, pageURL)
+		pageURL = getURLString(&c.Paginator.Location, doc.Selection, baseUrl)
 		if pageURL != "" {
 			currentPage++
 			if currentPage < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
@@ -683,4 +686,14 @@ func transformString(t *TransformConfig, s string) (string, error) {
 		return "", fmt.Errorf("transform type '%s' does not exist", t.TransformType)
 	}
 	return extractedString, nil
+}
+
+func getBaseURL(pageUrl string, doc *goquery.Document) string {
+	// relevant info: https://www.w3.org/TR/WD-html40-970917/htmlweb.html#relative-urls
+	// currently this function does not fully implement the standard
+	baseURL := doc.Find("base").AttrOr("href", "")
+	if baseURL == "" {
+		baseURL = pageUrl
+	}
+	return baseURL
 }

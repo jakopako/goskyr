@@ -87,6 +87,7 @@ func (d *DynamicFetcher) Fetch(url string) (string, error) {
 			count = d.Interaction.Count
 		}
 		for i := 0; i < count; i++ {
+			// TODO check if selector even exists and only then add the action
 			actions = append(actions, chromedp.Click(d.Interaction.Selector, chromedp.ByQuery))
 			actions = append(actions, chromedp.Sleep(sleepTime))
 		}

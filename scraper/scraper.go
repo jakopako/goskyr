@@ -275,6 +275,9 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 		hasNextPage = false
 		// if click is true we already fetched the entire content with the dynamic fetcher
 		// and page interaction
+		// TODO what happens with websites have a next page button that needs a button click
+		//   ie we have to somehow distinguish between button clicks that navigate to the next page
+		//   and button clicks that load the entire content
 		if !c.Paginator.Click {
 			pageURL = getURLString(&c.Paginator.Location, doc.Selection, baseUrl)
 			if pageURL != "" {

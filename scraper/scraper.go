@@ -127,20 +127,25 @@ type Filter struct {
 	Match bool   `yaml:"match"`
 }
 
+// A Paginator is used to paginate through a website
+type Paginator struct {
+	Location ElementLocation `yaml:"location,omitempty"`
+	MaxPages int             `yaml:"max_pages,omitempty"`
+	Click    bool            `yaml:"click,omitempty"`
+	Count    int             `yaml:"count,omitempty"`
+}
+
 // A Scraper contains all the necessary config parameters and structs needed
 // to extract the desired information from a website
 type Scraper struct {
-	Name                string   `yaml:"name"`
-	URL                 string   `yaml:"url"`
-	Item                string   `yaml:"item"`
-	ExcludeWithSelector []string `yaml:"exclude_with_selector,omitempty"`
-	Fields              []Field  `yaml:"fields,omitempty"`
-	Filters             []Filter `yaml:"filters,omitempty"`
-	Paginator           struct {
-		Location ElementLocation `yaml:"location,omitempty"`
-		MaxPages int             `yaml:"max_pages,omitempty"`
-	} `yaml:"paginator,omitempty"`
-	RenderJs bool `yaml:"renderJs,omitempty"`
+	Name                string    `yaml:"name"`
+	URL                 string    `yaml:"url"`
+	Item                string    `yaml:"item"`
+	ExcludeWithSelector []string  `yaml:"exclude_with_selector,omitempty"`
+	Fields              []Field   `yaml:"fields,omitempty"`
+	Filters             []Filter  `yaml:"filters,omitempty"`
+	Paginator           Paginator `yaml:"paginator,omitempty"`
+	RenderJs            bool      `yaml:"renderJs,omitempty"`
 }
 
 // GetItems fetches and returns all items from a website according to the
@@ -158,8 +163,19 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 	currentPage := 0
 	var fetcher fetch.Fetcher
 	if c.RenderJs {
-		fetcher = &fetch.DynamicFetcher{
-			UserAgent: globalConfig.UserAgent,
+		// if click is true we use the dynamic fetcher with page interaction
+		if c.Paginator.Click {
+			fetcher = &fetch.DynamicFetcher{
+				UserAgent: globalConfig.UserAgent,
+				Interaction: fetch.Interaction{
+					Selector: c.Paginator.Location.Selector,
+					Count:    c.Paginator.Count,
+				},
+			}
+		} else {
+			fetcher = &fetch.DynamicFetcher{
+				UserAgent: globalConfig.UserAgent,
+			}
 		}
 	} else {
 		fetcher = &fetch.StaticFetcher{
@@ -171,7 +187,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 		if err != nil {
 			return items, err
 		}
-
+		// fmt.Println(res)
 		doc, err := goquery.NewDocumentFromReader(strings.NewReader(res))
 		if err != nil {
 			return items, err
@@ -212,6 +228,10 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 
 			// handle all fields on subpages
 			if !rawDyn {
+				subpageFetcher := &fetch.DynamicFetcher{
+					UserAgent:   globalConfig.UserAgent,
+					WaitSeconds: 1, // let's see if this works...
+				}
 				subDocs := make(map[string]*goquery.Document)
 				for _, f := range c.Fields {
 					if f.OnSubpage != "" && f.Value == "" {
@@ -219,7 +239,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 						subpageURL := fmt.Sprint(currentItem[f.OnSubpage])
 						_, found := subDocs[subpageURL]
 						if !found {
-							subRes, err := fetcher.Fetch(subpageURL)
+							subRes, err := subpageFetcher.Fetch(subpageURL)
 							if err != nil {
 								log.Printf("%s ERROR: %v. Skipping item %v.", c.Name, err, currentItem)
 								return
@@ -253,11 +273,15 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 		})
 
 		hasNextPage = false
-		pageURL = getURLString(&c.Paginator.Location, doc.Selection, baseUrl)
-		if pageURL != "" {
-			currentPage++
-			if currentPage < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
-				hasNextPage = true
+		// if click is true we already fetched the entire content with the dynamic fetcher
+		// and page interaction
+		if !c.Paginator.Click {
+			pageURL = getURLString(&c.Paginator.Location, doc.Selection, baseUrl)
+			if pageURL != "" {
+				currentPage++
+				if currentPage < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
+					hasNextPage = true
+				}
 			}
 		}
 	}

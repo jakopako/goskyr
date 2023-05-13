@@ -8,8 +8,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/chromedp"
+	"github.com/jakopako/goskyr/types"
 )
 
 // A Fetcher allows to fetch the content of a web page
@@ -52,13 +54,8 @@ func (s *StaticFetcher) Fetch(url string) (string, error) {
 // The DynamicFetcher renders js
 type DynamicFetcher struct {
 	UserAgent   string
-	Interaction Interaction
+	Interaction types.Interaction
 	WaitSeconds int
-}
-
-type Interaction struct {
-	Selector string
-	Count    int
 }
 
 func (d *DynamicFetcher) Fetch(url string) (string, error) {
@@ -81,14 +78,25 @@ func (d *DynamicFetcher) Fetch(url string) (string, error) {
 		chromedp.Navigate(url),
 		chromedp.Sleep(sleepTime), // for now
 	}
-	if d.Interaction.Selector != "" {
-		count := 1
+	if d.Interaction.Type == types.InteractionTypeClick {
+		count := 1 // default is 1
 		if d.Interaction.Count > 0 {
 			count = d.Interaction.Count
 		}
 		for i := 0; i < count; i++ {
-			// TODO check if selector even exists and only then add the action
-			actions = append(actions, chromedp.Click(d.Interaction.Selector, chromedp.ByQuery))
+			// we only click the button if it exists
+			// TODO: should we click as many times as possible if count == 0? How would we implement this?
+			// actions = append(actions, chromedp.Click(d.Interaction.Selector, chromedp.ByQuery))
+			actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
+				var nodes []*cdp.Node
+				if err := chromedp.Nodes(d.Interaction.Selector, &nodes, chromedp.AtLeast(0)).Do(ctx); err != nil {
+					return err
+				}
+				if len(nodes) == 0 {
+					return nil
+				} // nothing to do
+				return chromedp.MouseClickNode(nodes[0]).Do(ctx)
+			}))
 			actions = append(actions, chromedp.Sleep(sleepTime))
 		}
 	}

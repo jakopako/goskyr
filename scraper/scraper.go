@@ -17,6 +17,7 @@ import (
 	"github.com/jakopako/goskyr/date"
 	"github.com/jakopako/goskyr/fetch"
 	"github.com/jakopako/goskyr/output"
+	"github.com/jakopako/goskyr/types"
 	"github.com/jakopako/goskyr/utils"
 	"golang.org/x/net/html"
 	"gopkg.in/yaml.v3"
@@ -131,21 +132,20 @@ type Filter struct {
 type Paginator struct {
 	Location ElementLocation `yaml:"location,omitempty"`
 	MaxPages int             `yaml:"max_pages,omitempty"`
-	Click    bool            `yaml:"click,omitempty"`
-	Count    int             `yaml:"count,omitempty"`
 }
 
 // A Scraper contains all the necessary config parameters and structs needed
 // to extract the desired information from a website
 type Scraper struct {
-	Name                string    `yaml:"name"`
-	URL                 string    `yaml:"url"`
-	Item                string    `yaml:"item"`
-	ExcludeWithSelector []string  `yaml:"exclude_with_selector,omitempty"`
-	Fields              []Field   `yaml:"fields,omitempty"`
-	Filters             []Filter  `yaml:"filters,omitempty"`
-	Paginator           Paginator `yaml:"paginator,omitempty"`
-	RenderJs            bool      `yaml:"renderJs,omitempty"`
+	Name                string            `yaml:"name"`
+	URL                 string            `yaml:"url"`
+	Item                string            `yaml:"item"`
+	ExcludeWithSelector []string          `yaml:"exclude_with_selector,omitempty"`
+	Fields              []Field           `yaml:"fields,omitempty"`
+	Filters             []Filter          `yaml:"filters,omitempty"`
+	Paginator           Paginator         `yaml:"paginator,omitempty"`
+	RenderJs            bool              `yaml:"renderJs,omitempty"`
+	Interaction         types.Interaction `yaml:"interaction,omitempty"`
 }
 
 // GetItems fetches and returns all items from a website according to the
@@ -163,19 +163,9 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 	currentPage := 0
 	var fetcher fetch.Fetcher
 	if c.RenderJs {
-		// if click is true we use the dynamic fetcher with page interaction
-		if c.Paginator.Click {
-			fetcher = &fetch.DynamicFetcher{
-				UserAgent: globalConfig.UserAgent,
-				Interaction: fetch.Interaction{
-					Selector: c.Paginator.Location.Selector,
-					Count:    c.Paginator.Count,
-				},
-			}
-		} else {
-			fetcher = &fetch.DynamicFetcher{
-				UserAgent: globalConfig.UserAgent,
-			}
+		fetcher = &fetch.DynamicFetcher{
+			UserAgent:   globalConfig.UserAgent,
+			Interaction: c.Interaction,
 		}
 	} else {
 		fetcher = &fetch.StaticFetcher{
@@ -278,13 +268,11 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 		// TODO what happens with websites have a next page button that needs a button click
 		//   ie we have to somehow distinguish between button clicks that navigate to the next page
 		//   and button clicks that load the entire content
-		if !c.Paginator.Click {
-			pageURL = getURLString(&c.Paginator.Location, doc.Selection, baseUrl)
-			if pageURL != "" {
-				currentPage++
-				if currentPage < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
-					hasNextPage = true
-				}
+		pageURL = getURLString(&c.Paginator.Location, doc.Selection, baseUrl)
+		if pageURL != "" {
+			currentPage++
+			if currentPage < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
+				hasNextPage = true
 			}
 		}
 	}

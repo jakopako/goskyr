@@ -205,10 +205,16 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 
 			// handle all fields on subpages
 			if !rawDyn {
-				// TODO subpageFetcher only needs to be dynamic if c.RenderJs is true
-				subpageFetcher := &fetch.DynamicFetcher{
-					UserAgent:   globalConfig.UserAgent,
-					WaitSeconds: 1, // let's see if this works...
+				var subpageFetcher fetch.Fetcher
+				if c.RenderJs {
+					subpageFetcher = &fetch.DynamicFetcher{
+						UserAgent:   globalConfig.UserAgent,
+						WaitSeconds: 1, // let's see if this works...
+					}
+				} else {
+					subpageFetcher = &fetch.StaticFetcher{
+						UserAgent: globalConfig.UserAgent,
+					}
 				}
 				subDocs := make(map[string]*goquery.Document)
 				for _, f := range c.Fields {
@@ -250,24 +256,11 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 			}
 		})
 
-		// hasNextPage = false
-		// if click is true we already fetched the entire content with the dynamic fetcher
-		// and page interaction
-		// TODO what happens with websites have a next page button that needs a button click
-		//   ie we have to somehow distinguish between button clicks that navigate to the next page
-		//   and button clicks that load the entire content
 		currentPage++
 		hasNextPage, pageURL, doc, err = c.fetchPage(doc, currentPage, pageURL, globalConfig.UserAgent)
 		if err != nil {
 			return items, err
 		}
-		// pageURL = getURLString(&c.Paginator.Location, doc.Selection, baseUrl)
-		// if pageURL != "" {
-		// 	currentPage++
-		// 	if currentPage < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
-		// 		hasNextPage = true
-		// 	}
-		// }
 	}
 	// TODO: check if the dates make sense. Sometimes we have to guess the year since it
 	// does not appear on the website. In that case, eg. having a list of events around
@@ -316,7 +309,6 @@ func (c *Scraper) removeHiddenFields(item map[string]interface{}) map[string]int
 }
 
 func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl, userAgent string) (bool, string, *goquery.Document, error) {
-	// TODO clean up this function
 	var fetcher fetch.Fetcher
 	if c.RenderJs {
 		fetcher = &fetch.DynamicFetcher{
@@ -333,7 +325,6 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 		if err != nil {
 			return false, "", nil, err
 		}
-		// fmt.Println(res)
 		newDoc, err := goquery.NewDocumentFromReader(strings.NewReader(res))
 		if err != nil {
 			return false, "", nil, err
@@ -343,7 +334,6 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 		if c.Paginator.Location.Selector != "" {
 			if c.RenderJs {
 				// check if node c.Paginator.Location.Selector is present in doc
-				// TODO doesn't seem to work if max pages is not given
 				pagSelector := doc.Find(c.Paginator.Location.Selector)
 				if len(pagSelector.Nodes) > 0 {
 					fetcher = &fetch.DynamicFetcher{

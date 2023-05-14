@@ -158,7 +158,6 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 
 	var items []map[string]interface{}
 
-	// pageURL := c.URL
 	hasNextPage := true
 	currentPage := 0
 	var doc *goquery.Document

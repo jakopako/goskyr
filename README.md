@@ -449,7 +449,7 @@ interaction:
   count: 1 # number of clicks
 ```
 
-Note that these clicks are executed before the data is scraped.
+Note that these clicks are executed before the data is scraped. Also the interaction configuration will be ignored if `renderJs` is not set to `true` because only in that case is the website actually run within a headless browser.
 
 ### Pagination
 

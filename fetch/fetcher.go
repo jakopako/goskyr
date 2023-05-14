@@ -97,7 +97,7 @@ func (d *DynamicFetcher) Fetch(url string) (string, error) {
 				} // nothing to do
 				return chromedp.MouseClickNode(nodes[0]).Do(ctx)
 			}))
-			actions = append(actions, chromedp.Sleep(1*time.Second))
+			actions = append(actions, chromedp.Sleep(2*time.Second)) // a bit arbitrary
 		}
 	}
 	actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {

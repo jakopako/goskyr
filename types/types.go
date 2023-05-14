@@ -7,6 +7,7 @@ type Interaction struct {
 	Type     string `yaml:"type,omitempty"`
 	Selector string `yaml:"selector,omitempty"`
 	Count    int    `yaml:"count,omitempty"`
+	Delay    int    `yaml:"delay,omitempty"`
 }
 
 const (

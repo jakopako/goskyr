@@ -78,6 +78,10 @@ func (d *DynamicFetcher) Fetch(url string) (string, error) {
 		chromedp.Navigate(url),
 		chromedp.Sleep(sleepTime), // for now
 	}
+	delay := 1000 * time.Millisecond // default is 1 second
+	if d.Interaction.Delay > 0 {
+		delay = time.Duration(d.Interaction.Delay) * time.Millisecond
+	}
 	if d.Interaction.Type == types.InteractionTypeClick {
 		count := 1 // default is 1
 		if d.Interaction.Count > 0 {
@@ -97,7 +101,7 @@ func (d *DynamicFetcher) Fetch(url string) (string, error) {
 				} // nothing to do
 				return chromedp.MouseClickNode(nodes[0]).Do(ctx)
 			}))
-			actions = append(actions, chromedp.Sleep(2*time.Second)) // a bit arbitrary
+			actions = append(actions, chromedp.Sleep(delay))
 		}
 	}
 	actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {

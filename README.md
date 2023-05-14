@@ -438,6 +438,19 @@ filters:
 
 The `field` key determines to which field the regular expression will be applied. `regex` defines the regular expression and `match` determines whether the item should be included or excluded on match. Note, that as soon as there is one match for a regular expression that has `match` set to **false** the respective item will be exlcuded from the results without looking at the other filters.
 
+### Interaction
+
+If a dynamic webpage does initially not load all the items it might be necessary to click some kind of 'load more' button. This can be configured as follows:
+
+```yml
+interaction:
+  type: click # for now only click is supported.
+  selector: .some > div.selector
+  count: 1 # number of clicks
+```
+
+Note that these clicks are executed before the data is scraped.
+
 ### Pagination
 
 If the list of items on a web page spans multiple pages pagination can be configured as follows:
@@ -448,7 +461,7 @@ paginator:
     selector: ".pagination .selector"
 ```
 
-By default the value of the `href` key is taken as url for the next page. However, you can change this and other parameters in the paginator configuration.
+In case `renderJs` is set to `false` by default the value of the `href` key is taken as url for the next page. However, you can change this and other parameters in the paginator configuration.
 
 ```yml
 paginator:
@@ -458,6 +471,8 @@ paginator:
     attr: <string>
   max_pages: <number>
 ```
+
+If `renderJs` is set to `true` the scraper will simulate a mouse click on the given selector to loop over the pages.
 
 ### Output
 

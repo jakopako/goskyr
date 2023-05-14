@@ -318,17 +318,17 @@ func (c *Scraper) removeHiddenFields(item map[string]interface{}) map[string]int
 func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl, userAgent string) (bool, string, *goquery.Document, error) {
 	// TODO clean up this function
 	var fetcher fetch.Fetcher
-	if nextPageI == 0 {
-		if c.RenderJs {
-			fetcher = &fetch.DynamicFetcher{
-				UserAgent:   userAgent,
-				Interaction: c.Interaction,
-			}
-		} else {
-			fetcher = &fetch.StaticFetcher{
-				UserAgent: userAgent,
-			}
+	if c.RenderJs {
+		fetcher = &fetch.DynamicFetcher{
+			UserAgent:   userAgent,
+			Interaction: c.Interaction,
 		}
+	} else {
+		fetcher = &fetch.StaticFetcher{
+			UserAgent: userAgent,
+		}
+	}
+	if nextPageI == 0 {
 		res, err := fetcher.Fetch(currentPageUrl)
 		if err != nil {
 			return false, "", nil, err
@@ -340,8 +340,6 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 		}
 		return true, currentPageUrl, newDoc, nil
 	} else {
-		var nextPageUrl string
-		var nextPageDoc *goquery.Document
 		if c.Paginator.Location.Selector != "" {
 			if c.RenderJs {
 				// check if node c.Paginator.Location.Selector is present in doc
@@ -356,11 +354,7 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 							Count:    nextPageI, // we always need to 'restart' the clicks because we always re-fetch the page
 						},
 					}
-					res, err := fetcher.Fetch(currentPageUrl)
-					if err != nil {
-						return false, "", nil, err
-					}
-					nextPageDoc, err = goquery.NewDocumentFromReader(strings.NewReader(res))
+					nextPageDoc, err := fetchToDoc(currentPageUrl, fetcher)
 					if err != nil {
 						return false, "", nil, err
 					}
@@ -369,17 +363,10 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 					}
 				}
 			} else {
-				fetcher = &fetch.StaticFetcher{
-					UserAgent: userAgent,
-				}
 				baseUrl := getBaseURL(currentPageUrl, doc)
-				nextPageUrl = getURLString(&c.Paginator.Location, doc.Selection, baseUrl)
+				nextPageUrl := getURLString(&c.Paginator.Location, doc.Selection, baseUrl)
 				if nextPageUrl != "" {
-					res, err := fetcher.Fetch(nextPageUrl)
-					if err != nil {
-						return false, "", nil, err
-					}
-					nextPageDoc, err = goquery.NewDocumentFromReader(strings.NewReader(res))
+					nextPageDoc, err := fetchToDoc(nextPageUrl, fetcher)
 					if err != nil {
 						return false, "", nil, err
 					}
@@ -391,6 +378,14 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 		}
 		return false, "", nil, nil
 	}
+}
+
+func fetchToDoc(url string, fetcher fetch.Fetcher) (*goquery.Document, error) {
+	res, err := fetcher.Fetch(url)
+	if err != nil {
+		return nil, err
+	}
+	return goquery.NewDocumentFromReader(strings.NewReader(res))
 }
 
 func extractField(field *Field, event map[string]interface{}, s *goquery.Selection, baseURL string) error {

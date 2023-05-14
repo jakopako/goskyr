@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/chromedp"
+	"github.com/jakopako/goskyr/types"
 )
 
 // A Fetcher allows to fetch the content of a web page
@@ -50,28 +52,66 @@ func (s *StaticFetcher) Fetch(url string) (string, error) {
 
 // The DynamicFetcher renders js
 type DynamicFetcher struct {
-	UserAgent string
+	UserAgent   string
+	Interaction types.Interaction
+	WaitSeconds int
 }
 
 func (d *DynamicFetcher) Fetch(url string) (string, error) {
-	ctx, cancel := chromedp.NewContext(context.Background())
+	// TODO: add user agent
+	opts := append(
+		chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.WindowSize(1920, 1080), // init with a desktop view (sometimes pages look different on mobile, eg buttons are missing)
+	)
+	parentCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
+	defer cancel()
+	ctx, cancel := chromedp.NewContext(parentCtx)
+	// ctx, cancel := chromedp.NewContext(parentCtx, chromedp.WithDebugf(log.Printf))
 	defer cancel()
 
-	// TODO: add user agent
+	var body string
+	sleepTime := 5 * time.Second
+	if d.WaitSeconds > 0 {
+		sleepTime = time.Duration(d.WaitSeconds) * time.Second
+	}
+	actions := []chromedp.Action{
+		chromedp.Navigate(url),
+		chromedp.Sleep(sleepTime), // for now
+	}
+	if d.Interaction.Type == types.InteractionTypeClick {
+		count := 1 // default is 1
+		if d.Interaction.Count > 0 {
+			count = d.Interaction.Count
+		}
+		for i := 0; i < count; i++ {
+			// we only click the button if it exists. Do we really need this check here?
+			// TODO: should we click as many times as possible if count == 0? How would we implement this?
+			// actions = append(actions, chromedp.Click(d.Interaction.Selector, chromedp.ByQuery))
+			actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
+				var nodes []*cdp.Node
+				if err := chromedp.Nodes(d.Interaction.Selector, &nodes, chromedp.AtLeast(0)).Do(ctx); err != nil {
+					return err
+				}
+				if len(nodes) == 0 {
+					return nil
+				} // nothing to do
+				return chromedp.MouseClickNode(nodes[0]).Do(ctx)
+			}))
+			actions = append(actions, chromedp.Sleep(1*time.Second))
+		}
+	}
+	actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
+		node, err := dom.GetDocument().Do(ctx)
+		if err != nil {
+			return err
+		}
+		body, err = dom.GetOuterHTML().WithNodeID(node.NodeID).Do(ctx)
+		return err
+	}))
 
 	// run task list
-	var body string
 	err := chromedp.Run(ctx,
-		chromedp.Navigate(url),
-		chromedp.Sleep(5*time.Second), // for now
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			node, err := dom.GetDocument().Do(ctx)
-			if err != nil {
-				return err
-			}
-			body, err = dom.GetOuterHTML().WithNodeID(node.NodeID).Do(ctx)
-			return err
-		}),
+		actions...,
 	)
 	return body, err
 }

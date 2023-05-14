@@ -17,6 +17,7 @@ import (
 	"github.com/jakopako/goskyr/date"
 	"github.com/jakopako/goskyr/fetch"
 	"github.com/jakopako/goskyr/output"
+	"github.com/jakopako/goskyr/types"
 	"github.com/jakopako/goskyr/utils"
 	"golang.org/x/net/html"
 	"gopkg.in/yaml.v3"
@@ -127,20 +128,24 @@ type Filter struct {
 	Match bool   `yaml:"match"`
 }
 
+// A Paginator is used to paginate through a website
+type Paginator struct {
+	Location ElementLocation `yaml:"location,omitempty"`
+	MaxPages int             `yaml:"max_pages,omitempty"`
+}
+
 // A Scraper contains all the necessary config parameters and structs needed
 // to extract the desired information from a website
 type Scraper struct {
-	Name                string   `yaml:"name"`
-	URL                 string   `yaml:"url"`
-	Item                string   `yaml:"item"`
-	ExcludeWithSelector []string `yaml:"exclude_with_selector,omitempty"`
-	Fields              []Field  `yaml:"fields,omitempty"`
-	Filters             []Filter `yaml:"filters,omitempty"`
-	Paginator           struct {
-		Location ElementLocation `yaml:"location,omitempty"`
-		MaxPages int             `yaml:"max_pages,omitempty"`
-	} `yaml:"paginator,omitempty"`
-	RenderJs bool `yaml:"renderJs,omitempty"`
+	Name                string            `yaml:"name"`
+	URL                 string            `yaml:"url"`
+	Item                string            `yaml:"item"`
+	ExcludeWithSelector []string          `yaml:"exclude_with_selector,omitempty"`
+	Fields              []Field           `yaml:"fields,omitempty"`
+	Filters             []Filter          `yaml:"filters,omitempty"`
+	Paginator           Paginator         `yaml:"paginator,omitempty"`
+	RenderJs            bool              `yaml:"renderJs,omitempty"`
+	Interaction         types.Interaction `yaml:"interaction,omitempty"`
 }
 
 // GetItems fetches and returns all items from a website according to the
@@ -153,29 +158,16 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 
 	var items []map[string]interface{}
 
-	pageURL := c.URL
 	hasNextPage := true
 	currentPage := 0
-	var fetcher fetch.Fetcher
-	if c.RenderJs {
-		fetcher = &fetch.DynamicFetcher{
-			UserAgent: globalConfig.UserAgent,
-		}
-	} else {
-		fetcher = &fetch.StaticFetcher{
-			UserAgent: globalConfig.UserAgent,
-		}
-	}
-	for hasNextPage {
-		res, err := fetcher.Fetch(pageURL)
-		if err != nil {
-			return items, err
-		}
+	var doc *goquery.Document
 
-		doc, err := goquery.NewDocumentFromReader(strings.NewReader(res))
-		if err != nil {
-			return items, err
-		}
+	hasNextPage, pageURL, doc, err := c.fetchPage(nil, currentPage, c.URL, globalConfig.UserAgent)
+	if err != nil {
+		return items, err
+	}
+
+	for hasNextPage {
 
 		baseUrl := getBaseURL(pageURL, doc)
 
@@ -212,6 +204,17 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 
 			// handle all fields on subpages
 			if !rawDyn {
+				var subpageFetcher fetch.Fetcher
+				if c.RenderJs {
+					subpageFetcher = &fetch.DynamicFetcher{
+						UserAgent:   globalConfig.UserAgent,
+						WaitSeconds: 1, // let's see if this works...
+					}
+				} else {
+					subpageFetcher = &fetch.StaticFetcher{
+						UserAgent: globalConfig.UserAgent,
+					}
+				}
 				subDocs := make(map[string]*goquery.Document)
 				for _, f := range c.Fields {
 					if f.OnSubpage != "" && f.Value == "" {
@@ -219,7 +222,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 						subpageURL := fmt.Sprint(currentItem[f.OnSubpage])
 						_, found := subDocs[subpageURL]
 						if !found {
-							subRes, err := fetcher.Fetch(subpageURL)
+							subRes, err := subpageFetcher.Fetch(subpageURL)
 							if err != nil {
 								log.Printf("%s ERROR: %v. Skipping item %v.", c.Name, err, currentItem)
 								return
@@ -252,13 +255,10 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 			}
 		})
 
-		hasNextPage = false
-		pageURL = getURLString(&c.Paginator.Location, doc.Selection, baseUrl)
-		if pageURL != "" {
-			currentPage++
-			if currentPage < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
-				hasNextPage = true
-			}
+		currentPage++
+		hasNextPage, pageURL, doc, err = c.fetchPage(doc, currentPage, pageURL, globalConfig.UserAgent)
+		if err != nil {
+			return items, err
 		}
 	}
 	// TODO: check if the dates make sense. Sometimes we have to guess the year since it
@@ -305,6 +305,76 @@ func (c *Scraper) removeHiddenFields(item map[string]interface{}) map[string]int
 		}
 	}
 	return item
+}
+
+func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl, userAgent string) (bool, string, *goquery.Document, error) {
+	var fetcher fetch.Fetcher
+	if c.RenderJs {
+		fetcher = &fetch.DynamicFetcher{
+			UserAgent:   userAgent,
+			Interaction: c.Interaction,
+		}
+	} else {
+		fetcher = &fetch.StaticFetcher{
+			UserAgent: userAgent,
+		}
+	}
+	if nextPageI == 0 {
+		res, err := fetcher.Fetch(currentPageUrl)
+		if err != nil {
+			return false, "", nil, err
+		}
+		newDoc, err := goquery.NewDocumentFromReader(strings.NewReader(res))
+		if err != nil {
+			return false, "", nil, err
+		}
+		return true, currentPageUrl, newDoc, nil
+	} else {
+		if c.Paginator.Location.Selector != "" {
+			if c.RenderJs {
+				// check if node c.Paginator.Location.Selector is present in doc
+				pagSelector := doc.Find(c.Paginator.Location.Selector)
+				if len(pagSelector.Nodes) > 0 {
+					fetcher = &fetch.DynamicFetcher{
+						UserAgent: userAgent,
+						Interaction: types.Interaction{
+							Selector: c.Paginator.Location.Selector,
+							Type:     types.InteractionTypeClick,
+							Count:    nextPageI, // we always need to 'restart' the clicks because we always re-fetch the page
+						},
+					}
+					nextPageDoc, err := fetchToDoc(currentPageUrl, fetcher)
+					if err != nil {
+						return false, "", nil, err
+					}
+					if nextPageI < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
+						return true, currentPageUrl, nextPageDoc, nil
+					}
+				}
+			} else {
+				baseUrl := getBaseURL(currentPageUrl, doc)
+				nextPageUrl := getURLString(&c.Paginator.Location, doc.Selection, baseUrl)
+				if nextPageUrl != "" {
+					nextPageDoc, err := fetchToDoc(nextPageUrl, fetcher)
+					if err != nil {
+						return false, "", nil, err
+					}
+					if nextPageI < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
+						return true, nextPageUrl, nextPageDoc, nil
+					}
+				}
+			}
+		}
+		return false, "", nil, nil
+	}
+}
+
+func fetchToDoc(url string, fetcher fetch.Fetcher) (*goquery.Document, error) {
+	res, err := fetcher.Fetch(url)
+	if err != nil {
+		return nil, err
+	}
+	return goquery.NewDocumentFromReader(strings.NewReader(res))
 }
 
 func extractField(field *Field, event map[string]interface{}, s *goquery.Selection, baseURL string) error {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"time"
 
@@ -66,7 +65,8 @@ func (d *DynamicFetcher) Fetch(url string) (string, error) {
 	)
 	parentCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
 	defer cancel()
-	ctx, cancel := chromedp.NewContext(parentCtx, chromedp.WithDebugf(log.Printf))
+	ctx, cancel := chromedp.NewContext(parentCtx)
+	// ctx, cancel := chromedp.NewContext(parentCtx, chromedp.WithDebugf(log.Printf))
 	defer cancel()
 
 	var body string
@@ -84,7 +84,7 @@ func (d *DynamicFetcher) Fetch(url string) (string, error) {
 			count = d.Interaction.Count
 		}
 		for i := 0; i < count; i++ {
-			// we only click the button if it exists
+			// we only click the button if it exists. Do we really need this check here?
 			// TODO: should we click as many times as possible if count == 0? How would we implement this?
 			// actions = append(actions, chromedp.Click(d.Interaction.Selector, chromedp.ByQuery))
 			actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
@@ -97,7 +97,7 @@ func (d *DynamicFetcher) Fetch(url string) (string, error) {
 				} // nothing to do
 				return chromedp.MouseClickNode(nodes[0]).Do(ctx)
 			}))
-			actions = append(actions, chromedp.Sleep(sleepTime))
+			actions = append(actions, chromedp.Sleep(1*time.Second))
 		}
 	}
 	actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {

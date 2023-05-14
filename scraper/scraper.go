@@ -158,30 +158,17 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 
 	var items []map[string]interface{}
 
-	pageURL := c.URL
+	// pageURL := c.URL
 	hasNextPage := true
 	currentPage := 0
-	var fetcher fetch.Fetcher
-	if c.RenderJs {
-		fetcher = &fetch.DynamicFetcher{
-			UserAgent:   globalConfig.UserAgent,
-			Interaction: c.Interaction,
-		}
-	} else {
-		fetcher = &fetch.StaticFetcher{
-			UserAgent: globalConfig.UserAgent,
-		}
+	var doc *goquery.Document
+
+	hasNextPage, pageURL, doc, err := c.fetchPage(nil, currentPage, c.URL, globalConfig.UserAgent)
+	if err != nil {
+		return items, err
 	}
+
 	for hasNextPage {
-		res, err := fetcher.Fetch(pageURL)
-		if err != nil {
-			return items, err
-		}
-		// fmt.Println(res)
-		doc, err := goquery.NewDocumentFromReader(strings.NewReader(res))
-		if err != nil {
-			return items, err
-		}
 
 		baseUrl := getBaseURL(pageURL, doc)
 
@@ -218,6 +205,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 
 			// handle all fields on subpages
 			if !rawDyn {
+				// TODO subpageFetcher only needs to be dynamic if c.RenderJs is true
 				subpageFetcher := &fetch.DynamicFetcher{
 					UserAgent:   globalConfig.UserAgent,
 					WaitSeconds: 1, // let's see if this works...
@@ -262,19 +250,24 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 			}
 		})
 
-		hasNextPage = false
+		// hasNextPage = false
 		// if click is true we already fetched the entire content with the dynamic fetcher
 		// and page interaction
 		// TODO what happens with websites have a next page button that needs a button click
 		//   ie we have to somehow distinguish between button clicks that navigate to the next page
 		//   and button clicks that load the entire content
-		pageURL = getURLString(&c.Paginator.Location, doc.Selection, baseUrl)
-		if pageURL != "" {
-			currentPage++
-			if currentPage < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
-				hasNextPage = true
-			}
+		currentPage++
+		hasNextPage, pageURL, doc, err = c.fetchPage(doc, currentPage, pageURL, globalConfig.UserAgent)
+		if err != nil {
+			return items, err
 		}
+		// pageURL = getURLString(&c.Paginator.Location, doc.Selection, baseUrl)
+		// if pageURL != "" {
+		// 	currentPage++
+		// 	if currentPage < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
+		// 		hasNextPage = true
+		// 	}
+		// }
 	}
 	// TODO: check if the dates make sense. Sometimes we have to guess the year since it
 	// does not appear on the website. In that case, eg. having a list of events around
@@ -320,6 +313,84 @@ func (c *Scraper) removeHiddenFields(item map[string]interface{}) map[string]int
 		}
 	}
 	return item
+}
+
+func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl, userAgent string) (bool, string, *goquery.Document, error) {
+	// TODO clean up this function
+	var fetcher fetch.Fetcher
+	if nextPageI == 0 {
+		if c.RenderJs {
+			fetcher = &fetch.DynamicFetcher{
+				UserAgent:   userAgent,
+				Interaction: c.Interaction,
+			}
+		} else {
+			fetcher = &fetch.StaticFetcher{
+				UserAgent: userAgent,
+			}
+		}
+		res, err := fetcher.Fetch(currentPageUrl)
+		if err != nil {
+			return false, "", nil, err
+		}
+		// fmt.Println(res)
+		newDoc, err := goquery.NewDocumentFromReader(strings.NewReader(res))
+		if err != nil {
+			return false, "", nil, err
+		}
+		return true, currentPageUrl, newDoc, nil
+	} else {
+		var nextPageUrl string
+		var nextPageDoc *goquery.Document
+		if c.Paginator.Location.Selector != "" {
+			if c.RenderJs {
+				// check if node c.Paginator.Location.Selector is present in doc
+				// TODO doesn't seem to work if max pages is not given
+				pagSelector := doc.Find(c.Paginator.Location.Selector)
+				if len(pagSelector.Nodes) > 0 {
+					fetcher = &fetch.DynamicFetcher{
+						UserAgent: userAgent,
+						Interaction: types.Interaction{
+							Selector: c.Paginator.Location.Selector,
+							Type:     types.InteractionTypeClick,
+							Count:    nextPageI, // we always need to 'restart' the clicks because we always re-fetch the page
+						},
+					}
+					res, err := fetcher.Fetch(currentPageUrl)
+					if err != nil {
+						return false, "", nil, err
+					}
+					nextPageDoc, err = goquery.NewDocumentFromReader(strings.NewReader(res))
+					if err != nil {
+						return false, "", nil, err
+					}
+					if nextPageI < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
+						return true, currentPageUrl, nextPageDoc, nil
+					}
+				}
+			} else {
+				fetcher = &fetch.StaticFetcher{
+					UserAgent: userAgent,
+				}
+				baseUrl := getBaseURL(currentPageUrl, doc)
+				nextPageUrl = getURLString(&c.Paginator.Location, doc.Selection, baseUrl)
+				if nextPageUrl != "" {
+					res, err := fetcher.Fetch(nextPageUrl)
+					if err != nil {
+						return false, "", nil, err
+					}
+					nextPageDoc, err = goquery.NewDocumentFromReader(strings.NewReader(res))
+					if err != nil {
+						return false, "", nil, err
+					}
+					if nextPageI < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
+						return true, nextPageUrl, nextPageDoc, nil
+					}
+				}
+			}
+		}
+		return false, "", nil, nil
+	}
 }
 
 func extractField(field *Field, event map[string]interface{}, s *goquery.Selection, baseURL string) error {

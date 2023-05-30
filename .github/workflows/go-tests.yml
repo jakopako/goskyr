@@ -17,5 +17,10 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
 
+      - name: Install Dependancies
+        run: |
+          go get .
+          go get github.com/antchfx/jsonquery
+
       - name: Test
         run: go test -v ./...

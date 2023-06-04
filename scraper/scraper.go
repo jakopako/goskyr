@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/antchfx/jsonquery"
 	"github.com/goodsign/monday"
 	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/jakopako/goskyr/date"
@@ -54,6 +55,7 @@ type RegexConfig struct {
 // ElementLocation is used to find a specific string in a html document
 type ElementLocation struct {
 	Selector      string      `yaml:"selector,omitempty"`
+	JsonSelector  string      `yaml:"json_selector,omitempty"`
 	NodeIndex     int         `yaml:"node_index,omitempty"`
 	ChildIndex    int         `yaml:"child_index,omitempty"`
 	RegexExtract  RegexConfig `yaml:"regex_extract,omitempty"`
@@ -695,6 +697,14 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 			fieldStrings = append(fieldStrings, fieldSelection.AttrOr(t.Attr, ""))
 		}
 	}
+	// do json lookup if we have a json_selector
+	for i, f := range fieldStrings {
+		fieldString, err := extractJsonField(t.JsonSelector, f)
+		if err != nil {
+			return "", err
+		}
+		fieldStrings[i] = fieldString
+	}
 	// automatically trimming whitespaces might be confusing in some cases...
 	for i, f := range fieldStrings {
 		fieldStrings[i] = strings.TrimSpace(f)
@@ -766,4 +776,24 @@ func getBaseURL(pageUrl string, doc *goquery.Document) string {
 		baseURL = pageUrl
 	}
 	return baseURL
+}
+
+func extractJsonField(p string, s string) (string, error) {
+	extractedString := s
+	if p != "" {
+		// HACK: json has some instances of meaningfull whitespace
+		// (\n in values). Let's get rid of them
+		spacecleaner := regexp.MustCompile(`\s+`)
+		s = spacecleaner.ReplaceAllString(s, " ")
+		// HACK: a dangling comma is another common json mistake
+		regex := regexp.MustCompile(`,\s*}`)
+		s = regex.ReplaceAllString(s, " }")
+		doc, err := jsonquery.Parse(strings.NewReader(s))
+		if err != nil {
+			return "", fmt.Errorf("JSON: %+v : %s", err, s)
+		}
+		node := jsonquery.FindOne(doc, p)
+		extractedString = fmt.Sprintf("%v", node.Value())
+	}
+	return extractedString, nil
 }

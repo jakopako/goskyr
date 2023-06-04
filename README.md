@@ -446,7 +446,7 @@ If a dynamic webpage does initially not load all the items it might be necessary
 interaction:
   type: click # for now only click is supported.
   selector: .some > div.selector
-  count: 1 # number of clicks
+  count: 1 # number of clicks. Default is 1
   delay: 2000 # milliseconds that the scraper waits after each click. Default is 1000
 ```
 

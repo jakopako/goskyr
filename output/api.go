@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"sync"
 	"time"
 )
 
@@ -25,8 +24,7 @@ func NewAPIWriter(wc *WriterConfig) *APIWriter {
 	}
 }
 
-func (f *APIWriter) Write(items chan map[string]interface{}, wg *sync.WaitGroup) {
-	defer wg.Done()
+func (f *APIWriter) Write(items chan map[string]interface{}) {
 	client := &http.Client{
 		Timeout: time.Second * 10,
 	}

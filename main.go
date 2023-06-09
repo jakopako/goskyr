@@ -16,8 +16,7 @@ import (
 
 var version = "dev"
 
-func runScraper(s scraper.Scraper, itemsChannel chan map[string]interface{}, globalConfig *scraper.GlobalConfig, wg *sync.WaitGroup) {
-	defer wg.Done()
+func runScraper(s *scraper.Scraper, itemsChannel chan map[string]interface{}, globalConfig *scraper.GlobalConfig) {
 	log.Printf("scraping %s\n", s.Name)
 	// This could probably be improved. We could pass the channel to
 	// GetItems instead of waiting for the scraper to finish.
@@ -134,11 +133,17 @@ func main() {
 	for _, s := range config.Scrapers {
 		if *singleScraper == "" || *singleScraper == s.Name {
 			scraperWg.Add(1)
-			go runScraper(s, itemsChannel, &config.Global, &scraperWg)
+			go func(scr scraper.Scraper) {
+				defer scraperWg.Done()
+				runScraper(&scr, itemsChannel, &config.Global)
+			}(s)
 		}
 	}
 	writerWg.Add(1)
-	go writer.Write(itemsChannel, &writerWg)
+	go func() {
+		defer writerWg.Done()
+		writer.Write(itemsChannel)
+	}()
 	scraperWg.Wait()
 	close(itemsChannel)
 	writerWg.Wait()

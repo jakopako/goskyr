@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"sync"
 )
 
 type StdoutWriter struct{}
 
-func (s *StdoutWriter) Write(items chan map[string]interface{}, wg *sync.WaitGroup) {
-	defer wg.Done()
+func (s *StdoutWriter) Write(items chan map[string]interface{}) {
 	for item := range items {
 		// We cannot use the following line of code because it automatically replaces certain html characters
 		// with the corresponding Unicode replacement rune.

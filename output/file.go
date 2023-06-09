@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"os"
-	"sync"
 )
 
 type FileWriter struct {
@@ -18,8 +17,7 @@ func NewFileWriter(wc *WriterConfig) *FileWriter {
 		writerConfig: wc,
 	}
 }
-func (fr *FileWriter) Write(items chan map[string]interface{}, wg *sync.WaitGroup) {
-	defer wg.Done()
+func (fr *FileWriter) Write(items chan map[string]interface{}) {
 	f, err := os.Create(fr.writerConfig.FilePath)
 	if err != nil {
 		log.Fatalf("FileWriter ERROR while trying to open file: %v", err)

@@ -503,25 +503,27 @@ parse:
 					moreAttr := true
 					var hrefVal string
 					var cls []string
-					for moreAttr {
-						k, v, m := z.TagAttr()
-						vString := strings.TrimSpace(string(v))
-						if string(k) == "class" && vString != "" {
-							cls = strings.Split(vString, " ")
-							j := 0
-							for _, cl := range cls {
-								// for now we ignore classes that contain dots
-								if cl != "" && !strings.Contains(cl, ".") {
-									cls[j] = cl
-									j++
+					if tnString != "body" { // we don't care about classes for the body tag
+						for moreAttr {
+							k, v, m := z.TagAttr()
+							vString := strings.TrimSpace(string(v))
+							if string(k) == "class" && vString != "" {
+								cls = strings.Split(vString, " ")
+								j := 0
+								for _, cl := range cls {
+									// for now we ignore classes that contain dots
+									if cl != "" && !strings.Contains(cl, ".") {
+										cls[j] = cl
+										j++
+									}
 								}
+								cls = cls[:j]
 							}
-							cls = cls[:j]
+							if string(k) == "href" {
+								hrefVal = string(v)
+							}
+							moreAttr = m
 						}
-						if string(k) == "href" {
-							hrefVal = string(v)
-						}
-						moreAttr = m
 					}
 					var pCls []string
 					// only add nth-child if there has been another node before at the same

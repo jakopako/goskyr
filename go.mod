@@ -8,7 +8,7 @@ require (
 	github.com/chromedp/chromedp v0.9.1
 	github.com/gdamore/tcell/v2 v2.6.0
 	github.com/goodsign/monday v1.0.1
-	github.com/ilyakaznacheev/cleanenv v1.4.2
+	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/rivo/tview v0.0.0-20220916081518-2e69b7385a37
 	golang.org/x/net v0.12.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -35,7 +35,7 @@ require (
 )
 
 require (
-	github.com/BurntSushi/toml v1.2.0 // indirect
+	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/agnivade/levenshtein v1.1.1
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/chromedp/sysutil v1.0.0 // indirect
@@ -43,7 +43,7 @@ require (
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/gobwas/ws v1.1.0 // indirect
-	github.com/joho/godotenv v1.4.0 // indirect
+	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect

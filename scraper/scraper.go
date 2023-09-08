@@ -601,6 +601,7 @@ func getURLString(e *ElementLocation, s *goquery.Selection, baseURL string) stri
 		}
 	}
 
+	urlVal = strings.TrimSpace(urlVal)
 	if urlVal == "" {
 		return ""
 	} else if strings.HasPrefix(urlVal, "http") {

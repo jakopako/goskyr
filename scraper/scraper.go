@@ -99,7 +99,8 @@ type Field struct {
 	Components   []DateComponent `yaml:"components,omitempty"`    // applies to date
 	DateLocation string          `yaml:"date_location,omitempty"` // applies to date
 	DateLanguage string          `yaml:"date_language,omitempty"` // applies to date
-	Hide         bool            `yaml:"hide,omitempty"`          // appliess to text, url, date
+	Hide         bool            `yaml:"hide,omitempty"`          // applies to text, url, date
+	GuessYear    bool            `yaml:"guess_year,omitempty"`    // applies to date
 }
 
 type ElementLocations []ElementLocation
@@ -263,11 +264,35 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 			return items, err
 		}
 	}
-	// TODO: check if the dates make sense. Sometimes we have to guess the year since it
-	// does not appear on the website. In that case, eg. having a list of events around
-	// the end of one year and the beginning of the next year we might want to change the
-	// year of some events because our previous guess was rather naiv. We also might want
-	// to make this functionality optional. See issue #68
+
+	// get date field names where we need to adapt the year
+	dateFieldsGuessYear := map[string]bool{}
+	for _, f := range c.Fields {
+		if f.Type == "date" {
+			if f.GuessYear {
+				dateFieldsGuessYear[f.Name] = true
+			}
+		}
+	}
+
+	if len(dateFieldsGuessYear) > 0 {
+		for i, item := range items {
+			if i > 0 {
+				for name, val := range item {
+					if dateFieldsGuessYear[name] {
+						if t, ok := val.(time.Time); ok {
+							if prevT, ok := items[i-1][name].(time.Time); ok {
+								if t.Before(prevT) {
+									t := time.Date(t.Year()+1, t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
+									item[name] = t
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 
 	return items, nil
 }

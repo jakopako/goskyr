@@ -10,7 +10,7 @@ require (
 	github.com/goodsign/monday v1.0.1
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/rivo/tview v0.0.0-20220916081518-2e69b7385a37
-	golang.org/x/net v0.15.0
+	golang.org/x/net v0.16.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -49,8 +49,8 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/rivo/uniseg v0.4.3 // indirect
-	golang.org/x/sys v0.12.0 // indirect
-	golang.org/x/term v0.12.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/term v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	olympos.io/encoding/edn v0.0.0-20201019073823-d3554ca0b0a3 // indirect
 )

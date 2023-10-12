@@ -126,9 +126,69 @@ func (e *ElementLocations) UnmarshalYAML(value *yaml.Node) error {
 
 // A Filter is used to filter certain items from the result list
 type Filter struct {
-	Field string `yaml:"field"`
-	Regex string `yaml:"regex"`
-	Match bool   `yaml:"match"`
+	Field      string `yaml:"field"`
+	Type       string
+	Expression string `yaml:"exp"` // changed from 'regex' to 'exp' in version 0.5.7
+	RegexComp  *regexp.Regexp
+	DateComp   time.Time
+	DateOp     string
+	Match      bool `yaml:"match"`
+}
+
+func (f *Filter) FilterMatch(value interface{}) bool {
+	switch f.Type {
+	case "regex":
+		return f.RegexComp.MatchString(fmt.Sprint(value))
+	case "date":
+		d, _ := value.(time.Time)
+		if f.DateOp == ">" {
+			return d.After(f.DateComp)
+		} else {
+			return d.Before(f.DateComp)
+		}
+	default:
+		return false
+	}
+}
+
+func (f *Filter) Initialize(fieldType string) error {
+	if fieldType == "date" {
+		f.Type = "date"
+	} else {
+		f.Type = "regex" // default for everything except date fields
+	}
+	switch f.Type {
+	case "regex":
+		regex, err := regexp.Compile(f.Expression)
+		if err != nil {
+			return err
+		}
+		f.RegexComp = regex
+		return nil
+	case "date":
+		initErr := fmt.Errorf("the expression for filtering by date should be of the following format: '<|> now|YYYY-MM-ddTHH:mm'")
+		tokens := strings.Split(f.Expression, " ")
+		if len(tokens) != 2 {
+			return initErr
+		}
+		if tokens[0] != ">" && tokens[0] != "<" {
+			return initErr
+		}
+		f.DateOp = tokens[0]
+		// parse date, return error
+		if tokens[1] != "now" {
+			t, err := time.Parse("2006-01-02T15:04", tokens[1])
+			if err != nil {
+				return initErr
+			}
+			f.DateComp = t
+		} else {
+			f.DateComp = time.Now().UTC()
+		}
+		return nil
+	default:
+		return fmt.Errorf("type '%s' does not exist for filters", f.Type)
+	}
 }
 
 // A Paginator is used to paginate through a website
@@ -145,7 +205,7 @@ type Scraper struct {
 	Item                string            `yaml:"item"`
 	ExcludeWithSelector []string          `yaml:"exclude_with_selector,omitempty"`
 	Fields              []Field           `yaml:"fields,omitempty"`
-	Filters             []Filter          `yaml:"filters,omitempty"`
+	Filters             []*Filter         `yaml:"filters,omitempty"`
 	Paginator           Paginator         `yaml:"paginator,omitempty"`
 	RenderJs            bool              `yaml:"renderJs,omitempty"`
 	Interaction         types.Interaction `yaml:"interaction,omitempty"`
@@ -160,6 +220,10 @@ type Scraper struct {
 func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string]interface{}, error) {
 
 	var items []map[string]interface{}
+
+	if err := c.initializeFilters(); err != nil {
+		return items, err
+	}
 
 	hasNextPage := true
 	currentPage := 0
@@ -297,27 +361,57 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 	return items, nil
 }
 
+func (c *Scraper) initializeFilters() error {
+	// build temporary map field name -> field type
+	fieldTypes := map[string]string{}
+	for _, field := range c.Fields {
+		fieldTypes[field.Name] = field.Type
+	}
+	for _, f := range c.Filters {
+		if err := f.Initialize(fieldTypes[f.Field]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (c *Scraper) filterItem(item map[string]interface{}) (bool, error) {
 	nrMatchTrue := 0
 	filterMatchTrue := false
 	filterMatchFalse := true
-	for _, filter := range c.Filters {
-		regex, err := regexp.Compile(filter.Regex)
-		if err != nil {
-			return false, err
-		}
-		if fieldValue, found := item[filter.Field]; found {
-			if filter.Match {
+	for _, f := range c.Filters {
+		// how do we get the field type??
+		// if err := f.Initialize(fieldType); err != nil {
+		// 	return false, err
+		// }
+		if fieldValue, found := item[f.Field]; found {
+			if f.Match {
 				nrMatchTrue++
-				if regex.MatchString(fmt.Sprint(fieldValue)) {
+				if f.FilterMatch(fieldValue) {
 					filterMatchTrue = true
 				}
 			} else {
-				if regex.MatchString(fmt.Sprint(fieldValue)) {
+				if f.FilterMatch(fieldValue) {
 					filterMatchFalse = false
 				}
 			}
 		}
+		// regex, err := regexp.Compile(filter.Regex)
+		// if err != nil {
+		// 	return false, err
+		// }
+		// if fieldValue, found := item[filter.Field]; found {
+		// 	if filter.Match {
+		// 		nrMatchTrue++
+		// 		if regex.MatchString(fmt.Sprint(fieldValue)) {
+		// 			filterMatchTrue = true
+		// 		}
+		// 	} else {
+		// 		if regex.MatchString(fmt.Sprint(fieldValue)) {
+		// 			filterMatchFalse = false
+		// 		}
+		// 	}
+		// }
 	}
 	if nrMatchTrue == 0 {
 		filterMatchTrue = true

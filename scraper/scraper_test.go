@@ -82,11 +82,11 @@ const (
 func TestFilterItemMatchTrue(t *testing.T) {
 	item := map[string]interface{}{"title": "Jacob Collier - Concert"}
 	s := &Scraper{
-		Filters: []Filter{
+		Filters: []*Filter{
 			{
-				Field: "title",
-				Regex: ".*Concert",
-				Match: true,
+				Field:      "title",
+				Expression: ".*Concert",
+				Match:      true,
 			},
 		},
 	}
@@ -102,11 +102,11 @@ func TestFilterItemMatchTrue(t *testing.T) {
 func TestFilterItemMatchFalse(t *testing.T) {
 	item := map[string]interface{}{"title": "Jacob Collier - Cancelled"}
 	s := &Scraper{
-		Filters: []Filter{
+		Filters: []*Filter{
 			{
-				Field: "title",
-				Regex: ".*Cancelled",
-				Match: false,
+				Field:      "title",
+				Expression: ".*Cancelled",
+				Match:      false,
 			},
 		},
 	}

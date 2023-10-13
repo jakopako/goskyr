@@ -167,10 +167,10 @@ scrapers:
         date_location: "Europe/Berlin"
     filters:
       - field: "title"
-        regex: "Verschoben.*"
+        exp: "Verschoben.*"
         match: false
       - field: "title"
-        regex: "Abgesagt.*"
+        exp: "Abgesagt.*"
         match: false
 ```
 
@@ -424,19 +424,24 @@ Since version 0.3.0 js rendering is supported. For this to work the `google-chro
 
 ### Filters
 
-Filters can be used to define what items should make it into the resulting list of items. A filter configuration looks as follows:
+Filters can be used to define what items should make it into the resulting list of items. A filter configuration can look as follows:
 
 ```yml
 filters:
   - field: "status"
-    regex: "cancelled"
+    exp: "cancelled"
     match: false
   - field: "status"
-    regex: "delayed"
+    exp: ".*(?i)(delayed).*"
     match: false
+  - field: "date"
+    exp: "> now" # format: <|> now|YYYY-MM-ddTHH:mm
+    match: true
 ```
 
-The `field` key determines to which field the regular expression will be applied. `regex` defines the regular expression and `match` determines whether the item should be included or excluded on match. Note, that as soon as there is one match for a regular expression that has `match` set to **false** the respective item will be exlcuded from the results without looking at the other filters.
+The `field` key determines to which field the expression will be applied. `exp` defines the expression and `match` determines whether the item should be included or excluded on match. Note, that as soon as there is one match for an expression that has `match` set to **false** the respective item will be excluded from the results without looking at the other filters.
+
+The expression `exp` can be either a regular expression or a date comparison. Depending on the type of the respective `field` in the `fields` section of the configuration it has to be either one or the other. If the corresponding field is of type `date` the expression has to be a date comparison. For every other field type it has to be a regular expression.
 
 ### Interaction
 

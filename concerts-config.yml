@@ -91,13 +91,13 @@ scrapers:
         date_language: "it_IT"
     filters:
       - field: "title"
-        regex: ".*CANCELED.*"
+        exp: ".*CANCELED.*"
         match: false
       - field: "title"
-        regex: "ANNULLATO!.*"
+        exp: "ANNULLATO!.*"
         match: false
       - field: "title"
-        regex: ".*Postponed.*"
+        exp: ".*Postponed.*"
         match: false
     paginator:
       location:
@@ -164,10 +164,10 @@ scrapers:
         selector: ".pager__item a"
     filters:
       - field: "title"
-        regex: ".*POSTPONED.*"
+        exp: ".*POSTPONED.*"
         match: false
       - field: "title"
-        regex: ".*CANCELLED.*"
+        exp: ".*CANCELLED.*"
         match: false
 
   ##########
@@ -321,16 +321,16 @@ scrapers:
         date_location: "Europe/Berlin"
     filters:
       - field: "location"
-        regex: "Zenith" # duplicate (also present on Motorworld website)
+        exp: "Zenith" # duplicate (also present on Motorworld website)
         match: false
       - field: "location"
-        regex: "Strom" # duplicate
+        exp: "Strom" # duplicate
         match: false
       - field: "location"
-        regex: "Tonhalle" # duplicate
+        exp: "Tonhalle" # duplicate
         match: false
       - field: "location"
-        regex: "TonHalle" # duplicate
+        exp: "TonHalle" # duplicate
         match: false
 
   #########

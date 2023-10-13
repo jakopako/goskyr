@@ -312,7 +312,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 			}
 
 			// check if item should be filtered
-			filter, err := c.filterItem(currentItem)
+			filter := c.filterItem(currentItem)
 			if err != nil {
 				log.Fatalf("%s ERROR: error while applying filter: %v.", c.Name, err)
 			}
@@ -368,22 +368,22 @@ func (c *Scraper) initializeFilters() error {
 		fieldTypes[field.Name] = field.Type
 	}
 	for _, f := range c.Filters {
-		if err := f.Initialize(fieldTypes[f.Field]); err != nil {
-			return err
+		if fieldType, ok := fieldTypes[f.Field]; ok {
+			if err := f.Initialize(fieldType); err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("filter error. There is no field with the name '%s'", f.Field)
 		}
 	}
 	return nil
 }
 
-func (c *Scraper) filterItem(item map[string]interface{}) (bool, error) {
+func (c *Scraper) filterItem(item map[string]interface{}) bool {
 	nrMatchTrue := 0
 	filterMatchTrue := false
 	filterMatchFalse := true
 	for _, f := range c.Filters {
-		// how do we get the field type??
-		// if err := f.Initialize(fieldType); err != nil {
-		// 	return false, err
-		// }
 		if fieldValue, found := item[f.Field]; found {
 			if f.Match {
 				nrMatchTrue++
@@ -396,27 +396,11 @@ func (c *Scraper) filterItem(item map[string]interface{}) (bool, error) {
 				}
 			}
 		}
-		// regex, err := regexp.Compile(filter.Regex)
-		// if err != nil {
-		// 	return false, err
-		// }
-		// if fieldValue, found := item[filter.Field]; found {
-		// 	if filter.Match {
-		// 		nrMatchTrue++
-		// 		if regex.MatchString(fmt.Sprint(fieldValue)) {
-		// 			filterMatchTrue = true
-		// 		}
-		// 	} else {
-		// 		if regex.MatchString(fmt.Sprint(fieldValue)) {
-		// 			filterMatchFalse = false
-		// 		}
-		// 	}
-		// }
 	}
 	if nrMatchTrue == 0 {
 		filterMatchTrue = true
 	}
-	return filterMatchTrue && filterMatchFalse, nil
+	return filterMatchTrue && filterMatchFalse
 }
 
 func (c *Scraper) removeHiddenFields(item map[string]interface{}) map[string]interface{} {

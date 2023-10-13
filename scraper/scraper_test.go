@@ -82,6 +82,11 @@ const (
 func TestFilterItemMatchTrue(t *testing.T) {
 	item := map[string]interface{}{"title": "Jacob Collier - Concert"}
 	s := &Scraper{
+		Fields: []Field{
+			{
+				Name: "title",
+			},
+		},
 		Filters: []*Filter{
 			{
 				Field:      "title",
@@ -90,10 +95,11 @@ func TestFilterItemMatchTrue(t *testing.T) {
 			},
 		},
 	}
-	f, err := s.filterItem(item)
+	err := s.initializeFilters()
 	if err != nil {
 		t.Fatalf("got unexpected error: %v", err)
 	}
+	f := s.filterItem(item)
 	if !f {
 		t.Fatalf("expected 'true' but got 'false'")
 	}
@@ -102,6 +108,11 @@ func TestFilterItemMatchTrue(t *testing.T) {
 func TestFilterItemMatchFalse(t *testing.T) {
 	item := map[string]interface{}{"title": "Jacob Collier - Cancelled"}
 	s := &Scraper{
+		Fields: []Field{
+			{
+				Name: "title",
+			},
+		},
 		Filters: []*Filter{
 			{
 				Field:      "title",
@@ -110,10 +121,95 @@ func TestFilterItemMatchFalse(t *testing.T) {
 			},
 		},
 	}
-	f, err := s.filterItem(item)
+	err := s.initializeFilters()
 	if err != nil {
 		t.Fatalf("got unexpected error: %v", err)
 	}
+	f := s.filterItem(item)
+	if f {
+		t.Fatalf("expected 'false' but got 'true'")
+	}
+}
+
+func TestFilterItemByDateMatchTrue(t *testing.T) {
+	loc, _ := time.LoadLocation("UTC")
+	item := map[string]interface{}{"date": time.Date(2023, 10, 20, 19, 1, 0, 0, loc)}
+	s := &Scraper{
+		Fields: []Field{
+			{
+				Name: "date",
+				Type: "date",
+			},
+		},
+		Filters: []*Filter{
+			{
+				Field:      "date",
+				Expression: "> 2023-10-20T19:00",
+				Match:      true,
+			},
+		},
+	}
+	err := s.initializeFilters()
+	if err != nil {
+		t.Fatalf("got unexpected error: %v", err)
+	}
+	f := s.filterItem(item)
+	if !f {
+		t.Fatalf("expected 'true' but got 'false'")
+	}
+}
+
+func TestFilterItemByDateMatchTrue2(t *testing.T) {
+	loc, _ := time.LoadLocation("UTC")
+	item := map[string]interface{}{"date": time.Date(2023, 10, 20, 19, 0, 0, 0, loc)}
+	s := &Scraper{
+		Fields: []Field{
+			{
+				Name: "date",
+				Type: "date",
+			},
+		},
+		Filters: []*Filter{
+			{
+				Field:      "date",
+				Expression: "> 2023-10-20T19:00",
+				Match:      true,
+			},
+		},
+	}
+	err := s.initializeFilters()
+	if err != nil {
+		t.Fatalf("got unexpected error: %v", err)
+	}
+	f := s.filterItem(item)
+	if f {
+		t.Fatalf("expected 'false' but got 'true'")
+	}
+}
+
+func TestFilterItemByDateMatchFalse(t *testing.T) {
+	loc, _ := time.LoadLocation("UTC")
+	item := map[string]interface{}{"date": time.Date(2023, 10, 20, 19, 1, 0, 0, loc)}
+	s := &Scraper{
+		Fields: []Field{
+			{
+				Name: "date",
+				Type: "date",
+			},
+		},
+		Filters: []*Filter{
+			{
+				Field:      "date",
+				Expression: "> 2023-10-20T19:00",
+				Match:      false,
+			},
+		},
+	}
+	err := s.initializeFilters()
+	if err != nil {
+		t.Fatalf("got unexpected error: %v", err)
+	}
+	f := s.filterItem(item)
 	if f {
 		t.Fatalf("expected 'false' but got 'true'")
 	}

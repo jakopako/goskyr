@@ -56,14 +56,14 @@ func (s *StaticFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 
 // The DynamicFetcher renders js
 type DynamicFetcher struct {
-	UserAgent    string
-	WaitSeconds  int
-	ctx          context.Context
-	cancelParent context.CancelFunc
-	cancel       context.CancelFunc
+	UserAgent        string
+	WaitMilliseconds int
+	ctx              context.Context
+	cancelParent     context.CancelFunc
+	cancel           context.CancelFunc
 }
 
-func NewDynamicFetcher(ua string, s int) *DynamicFetcher {
+func NewDynamicFetcher(ua string, ms int) *DynamicFetcher {
 	opts := append(
 		chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.WindowSize(1920, 1080), // init with a desktop view (sometimes pages look different on mobile, eg buttons are missing)
@@ -71,14 +71,14 @@ func NewDynamicFetcher(ua string, s int) *DynamicFetcher {
 	parentCtx, cancelParent := chromedp.NewExecAllocator(context.Background(), opts...)
 	ctx, cancel := chromedp.NewContext(parentCtx)
 	d := &DynamicFetcher{
-		UserAgent:    ua,
-		WaitSeconds:  s,
-		ctx:          ctx,
-		cancelParent: cancelParent,
-		cancel:       cancel,
+		UserAgent:        ua,
+		WaitMilliseconds: ms,
+		ctx:              ctx,
+		cancelParent:     cancelParent,
+		cancel:           cancel,
 	}
-	if d.WaitSeconds == 0 {
-		d.WaitSeconds = 2 // default
+	if d.WaitMilliseconds == 0 {
+		d.WaitMilliseconds = 2000 // default
 	}
 	return d
 }
@@ -91,7 +91,7 @@ func (d *DynamicFetcher) Cancel() {
 func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 	// TODO: add user agent
 	var body string
-	sleepTime := time.Duration(d.WaitSeconds) * time.Second
+	sleepTime := time.Duration(d.WaitMilliseconds) * time.Millisecond
 	actions := []chromedp.Action{
 		chromedp.Navigate(url),
 		chromedp.Sleep(sleepTime), // for now

@@ -208,7 +208,7 @@ type Scraper struct {
 	Filters             []*Filter         `yaml:"filters,omitempty"`
 	Paginator           Paginator         `yaml:"paginator,omitempty"`
 	RenderJs            bool              `yaml:"renderJs,omitempty"`
-	PageLoadWaitSeconds int               `yaml:"page_load_wait_sec,omitempty"` // only taken into account when renderJs = true
+	PageLoadWait        int               `yaml:"page_load_wait,omitempty"` // milliseconds. Only taken into account when renderJs = true
 	Interaction         types.Interaction `yaml:"interaction,omitempty"`
 	fetcher             fetch.Fetcher
 }
@@ -223,7 +223,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 
 	// initialize fetcher
 	if c.RenderJs {
-		dynFetcher := fetch.NewDynamicFetcher(globalConfig.UserAgent, c.PageLoadWaitSeconds)
+		dynFetcher := fetch.NewDynamicFetcher(globalConfig.UserAgent, c.PageLoadWait)
 		defer dynFetcher.Cancel()
 		c.fetcher = dynFetcher
 	} else {

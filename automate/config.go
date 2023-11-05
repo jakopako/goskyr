@@ -436,7 +436,7 @@ func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields b
 	} else {
 		fetcher = &fetch.StaticFetcher{}
 	}
-	res, err := fetcher.Fetch(s.URL)
+	res, err := fetcher.Fetch(s.URL, fetch.FetchOpts{})
 	if err != nil {
 		return err
 	}

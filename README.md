@@ -420,7 +420,9 @@ A dynamic field has a field type that can either be `text`, `url` or `date`. The
 
 ### JS Rendering
 
-Since version 0.3.0 js rendering is supported. For this to work the `google-chrome` binary needs to be installed. In the configuration snippet of a scraper just add `renderJs: true` and everything will be taken care of. For now goskyr just tells chrome to fetch the page, render it, wait 5 seconds and return the rendered dom which will then be used to extract the desired data. User interactions with the page (eg scrolling) might be implemented in the future.
+Since version 0.3.0 js rendering is supported. For this to work the `google-chrome` binary needs to be installed. In the configuration snippet of a scraper just add `renderJs: true` and everything will be taken care of. With `page_load_wait_sec: <seconds>` the default waiting time of 2 seconds can be adapted accordingly.
+
+User interactions with the page (eg scrolling) might be implemented in the future. Clicking has been implemented. TODO: document.
 
 ### Filters
 

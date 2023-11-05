@@ -13,9 +13,13 @@ import (
 	"github.com/jakopako/goskyr/types"
 )
 
+type FetchOpts struct {
+	Interaction types.Interaction
+}
+
 // A Fetcher allows to fetch the content of a web page
 type Fetcher interface {
-	Fetch(url string) (string, error)
+	Fetch(url string, opts FetchOpts) (string, error)
 }
 
 // The StaticFetcher fetches static page content
@@ -23,7 +27,7 @@ type StaticFetcher struct {
 	UserAgent string
 }
 
-func (s *StaticFetcher) Fetch(url string) (string, error) {
+func (s *StaticFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 	var resString string
 	client := &http.Client{}
 
@@ -52,40 +56,54 @@ func (s *StaticFetcher) Fetch(url string) (string, error) {
 
 // The DynamicFetcher renders js
 type DynamicFetcher struct {
-	UserAgent   string
-	Interaction types.Interaction
-	WaitSeconds int
+	UserAgent    string
+	WaitSeconds  int
+	ctx          context.Context
+	cancelParent context.CancelFunc
+	cancel       context.CancelFunc
 }
 
-func (d *DynamicFetcher) Fetch(url string) (string, error) {
-	// TODO: add user agent
+func NewDynamicFetcher(ua string, s int) *DynamicFetcher {
 	opts := append(
 		chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.WindowSize(1920, 1080), // init with a desktop view (sometimes pages look different on mobile, eg buttons are missing)
 	)
-	parentCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
-	defer cancel()
+	parentCtx, cancelParent := chromedp.NewExecAllocator(context.Background(), opts...)
 	ctx, cancel := chromedp.NewContext(parentCtx)
-	// ctx, cancel := chromedp.NewContext(parentCtx, chromedp.WithDebugf(log.Printf))
-	defer cancel()
-
-	var body string
-	sleepTime := 5 * time.Second
-	if d.WaitSeconds > 0 {
-		sleepTime = time.Duration(d.WaitSeconds) * time.Second
+	d := &DynamicFetcher{
+		UserAgent:    ua,
+		WaitSeconds:  s,
+		ctx:          ctx,
+		cancelParent: cancelParent,
+		cancel:       cancel,
 	}
+	if d.WaitSeconds == 0 {
+		d.WaitSeconds = 2 // default
+	}
+	return d
+}
+
+func (d *DynamicFetcher) Cancel() {
+	d.cancelParent()
+	d.cancel()
+}
+
+func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
+	// TODO: add user agent
+	var body string
+	sleepTime := time.Duration(d.WaitSeconds) * time.Second
 	actions := []chromedp.Action{
 		chromedp.Navigate(url),
 		chromedp.Sleep(sleepTime), // for now
 	}
-	delay := 1000 * time.Millisecond // default is 1 second
-	if d.Interaction.Delay > 0 {
-		delay = time.Duration(d.Interaction.Delay) * time.Millisecond
+	delay := 500 * time.Millisecond // default is .5 seconds
+	if opts.Interaction.Delay > 0 {
+		delay = time.Duration(opts.Interaction.Delay) * time.Millisecond
 	}
-	if d.Interaction.Type == types.InteractionTypeClick {
+	if opts.Interaction.Type == types.InteractionTypeClick {
 		count := 1 // default is 1
-		if d.Interaction.Count > 0 {
-			count = d.Interaction.Count
+		if opts.Interaction.Count > 0 {
+			count = opts.Interaction.Count
 		}
 		for i := 0; i < count; i++ {
 			// we only click the button if it exists. Do we really need this check here?
@@ -93,7 +111,7 @@ func (d *DynamicFetcher) Fetch(url string) (string, error) {
 			// actions = append(actions, chromedp.Click(d.Interaction.Selector, chromedp.ByQuery))
 			actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
 				var nodes []*cdp.Node
-				if err := chromedp.Nodes(d.Interaction.Selector, &nodes, chromedp.AtLeast(0)).Do(ctx); err != nil {
+				if err := chromedp.Nodes(opts.Interaction.Selector, &nodes, chromedp.AtLeast(0)).Do(ctx); err != nil {
 					return err
 				}
 				if len(nodes) == 0 {
@@ -114,7 +132,7 @@ func (d *DynamicFetcher) Fetch(url string) (string, error) {
 	}))
 
 	// run task list
-	err := chromedp.Run(ctx,
+	err := chromedp.Run(d.ctx,
 		actions...,
 	)
 	return body, err

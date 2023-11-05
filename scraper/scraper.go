@@ -289,7 +289,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 						subpageURL := fmt.Sprint(currentItem[f.OnSubpage])
 						_, found := subDocs[subpageURL]
 						if !found {
-							subRes, err := subpageFetcher.Fetch(subpageURL, nil)
+							subRes, err := subpageFetcher.Fetch(subpageURL, fetch.FetchOpts{})
 							if err != nil {
 								log.Printf("%s ERROR: %v. Skipping item %v.", c.Name, err, currentItem)
 								return
@@ -426,7 +426,7 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 		}
 	}
 	if nextPageI == 0 {
-		newDoc, err := fetchToDoc(currentPageUrl, nil, fetcher)
+		newDoc, err := fetchToDoc(currentPageUrl, fetcher, fetch.FetchOpts{})
 		// res, err := fetcher.Fetch(currentPageUrl)
 		// if err != nil {
 		// 	return false, "", nil, err
@@ -450,12 +450,12 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 					// 		Count:    nextPageI, // we always need to 'restart' the clicks because we always re-fetch the page
 					// 	},
 					// }
-					ia := &types.Interaction{
+					ia := types.Interaction{
 						Selector: c.Paginator.Location.Selector,
 						Type:     types.InteractionTypeClick,
 						Count:    nextPageI, // we always need to 'restart' the clicks because we always re-fetch the page
 					}
-					nextPageDoc, err := fetchToDoc(currentPageUrl, ia, fetcher)
+					nextPageDoc, err := fetchToDoc(currentPageUrl, fetcher, fetch.FetchOpts{Interaction: ia})
 					if err != nil {
 						return false, "", nil, err
 					}
@@ -467,7 +467,7 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 				baseUrl := getBaseURL(currentPageUrl, doc)
 				nextPageUrl := getURLString(&c.Paginator.Location, doc.Selection, baseUrl)
 				if nextPageUrl != "" {
-					nextPageDoc, err := fetchToDoc(nextPageUrl, nil, fetcher)
+					nextPageDoc, err := fetchToDoc(nextPageUrl, fetcher, fetch.FetchOpts{})
 					if err != nil {
 						return false, "", nil, err
 					}
@@ -481,8 +481,8 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 	}
 }
 
-func fetchToDoc(url string, ia *types.Interaction, fetcher fetch.Fetcher) (*goquery.Document, error) {
-	res, err := fetcher.Fetch(url, ia)
+func fetchToDoc(url string, fetcher fetch.Fetcher, opts fetch.FetchOpts) (*goquery.Document, error) {
+	res, err := fetcher.Fetch(url, opts)
 	if err != nil {
 		return nil, err
 	}

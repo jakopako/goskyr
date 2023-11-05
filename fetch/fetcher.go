@@ -13,9 +13,13 @@ import (
 	"github.com/jakopako/goskyr/types"
 )
 
+type FetchOpts struct {
+	Interaction types.Interaction
+}
+
 // A Fetcher allows to fetch the content of a web page
 type Fetcher interface {
-	Fetch(url string, ia *types.Interaction) (string, error)
+	Fetch(url string, opts FetchOpts) (string, error)
 }
 
 // The StaticFetcher fetches static page content
@@ -23,7 +27,7 @@ type StaticFetcher struct {
 	UserAgent string
 }
 
-func (s *StaticFetcher) Fetch(url string, ia *types.Interaction) (string, error) {
+func (s *StaticFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 	var resString string
 	client := &http.Client{}
 
@@ -72,7 +76,7 @@ func NewDynamicFetcher(ua string, s int) *DynamicFetcher {
 	}
 }
 
-func (d *DynamicFetcher) Fetch(url string, ia *types.Interaction) (string, error) {
+func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 	// TODO: add user agent
 	start := time.Now()
 	// opts := append(
@@ -99,14 +103,14 @@ func (d *DynamicFetcher) Fetch(url string, ia *types.Interaction) (string, error
 		chromedp.Sleep(sleepTime), // for now
 	}
 	delay := 1000 * time.Millisecond // default is 1 second
-	if ia.Delay > 0 {
-		delay = time.Duration(ia.Delay) * time.Millisecond
+	if opts.Interaction.Delay > 0 {
+		delay = time.Duration(opts.Interaction.Delay) * time.Millisecond
 	}
-	if ia.Type == types.InteractionTypeClick {
+	if opts.Interaction.Type == types.InteractionTypeClick {
 		count := 1 // default is 1
 		fmt.Println("shouldnt get here")
-		if ia.Count > 0 {
-			count = ia.Count
+		if opts.Interaction.Count > 0 {
+			count = opts.Interaction.Count
 		}
 		for i := 0; i < count; i++ {
 			// we only click the button if it exists. Do we really need this check here?
@@ -114,7 +118,7 @@ func (d *DynamicFetcher) Fetch(url string, ia *types.Interaction) (string, error
 			// actions = append(actions, chromedp.Click(d.Interaction.Selector, chromedp.ByQuery))
 			actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
 				var nodes []*cdp.Node
-				if err := chromedp.Nodes(ia.Selector, &nodes, chromedp.AtLeast(0)).Do(ctx); err != nil {
+				if err := chromedp.Nodes(opts.Interaction.Selector, &nodes, chromedp.AtLeast(0)).Do(ctx); err != nil {
 					return err
 				}
 				if len(nodes) == 0 {

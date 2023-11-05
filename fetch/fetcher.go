@@ -15,7 +15,7 @@ import (
 
 // A Fetcher allows to fetch the content of a web page
 type Fetcher interface {
-	Fetch(url string) (string, error)
+	Fetch(url string, ia *types.Interaction) (string, error)
 }
 
 // The StaticFetcher fetches static page content
@@ -23,7 +23,7 @@ type StaticFetcher struct {
 	UserAgent string
 }
 
-func (s *StaticFetcher) Fetch(url string) (string, error) {
+func (s *StaticFetcher) Fetch(url string, ia *types.Interaction) (string, error) {
 	var resString string
 	client := &http.Client{}
 
@@ -52,22 +52,42 @@ func (s *StaticFetcher) Fetch(url string) (string, error) {
 
 // The DynamicFetcher renders js
 type DynamicFetcher struct {
-	UserAgent   string
-	Interaction types.Interaction
+	UserAgent string
+	// Interaction types.Interaction
 	WaitSeconds int
+	ctx         context.Context
 }
 
-func (d *DynamicFetcher) Fetch(url string) (string, error) {
-	// TODO: add user agent
+func NewDynamicFetcher(ua string, s int) *DynamicFetcher {
 	opts := append(
 		chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.WindowSize(1920, 1080), // init with a desktop view (sometimes pages look different on mobile, eg buttons are missing)
 	)
-	parentCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
-	defer cancel()
-	ctx, cancel := chromedp.NewContext(parentCtx)
+	parentCtx, _ := chromedp.NewExecAllocator(context.Background(), opts...)
+	ctx, _ := chromedp.NewContext(parentCtx)
+	return &DynamicFetcher{
+		UserAgent:   ua,
+		WaitSeconds: s,
+		ctx:         ctx,
+	}
+}
+
+func (d *DynamicFetcher) Fetch(url string, ia *types.Interaction) (string, error) {
+	// TODO: add user agent
+	start := time.Now()
+	// opts := append(
+	// 	chromedp.DefaultExecAllocatorOptions[:],
+	// 	chromedp.WindowSize(1920, 1080), // init with a desktop view (sometimes pages look different on mobile, eg buttons are missing)
+	// )
+	// parentCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
+	elapsed := time.Since(start)
+	fmt.Printf("time elapsed: %s\n", elapsed)
+	// defer cancel()
+	// ctx, cancel := chromedp.NewContext(parentCtx)
+	elapsed = time.Since(start)
+	fmt.Printf("time elapsed: %s\n", elapsed)
 	// ctx, cancel := chromedp.NewContext(parentCtx, chromedp.WithDebugf(log.Printf))
-	defer cancel()
+	// defer cancel()
 
 	var body string
 	sleepTime := 5 * time.Second
@@ -79,13 +99,14 @@ func (d *DynamicFetcher) Fetch(url string) (string, error) {
 		chromedp.Sleep(sleepTime), // for now
 	}
 	delay := 1000 * time.Millisecond // default is 1 second
-	if d.Interaction.Delay > 0 {
-		delay = time.Duration(d.Interaction.Delay) * time.Millisecond
+	if ia.Delay > 0 {
+		delay = time.Duration(ia.Delay) * time.Millisecond
 	}
-	if d.Interaction.Type == types.InteractionTypeClick {
+	if ia.Type == types.InteractionTypeClick {
 		count := 1 // default is 1
-		if d.Interaction.Count > 0 {
-			count = d.Interaction.Count
+		fmt.Println("shouldnt get here")
+		if ia.Count > 0 {
+			count = ia.Count
 		}
 		for i := 0; i < count; i++ {
 			// we only click the button if it exists. Do we really need this check here?
@@ -93,7 +114,7 @@ func (d *DynamicFetcher) Fetch(url string) (string, error) {
 			// actions = append(actions, chromedp.Click(d.Interaction.Selector, chromedp.ByQuery))
 			actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
 				var nodes []*cdp.Node
-				if err := chromedp.Nodes(d.Interaction.Selector, &nodes, chromedp.AtLeast(0)).Do(ctx); err != nil {
+				if err := chromedp.Nodes(ia.Selector, &nodes, chromedp.AtLeast(0)).Do(ctx); err != nil {
 					return err
 				}
 				if len(nodes) == 0 {
@@ -113,9 +134,13 @@ func (d *DynamicFetcher) Fetch(url string) (string, error) {
 		return err
 	}))
 
+	elapsed = time.Since(start)
+	fmt.Printf("time elapsed: %s\n", elapsed)
 	// run task list
-	err := chromedp.Run(ctx,
+	err := chromedp.Run(d.ctx,
 		actions...,
 	)
+	elapsed = time.Since(start)
+	fmt.Printf("time elapsed: %s\n", elapsed)
 	return body, err
 }

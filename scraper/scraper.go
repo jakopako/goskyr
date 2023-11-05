@@ -210,6 +210,7 @@ type Scraper struct {
 	RenderJs            bool              `yaml:"renderJs,omitempty"`
 	PageLoadWaitSeconds int               `yaml:"page_load_wait_sec,omitempty"` // only taken into account when renderJs = true
 	Interaction         types.Interaction `yaml:"interaction,omitempty"`
+	fetcher             fetch.Fetcher
 }
 
 // GetItems fetches and returns all items from a website according to the
@@ -219,6 +220,17 @@ type Scraper struct {
 // of dynamic fields, ie fields that don't have a predefined value and that are
 // present on the main page (not subpages). This is used by the ML feature generation.
 func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string]interface{}, error) {
+
+	// initialize fetcher
+	if c.RenderJs {
+		dynFetcher := fetch.NewDynamicFetcher(globalConfig.UserAgent, c.PageLoadWaitSeconds)
+		defer dynFetcher.Cancel()
+		c.fetcher = dynFetcher
+	} else {
+		c.fetcher = &fetch.StaticFetcher{
+			UserAgent: globalConfig.UserAgent,
+		}
+	}
 
 	var items []map[string]interface{}
 
@@ -272,17 +284,6 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 
 			// handle all fields on subpages
 			if !rawDyn {
-				var subpageFetcher fetch.Fetcher
-				if c.RenderJs {
-					subpageFetcher = &fetch.DynamicFetcher{
-						UserAgent:   globalConfig.UserAgent,
-						WaitSeconds: 1, // let's see if this works...
-					}
-				} else {
-					subpageFetcher = &fetch.StaticFetcher{
-						UserAgent: globalConfig.UserAgent,
-					}
-				}
 				subDocs := make(map[string]*goquery.Document)
 				for _, f := range c.Fields {
 					if f.OnSubpage != "" && f.Value == "" {
@@ -290,7 +291,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 						subpageURL := fmt.Sprint(currentItem[f.OnSubpage])
 						_, found := subDocs[subpageURL]
 						if !found {
-							subRes, err := subpageFetcher.Fetch(subpageURL, fetch.FetchOpts{})
+							subRes, err := c.fetcher.Fetch(subpageURL, fetch.FetchOpts{})
 							if err != nil {
 								log.Printf("%s ERROR: %v. Skipping item %v.", c.Name, err, currentItem)
 								return
@@ -414,20 +415,9 @@ func (c *Scraper) removeHiddenFields(item map[string]interface{}) map[string]int
 }
 
 func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl, userAgent string) (bool, string, *goquery.Document, error) {
-	var fetcher fetch.Fetcher
-	if c.RenderJs {
-		// fetcher = &fetch.DynamicFetcher{
-		// 	UserAgent:   userAgent,
-		// 	Interaction: c.Interaction,
-		// }
-		fetcher = fetch.NewDynamicFetcher(userAgent, c.PageLoadWaitSeconds)
-	} else {
-		fetcher = &fetch.StaticFetcher{
-			UserAgent: userAgent,
-		}
-	}
+
 	if nextPageI == 0 {
-		newDoc, err := fetchToDoc(currentPageUrl, fetcher, fetch.FetchOpts{})
+		newDoc, err := fetchToDoc(currentPageUrl, c.fetcher, fetch.FetchOpts{})
 		// res, err := fetcher.Fetch(currentPageUrl)
 		// if err != nil {
 		// 	return false, "", nil, err
@@ -456,7 +446,7 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 						Type:     types.InteractionTypeClick,
 						Count:    nextPageI, // we always need to 'restart' the clicks because we always re-fetch the page
 					}
-					nextPageDoc, err := fetchToDoc(currentPageUrl, fetcher, fetch.FetchOpts{Interaction: ia})
+					nextPageDoc, err := fetchToDoc(currentPageUrl, c.fetcher, fetch.FetchOpts{Interaction: ia})
 					if err != nil {
 						return false, "", nil, err
 					}
@@ -468,7 +458,7 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 				baseUrl := getBaseURL(currentPageUrl, doc)
 				nextPageUrl := getURLString(&c.Paginator.Location, doc.Selection, baseUrl)
 				if nextPageUrl != "" {
-					nextPageDoc, err := fetchToDoc(nextPageUrl, fetcher, fetch.FetchOpts{})
+					nextPageDoc, err := fetchToDoc(nextPageUrl, c.fetcher, fetch.FetchOpts{})
 					if err != nil {
 						return false, "", nil, err
 					}

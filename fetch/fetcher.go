@@ -56,10 +56,11 @@ func (s *StaticFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 
 // The DynamicFetcher renders js
 type DynamicFetcher struct {
-	UserAgent string
-	// Interaction types.Interaction
-	WaitSeconds int
-	ctx         context.Context
+	UserAgent    string
+	WaitSeconds  int
+	ctx          context.Context
+	cancelParent context.CancelFunc
+	cancel       context.CancelFunc
 }
 
 func NewDynamicFetcher(ua string, s int) *DynamicFetcher {
@@ -67,38 +68,30 @@ func NewDynamicFetcher(ua string, s int) *DynamicFetcher {
 		chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.WindowSize(1920, 1080), // init with a desktop view (sometimes pages look different on mobile, eg buttons are missing)
 	)
-	parentCtx, _ := chromedp.NewExecAllocator(context.Background(), opts...)
-	ctx, _ := chromedp.NewContext(parentCtx)
-	// TODO don't forget to actually do something with the context.CancelFunc
-	return &DynamicFetcher{
-		UserAgent:   ua,
-		WaitSeconds: s,
-		ctx:         ctx,
+	parentCtx, cancelParent := chromedp.NewExecAllocator(context.Background(), opts...)
+	ctx, cancel := chromedp.NewContext(parentCtx)
+	d := &DynamicFetcher{
+		UserAgent:    ua,
+		WaitSeconds:  s,
+		ctx:          ctx,
+		cancelParent: cancelParent,
+		cancel:       cancel,
 	}
+	if d.WaitSeconds == 0 {
+		d.WaitSeconds = 2 // default
+	}
+	return d
+}
+
+func (d *DynamicFetcher) Cancel() {
+	d.cancelParent()
+	d.cancel()
 }
 
 func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 	// TODO: add user agent
-	start := time.Now()
-	// opts := append(
-	// 	chromedp.DefaultExecAllocatorOptions[:],
-	// 	chromedp.WindowSize(1920, 1080), // init with a desktop view (sometimes pages look different on mobile, eg buttons are missing)
-	// )
-	// parentCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
-	// elapsed := time.Since(start)
-	// fmt.Printf("time elapsed: %s\n", elapsed)
-	// defer cancel()
-	// ctx, cancel := chromedp.NewContext(parentCtx)
-	// elapsed = time.Since(start)
-	// fmt.Printf("time elapsed: %s\n", elapsed)
-	// ctx, cancel := chromedp.NewContext(parentCtx, chromedp.WithDebugf(log.Printf))
-	// defer cancel()
-
 	var body string
-	sleepTime := 2 * time.Second
-	if d.WaitSeconds > 0 {
-		sleepTime = time.Duration(d.WaitSeconds) * time.Second
-	}
+	sleepTime := time.Duration(d.WaitSeconds) * time.Second
 	actions := []chromedp.Action{
 		chromedp.Navigate(url),
 		chromedp.Sleep(sleepTime), // for now
@@ -109,7 +102,6 @@ func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 	}
 	if opts.Interaction.Type == types.InteractionTypeClick {
 		count := 1 // default is 1
-		fmt.Println("shouldnt get here")
 		if opts.Interaction.Count > 0 {
 			count = opts.Interaction.Count
 		}
@@ -139,13 +131,9 @@ func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 		return err
 	}))
 
-	elapsed := time.Since(start)
-	fmt.Printf("time elapsed: %s\n", elapsed)
 	// run task list
 	err := chromedp.Run(d.ctx,
 		actions...,
 	)
-	elapsed = time.Since(start)
-	fmt.Printf("time elapsed: %s\n", elapsed)
 	return body, err
 }

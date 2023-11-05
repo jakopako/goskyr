@@ -69,6 +69,7 @@ func NewDynamicFetcher(ua string, s int) *DynamicFetcher {
 	)
 	parentCtx, _ := chromedp.NewExecAllocator(context.Background(), opts...)
 	ctx, _ := chromedp.NewContext(parentCtx)
+	// TODO don't forget to actually do something with the context.CancelFunc
 	return &DynamicFetcher{
 		UserAgent:   ua,
 		WaitSeconds: s,
@@ -84,17 +85,17 @@ func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 	// 	chromedp.WindowSize(1920, 1080), // init with a desktop view (sometimes pages look different on mobile, eg buttons are missing)
 	// )
 	// parentCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
-	elapsed := time.Since(start)
-	fmt.Printf("time elapsed: %s\n", elapsed)
+	// elapsed := time.Since(start)
+	// fmt.Printf("time elapsed: %s\n", elapsed)
 	// defer cancel()
 	// ctx, cancel := chromedp.NewContext(parentCtx)
-	elapsed = time.Since(start)
-	fmt.Printf("time elapsed: %s\n", elapsed)
+	// elapsed = time.Since(start)
+	// fmt.Printf("time elapsed: %s\n", elapsed)
 	// ctx, cancel := chromedp.NewContext(parentCtx, chromedp.WithDebugf(log.Printf))
 	// defer cancel()
 
 	var body string
-	sleepTime := 5 * time.Second
+	sleepTime := 2 * time.Second
 	if d.WaitSeconds > 0 {
 		sleepTime = time.Duration(d.WaitSeconds) * time.Second
 	}
@@ -102,7 +103,7 @@ func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 		chromedp.Navigate(url),
 		chromedp.Sleep(sleepTime), // for now
 	}
-	delay := 1000 * time.Millisecond // default is 1 second
+	delay := 500 * time.Millisecond // default is .5 seconds
 	if opts.Interaction.Delay > 0 {
 		delay = time.Duration(opts.Interaction.Delay) * time.Millisecond
 	}
@@ -138,7 +139,7 @@ func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 		return err
 	}))
 
-	elapsed = time.Since(start)
+	elapsed := time.Since(start)
 	fmt.Printf("time elapsed: %s\n", elapsed)
 	// run task list
 	err := chromedp.Run(d.ctx,

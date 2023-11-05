@@ -208,6 +208,7 @@ type Scraper struct {
 	Filters             []*Filter         `yaml:"filters,omitempty"`
 	Paginator           Paginator         `yaml:"paginator,omitempty"`
 	RenderJs            bool              `yaml:"renderJs,omitempty"`
+	PageLoadWaitSeconds int               `yaml:"page_load_wait_sec,omitempty"` // only taken into account when renderJs = true
 	Interaction         types.Interaction `yaml:"interaction,omitempty"`
 }
 
@@ -419,7 +420,7 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 		// 	UserAgent:   userAgent,
 		// 	Interaction: c.Interaction,
 		// }
-		fetcher = fetch.NewDynamicFetcher(userAgent, 0)
+		fetcher = fetch.NewDynamicFetcher(userAgent, c.PageLoadWaitSeconds)
 	} else {
 		fetcher = &fetch.StaticFetcher{
 			UserAgent: userAgent,

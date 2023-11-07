@@ -432,7 +432,7 @@ func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields b
 
 	var fetcher fetch.Fetcher
 	if s.RenderJs {
-		fetcher = &fetch.DynamicFetcher{}
+		fetcher = fetch.NewDynamicFetcher("", 0)
 	} else {
 		fetcher = &fetch.StaticFetcher{}
 	}

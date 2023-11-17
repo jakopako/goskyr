@@ -428,16 +428,16 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 				// check if node c.Paginator.Location.Selector is present in doc
 				pagSelector := doc.Find(c.Paginator.Location.Selector)
 				if len(pagSelector.Nodes) > 0 {
-					ia := types.Interaction{
-						Selector: c.Paginator.Location.Selector,
-						Type:     types.InteractionTypeClick,
-						Count:    nextPageI, // we always need to 'restart' the clicks because we always re-fetch the page
-					}
-					nextPageDoc, err := fetchToDoc(currentPageUrl, c.fetcher, fetch.FetchOpts{Interaction: ia})
-					if err != nil {
-						return false, "", nil, err
-					}
 					if nextPageI < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
+						ia := types.Interaction{
+							Selector: c.Paginator.Location.Selector,
+							Type:     types.InteractionTypeClick,
+							Count:    nextPageI, // we always need to 'restart' the clicks because we always re-fetch the page
+						}
+						nextPageDoc, err := fetchToDoc(currentPageUrl, c.fetcher, fetch.FetchOpts{Interaction: ia})
+						if err != nil {
+							return false, "", nil, err
+						}
 						return true, currentPageUrl, nextPageDoc, nil
 					}
 				}

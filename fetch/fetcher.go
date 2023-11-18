@@ -60,7 +60,6 @@ type DynamicFetcher struct {
 	WaitMilliseconds int
 	allocContext     context.Context
 	cancelAlloc      context.CancelFunc
-	// cancel           context.CancelFunc
 }
 
 func NewDynamicFetcher(ua string, ms int) *DynamicFetcher {

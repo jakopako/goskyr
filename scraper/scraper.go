@@ -341,6 +341,11 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 		}
 	}
 
+	// main use case:
+	// event websites mostly contain a list of events ordered by date. Sometimes the date does
+	// not contain the year. In that case we could simply set the year to the current year but
+	// it might happen that the list of events spans across more than one year into the next
+	// year. In that case we still want to set the correct year which would be current year + 1.
 	if len(dateFieldsGuessYear) > 0 {
 		for i, item := range items {
 			if i > 0 {
@@ -348,7 +353,16 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 					if dateFieldsGuessYear[name] {
 						if t, ok := val.(time.Time); ok {
 							if prevT, ok := items[i-1][name].(time.Time); ok {
-								if t.Before(prevT) {
+								// here we do not compare the current date directly to the previous date. There
+								// are cases where we wouldn't want the year to be increased by one even though
+								// the previous date is bigger than the current one. Such cases occur when a
+								// website contains a list of items that are sorted by date but within a day are
+								// not sorted by time. To prevent the year from being increased wrongly in that
+								// case we introduce a min delta of 1 day.
+								tmpT := prevT.AddDate(0, 0, -1)
+								if t.Before(tmpT) {
+									// probably there is still a bug here when we have a list that spans to year
+									// changes..
 									t := time.Date(t.Year()+1, t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
 									item[name] = t
 								}

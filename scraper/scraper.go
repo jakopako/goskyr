@@ -457,7 +457,10 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 				}
 			} else {
 				baseUrl := getBaseURL(currentPageUrl, doc)
-				nextPageUrl := getURLString(&c.Paginator.Location, doc.Selection, baseUrl)
+				nextPageUrl, err := getURLString(&c.Paginator.Location, doc.Selection, baseUrl)
+				if err != nil {
+					return false, "", nil, err
+				}
 				if nextPageUrl != "" {
 					nextPageDoc, err := fetchToDoc(nextPageUrl, c.fetcher, fetch.FetchOpts{})
 					if err != nil {
@@ -503,7 +506,10 @@ func extractField(field *Field, event map[string]interface{}, s *goquery.Selecti
 		if len(field.ElementLocations) != 1 {
 			return fmt.Errorf("a field of type 'url' must exactly have one location")
 		}
-		url := getURLString(&field.ElementLocations[0], s, baseURL)
+		url, err := getURLString(&field.ElementLocations[0], s, baseURL)
+		if err != nil {
+			return err
+		}
 		if url == "" {
 			url = baseURL
 		}
@@ -681,31 +687,22 @@ func getRawDateComponents(f *Field, s *goquery.Selection) (map[string]string, er
 	return rawComponents, nil
 }
 
-func getURLString(e *ElementLocation, s *goquery.Selection, baseURL string) string {
+func getURLString(e *ElementLocation, s *goquery.Selection, baseURL string) (string, error) {
 	var urlVal, urlRes string
 	u, _ := url.Parse(baseURL)
 	if e.Attr == "" {
 		// set attr to the default if not set
 		e.Attr = "href"
 	}
-	if e.Selector == "" {
-		urlVal = s.AttrOr(e.Attr, "")
-	} else {
-		fieldSelection := s.Find(e.Selector)
-		if len(fieldSelection.Nodes) > e.NodeIndex {
-			fieldNode := fieldSelection.Get(e.NodeIndex)
-			for _, a := range fieldNode.Attr {
-				if a.Key == e.Attr {
-					urlVal = a.Val
-					break
-				}
-			}
-		}
+
+	urlVal, err := getTextString(e, s)
+	if err != nil {
+		return "", err
 	}
 
 	urlVal = strings.TrimSpace(urlVal)
 	if urlVal == "" {
-		return ""
+		return "", nil
 	} else if strings.HasPrefix(urlVal, "http") {
 		urlRes = urlVal
 	} else if strings.HasPrefix(urlVal, "?") || strings.HasPrefix(urlVal, ".?") {
@@ -725,20 +722,20 @@ func getURLString(e *ElementLocation, s *goquery.Selection, baseURL string) stri
 	}
 
 	urlRes = strings.TrimSpace(urlRes)
-	return urlRes
+	return urlRes, nil
 }
 
-func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
+func getTextString(e *ElementLocation, s *goquery.Selection) (string, error) {
 	var fieldStrings []string
 	var fieldSelection *goquery.Selection
-	if t.Selector == "" {
+	if e.Selector == "" {
 		fieldSelection = s
 	} else {
-		fieldSelection = s.Find(t.Selector)
+		fieldSelection = s.Find(e.Selector)
 	}
-	if len(fieldSelection.Nodes) > t.NodeIndex {
-		if t.Attr == "" {
-			if t.EntireSubtree {
+	if len(fieldSelection.Nodes) > e.NodeIndex {
+		if e.Attr == "" {
+			if e.EntireSubtree {
 				// copied from https://github.com/PuerkitoBio/goquery/blob/v1.8.0/property.go#L62
 				var buf bytes.Buffer
 				var f func(*html.Node)
@@ -753,20 +750,20 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 						}
 					}
 				}
-				if t.AllNodes {
+				if e.AllNodes {
 					for _, node := range fieldSelection.Nodes {
 						f(node)
 						fieldStrings = append(fieldStrings, buf.String())
 						buf.Reset()
 					}
 				} else {
-					f(fieldSelection.Get(t.NodeIndex))
+					f(fieldSelection.Get(e.NodeIndex))
 					fieldStrings = append(fieldStrings, buf.String())
 				}
 			} else {
 
 				var fieldNodes []*html.Node
-				if t.AllNodes {
+				if e.AllNodes {
 					for _, node := range fieldSelection.Nodes {
 						fieldNode := node.FirstChild
 						if fieldNode != nil {
@@ -774,7 +771,7 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 						}
 					}
 				} else {
-					fieldNode := fieldSelection.Get(t.NodeIndex).FirstChild
+					fieldNode := fieldSelection.Get(e.NodeIndex).FirstChild
 					if fieldNode != nil {
 						fieldNodes = append(fieldNodes, fieldNode)
 					}
@@ -782,7 +779,7 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 				for _, fieldNode := range fieldNodes {
 					currentChildIndex := 0
 					for fieldNode != nil {
-						if currentChildIndex == t.ChildIndex {
+						if currentChildIndex == e.ChildIndex {
 							if fieldNode.Type == html.TextNode {
 								fieldStrings = append(fieldStrings, fieldNode.Data)
 								break
@@ -797,12 +794,12 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 			// WRONG
 			// It could be the case that there are multiple nodes that match the selector
 			// and we don't want the attr of the first node...
-			fieldStrings = append(fieldStrings, fieldSelection.AttrOr(t.Attr, ""))
+			fieldStrings = append(fieldStrings, fieldSelection.AttrOr(e.Attr, ""))
 		}
 	}
 	// do json lookup if we have a json_selector
 	for i, f := range fieldStrings {
-		fieldString, err := extractJsonField(t.JsonSelector, f)
+		fieldString, err := extractJsonField(e.JsonSelector, f)
 		if err != nil {
 			return "", err
 		}
@@ -814,7 +811,7 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 	}
 	// regex extract
 	for i, f := range fieldStrings {
-		fieldString, err := extractStringRegex(&t.RegexExtract, f)
+		fieldString, err := extractStringRegex(&e.RegexExtract, f)
 		if err != nil {
 			return "", err
 		}
@@ -822,9 +819,9 @@ func getTextString(t *ElementLocation, s *goquery.Selection) (string, error) {
 	}
 	// shortening
 	for i, f := range fieldStrings {
-		fieldStrings[i] = utils.ShortenString(f, t.MaxLength)
+		fieldStrings[i] = utils.ShortenString(f, e.MaxLength)
 	}
-	return strings.Join(fieldStrings, t.Separator), nil
+	return strings.Join(fieldStrings, e.Separator), nil
 }
 
 func extractStringRegex(rc *RegexConfig, s string) (string, error) {

@@ -77,6 +77,13 @@ const (
 			<div class="beschreibung"><em>Osterferienprogramm Ukrainehilfe / ПРОГРАМА ПАСХАЛЬНИХ КАНІКУЛ ПІДТРИМКА УКРАЇНЦІВ</em></div>
 		</a>
 	</div>`
+	htmlString5 = `                                        
+	<h2>
+		<a href="?bli=bla"
+			title="Heinz Rudolf Kunze &amp; Verstärkung &#8211; ABGESAGT">
+			<span>29.02.</span><span>Heinz Rudolf Kunze &amp; Verstärkung
+				&#8211; ABGESAGT</span> </a>
+	</h2>`
 )
 
 func TestFilterItemMatchTrue(t *testing.T) {
@@ -569,5 +576,39 @@ func TestExtractFieldDateTransform(t *testing.T) {
 		if !vTime.Equal(expected) {
 			t.Fatalf("expected '%s' for date but got '%s'", expected, vTime)
 		}
+	}
+}
+
+func TestExtractFieldDate29Feb(t *testing.T) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString5))
+	if err != nil {
+		t.Fatalf("unexpected error while reading html string: %v", err)
+	}
+	f := &Field{
+		Name: "date",
+		Type: "date",
+		Components: []DateComponent{
+			{
+				Covers: date.CoveredDateParts{
+					Day:   true,
+					Month: true,
+				},
+				ElementLocation: ElementLocation{
+					Selector: "h2 > a > span",
+				},
+				Layout: []string{
+					"02.01.",
+				},
+			},
+		},
+		DateLocation: "Europe/Berlin",
+		GuessYear:    true,
+	}
+	dt, err := getDate(f, doc.Selection, dateDefaults{year: 2023})
+	if err != nil {
+		t.Fatalf("unexpected error while extracting the date field: %v", err)
+	}
+	if dt.Year() != 2024 {
+		t.Fatalf("expected '2024' as year of date but got '%d'", dt.Year())
 	}
 }

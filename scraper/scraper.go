@@ -622,9 +622,15 @@ func getDate(f *Field, s *goquery.Selection) (time.Time, error) {
 			}
 		}
 	}
+
+	// currently not all date parts have default values
+	if !combinedParts.Day || !combinedParts.Month {
+		return t, errors.New("date parsing error: to generate a date at least a day and a month is needed")
+	}
+
 	// adding default values where necessary
+	currentYear := time.Now().Year()
 	if !combinedParts.Year {
-		currentYear := time.Now().Year()
 		dateParts = append(dateParts, datePart{
 			stringPart:  strconv.Itoa(currentYear),
 			layoutParts: []string{"2006"},
@@ -635,10 +641,6 @@ func getDate(f *Field, s *goquery.Selection) (time.Time, error) {
 			stringPart:  "20:00",
 			layoutParts: []string{"15:04"},
 		})
-	}
-	// currently not all date parts have default values
-	if !combinedParts.Day || !combinedParts.Month {
-		return t, errors.New("date parsing error: to generate a date at least a day and a month is needed")
 	}
 
 	var dateTimeString string
@@ -653,10 +655,25 @@ func getDate(f *Field, s *goquery.Selection) (time.Time, error) {
 		}
 		dateTimeString += dp.stringPart + " "
 	}
+
 	for _, dateTimeLayout := range dateTimeLayouts {
 		t, err = monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
 		if err == nil {
 			return t, nil
+		} else if !combinedParts.Year && f.GuessYear {
+			// edge case, parsing time "29.02. 20:00 2023 ": day out of range
+			// We set the year to the current year but it should actually be 2024
+			// We only update the year string in case guess_year is set to true
+			// to not confuse the user too much
+			if strings.HasSuffix(err.Error(), "day out of range") && strings.Contains(err.Error(), "29") {
+				for i := 1; i < 4; i++ {
+					dateTimeString = strings.Replace(dateTimeString, strconv.Itoa(currentYear), strconv.Itoa(currentYear+i), 1)
+					t, err = monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
+					if err == nil {
+						return t, nil
+					}
+				}
+			}
 		}
 	}
 	return t, err

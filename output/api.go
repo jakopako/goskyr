@@ -46,7 +46,8 @@ func (f *APIWriter) Write(items chan map[string]interface{}) {
 			// delete all items from the given source
 			firstDate, ok := item["date"].(time.Time)
 			if !ok {
-				log.Fatalf("error while trying to cast the date field of item %v to time.Time", item)
+				log.Printf("error while trying to cast the date field of item %v to time.Time", item)
+				continue
 			}
 			firstDateUTCF := firstDate.UTC().Format("2006-01-02 15:04")
 			deleteURL := fmt.Sprintf("%s?sourceUrl=%s&datetime=%s", apiURL, url.QueryEscape(currentSrc), url.QueryEscape(firstDateUTCF))
@@ -54,14 +55,15 @@ func (f *APIWriter) Write(items chan map[string]interface{}) {
 			req.SetBasicAuth(apiUser, apiPassword)
 			resp, err := client.Do(req)
 			if err != nil {
-				log.Fatal(err)
+				log.Printf("error while sending event %+v to the api: %v", item, err)
+				continue
 			}
 			if resp.StatusCode != 200 {
 				body, err := io.ReadAll(resp.Body)
 				if err != nil {
 					log.Fatal(err)
 				}
-				log.Fatalf("something went wrong while deleting items. Status Code: %d\nUrl: %s Response: %s", resp.StatusCode, deleteURL, body)
+				log.Fatalf("error while deleting items. Status Code: %d\nUrl: %s Response: %s", resp.StatusCode, deleteURL, body)
 			}
 			resp.Body.Close()
 		}
@@ -88,15 +90,16 @@ func postBatch(client *http.Client, batch []map[string]interface{}, apiURL, apiU
 	req.SetBasicAuth(apiUser, apiPassword)
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("error while sending post request: %v", err)
+		return
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != 201 {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("error while reading post request respones: %v", err)
+		} else {
+			log.Printf("error while adding new events. Status Code: %d Response: %s", resp.StatusCode, body)
 		}
-		log.Fatalf("something went wrong while adding new events. Status Code: %d Response: %s", resp.StatusCode, body)
 	}
-	resp.Body.Close()
-
 }

@@ -832,10 +832,6 @@ func getTextString(e *ElementLocation, s *goquery.Selection) (string, error) {
 		}
 		fieldStrings[i] = fieldString
 	}
-	// automatically trimming whitespaces might be confusing in some cases...
-	for i, f := range fieldStrings {
-		fieldStrings[i] = strings.TrimSpace(f)
-	}
 	// regex extract
 	for i, f := range fieldStrings {
 		fieldString, err := extractStringRegex(&e.RegexExtract, f)
@@ -843,6 +839,11 @@ func getTextString(e *ElementLocation, s *goquery.Selection) (string, error) {
 			return "", err
 		}
 		fieldStrings[i] = fieldString
+	}
+	// automatically trimming whitespaces might be confusing in some cases...
+	// TODO make this configurable
+	for i, f := range fieldStrings {
+		fieldStrings[i] = strings.TrimSpace(f)
 	}
 	// shortening
 	for i, f := range fieldStrings {

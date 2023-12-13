@@ -361,7 +361,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 								// case we introduce a min delta of 1 day.
 								tmpT := prevT.AddDate(0, 0, -1)
 								if t.Before(tmpT) {
-									// probably there is still a bug here when we have a list that spans to year
+									// probably there is still a bug here when we have a list that spans two years
 									// changes..
 									t := time.Date(t.Year()+1, t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
 									item[name] = t

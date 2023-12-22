@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -85,7 +86,7 @@ func (d *DynamicFetcher) Cancel() {
 }
 
 func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
-	// start := time.Now()
+	start := time.Now()
 	ctx, cancel := chromedp.NewContext(d.allocContext)
 	defer cancel()
 	// TODO: add user agent
@@ -116,6 +117,7 @@ func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 				if len(nodes) == 0 {
 					return nil
 				} // nothing to do
+				fmt.Println("clicking now")
 				return chromedp.MouseClickNode(nodes[0]).Do(ctx)
 			}))
 			actions = append(actions, chromedp.Sleep(delay))
@@ -134,7 +136,7 @@ func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 	err := chromedp.Run(ctx,
 		actions...,
 	)
-	// elapsed := time.Since(start)
-	// log.Printf("scraping %s took %s", url, elapsed)
+	elapsed := time.Since(start)
+	log.Printf("fetching %s took %s", url, elapsed)
 	return body, err
 }

@@ -42,6 +42,7 @@ Start the configuration generation. The configuration file is written to the def
 ```bash
 goskyr -g https://www.imdb.com/chart/top/ -f
 ```
+
 Note, that different colors are used to show how 'close' certain fields are to each other in the html tree. This should help when there are multiple list-like structures on a web page and you need to figure out which fields belong together.
 
 Next, start the scraping process. The configuration file is read from the default location `config.yml`.
@@ -99,12 +100,12 @@ scrapers:
     url: "https://www.goodreads.com/quotes/tag/life"
     item: ".quote"
     fields:
-        - name: "quote"
-          location:
-            selector: ".quoteText"
-        - name: "author"
-          location:
-            selector: ".authorOrTitle"
+      - name: "quote"
+        location:
+          selector: ".quoteText"
+      - name: "author"
+        location:
+          selector: ".authorOrTitle"
 ```
 
 Save this to a file, e.g. `quotes-config.yml` and run `goskyr -c quotes-config.yml` (or `go run main.go -c quotes-config.yml`) to retreive the scraped quotes as json string. The result should look something like this:
@@ -244,7 +245,7 @@ The result may look like this.
 ...]
 ```
 
-*Subkey: `regex_extract`*
+_Subkey: `regex_extract`_
 
 It might be a bit more complex to extract the desired information. Take for instance the concert scraper configuration for "Kaufleuten", shown above, more specifically the config snippet for the `title` field.
 
@@ -260,7 +261,7 @@ fields:
 
 This field is implicitly of type `text`. Other types, such as `url` or `date` would have to be configured with the keyword `type`. The `location` tells the scraper where to look for the field value and how to extract it. In this case the selector on its own would not be enough to extract the desired value as we would get something like this: `Bastian Baker • Konzert`. That's why there is an extra option to define a regular expression to extract a substring. Note that in this example our extracted string would still contain a trainling space which is automatically removed by the scraper. Let's have a look at a few more examples to have a better understanding of the location configuration.
 
-*Subkey: `node_index`*
+_Subkey: `node_index`_
 
 Let's say we want to extract "Tonhalle-Orchester Zürich" from the following html snippet.
 
@@ -286,7 +287,7 @@ location:
 
 Note that the same result can be achieved with the `:nth-child()` selector so `node_index` might be removed in the future, see issue [#119](https://github.com/jakopako/goskyr/issues/119)
 
-*Subkey: `child_index`*
+_Subkey: `child_index`_
 
 Next, let's say we want to extract the time "20h00" from the following html snippet.
 
@@ -323,11 +324,11 @@ location:
 
 Here, the selector is not enough to extract the desired string and we can't go further down the tree by using different selectors. With the `child_index` we can point to the exact string we want. A `child_index` of 0 would point to the first `<strong>` node, a `child_index` of 1 would point to the string containing "19h00", a `child_index` of 2 would point to the second `<strong>` node and finally a `child_index` of 3 points to the correct string. If `child_index` is set to -1 the first child that results in a regex match will be used. This can be useful if the `child_index` varies across different items. In the current example however, the `child_index` is always the same but the string still contains more stuff than we need which is why we use a regular expression to extract the desired substring.
 
-*Subkey: `entire_subtree`*
+_Subkey: `entire_subtree`_
 
 This subkey, if set to `true` causes goskyr to grab all text elements under the element defined in the location's selector. It is useful when the target location contains inline tags, eg. `This is some text with a <strong>strong</strong> part.`
 
-*Subkey: `all_nodes`*
+_Subkey: `all_nodes`_
 
 This subkey, if set to `true` joins together all strings having the given selector. The subkey `separator` will be used as separator string. If not defined the separator is an empty string. Example:
 
@@ -357,8 +358,6 @@ Resulting json:
 {"title": "Anja Schneider, Steve Bug, Dirty Flav"},
 ...]
 ```
-
-
 
 To get an even better feeling for the location configuration check out the numerous examples in the `concerts-config.yml` file.
 
@@ -415,12 +414,12 @@ A dynamic field has a field type that can either be `text`, `url` or `date`. The
   ```
 
   As can be seen, a component has to define which part of the date it covers (at least one part has to be covered). Next, the location of this component has to be defined. This is done the same way as we defined the location for a text field string. Finally, we need to define a list of possible layouts where each layout is defined the 'go-way' as this scraper is written in go. For more details check out [this](https://yourbasic.org/golang/format-parse-string-time-date-example/) link or have a look at the numerous examples in the `concerts-config.yml` file. Note that a layout string is always in English although the date string on the scraped website might be in a different language. Also note that mostly the layout list only contains one element. Only in rare cases where different events on the same site have different layouts it is necessary to define more than one layout.
-  
+
   The `date_language` key needs to correspond to the language on the website. Currently, the default is `de_DE`. Note, that this doesn't matter for dates that only contain numbers. `date_location` sets the time zone of the respective date.
 
 ### JS Rendering
 
-Since version 0.3.0 js rendering is supported. For this to work the `google-chrome` binary needs to be installed. In the configuration snippet of a scraper just add `renderJs: true` and everything will be taken care of. With `page_load_wait_sec: <seconds>` the default waiting time of 2 seconds can be adapted accordingly.
+Since version 0.3.0 js rendering is supported. For this to work the `google-chrome` binary needs to be installed. In the configuration snippet of a scraper just add `render_js: true` and everything will be taken care of. With `page_load_wait_sec: <seconds>` the default waiting time of 2 seconds can be adapted accordingly.
 
 User interactions with the page (eg scrolling) might be implemented in the future. Clicking has been implemented. TODO: document.
 
@@ -457,7 +456,7 @@ interaction:
   delay: 2000 # milliseconds that the scraper waits after each click. Default is 1000
 ```
 
-Note that these clicks are executed before the data is scraped. Also the interaction configuration will be ignored if `renderJs` is not set to `true` because only in that case is the website actually run within a headless browser.
+Note that these clicks are executed before the data is scraped. Also the interaction configuration will be ignored if `render_js` is not set to `true` because only in that case is the website actually run within a headless browser.
 
 ### Pagination
 
@@ -469,7 +468,7 @@ paginator:
     selector: ".pagination .selector"
 ```
 
-In case `renderJs` is set to `false` by default the value of the `href` key is taken as url for the next page. However, you can change this and other parameters in the paginator configuration.
+In case `render_js` is set to `false` by default the value of the `href` key is taken as url for the next page. However, you can change this and other parameters in the paginator configuration.
 
 ```yml
 paginator:
@@ -480,7 +479,7 @@ paginator:
   max_pages: <number>
 ```
 
-If `renderJs` is set to `true` the scraper will simulate a mouse click on the given selector to loop over the pages.
+If `render_js` is set to `true` the scraper will simulate a mouse click on the given selector to loop over the pages.
 
 ### Output
 
@@ -491,7 +490,6 @@ writer:
   type: file
   filepath: test-file.json
 ```
-
 
 ## Build ML Model for Improved Auto-Config
 
@@ -530,28 +528,28 @@ To build and release a new version of goskyr [Goreleaser](https://goreleaser.com
 
 1. Make a "dry-run" release to see if it works using the release command:
 
-  ```bash
-  make release-dry-run
-  ```
+```bash
+make release-dry-run
+```
 
 1. Make sure you have a file called `.release-env` containing the github token.
 
-  ```bash
-  GITHUB_TOKEN=YOUR_GH_TOKEN
-  ```
+```bash
+GITHUB_TOKEN=YOUR_GH_TOKEN
+```
 
 1. Create a tag and push it to GitHub
 
-  ```bash
-  git tag -a v0.1.5 -m "new features"
-  git push origin v0.1.5
-  ```
+```bash
+git tag -a v0.1.5 -m "new features"
+git push origin v0.1.5
+```
 
 1. Run GoReleaser at the root of this repository:
 
-  ```bash
-  make release
-  ```
+```bash
+make release
+```
 
 ## Contributing
 

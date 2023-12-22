@@ -513,7 +513,7 @@ scrapers:
   - name: RoteFabrik
     url: "https://rotefabrik.ch/de/programm.html#/calendar/konzert/"
     item: ".rf-calendar-container > article"
-    renderJs: true
+    render_js: true
     fields:
       - name: title
         location:

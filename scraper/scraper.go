@@ -207,8 +207,8 @@ type Scraper struct {
 	Fields              []Field           `yaml:"fields,omitempty"`
 	Filters             []*Filter         `yaml:"filters,omitempty"`
 	Paginator           Paginator         `yaml:"paginator,omitempty"`
-	RenderJs            bool              `yaml:"renderJs,omitempty"`
-	PageLoadWait        int               `yaml:"page_load_wait,omitempty"` // milliseconds. Only taken into account when renderJs = true
+	RenderJs            bool              `yaml:"render_js,omitempty"`
+	PageLoadWait        int               `yaml:"page_load_wait,omitempty"` // milliseconds. Only taken into account when render_js = true
 	Interaction         types.Interaction `yaml:"interaction,omitempty"`
 	fetcher             fetch.Fetcher
 }
@@ -242,7 +242,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 	currentPage := 0
 	var doc *goquery.Document
 
-	hasNextPage, pageURL, doc, err := c.fetchPage(nil, currentPage, c.URL, globalConfig.UserAgent)
+	hasNextPage, pageURL, doc, err := c.fetchPage(nil, currentPage, c.URL, globalConfig.UserAgent, &c.Interaction)
 	if err != nil {
 		return items, err
 	}
@@ -325,7 +325,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 		})
 
 		currentPage++
-		hasNextPage, pageURL, doc, err = c.fetchPage(doc, currentPage, pageURL, globalConfig.UserAgent)
+		hasNextPage, pageURL, doc, err = c.fetchPage(doc, currentPage, pageURL, globalConfig.UserAgent, nil)
 		if err != nil {
 			return items, err
 		}
@@ -428,10 +428,10 @@ func (c *Scraper) removeHiddenFields(item map[string]interface{}) map[string]int
 	return item
 }
 
-func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl, userAgent string) (bool, string, *goquery.Document, error) {
+func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl, userAgent string, i *types.Interaction) (bool, string, *goquery.Document, error) {
 
 	if nextPageI == 0 {
-		newDoc, err := fetchToDoc(currentPageUrl, c.fetcher, fetch.FetchOpts{})
+		newDoc, err := fetchToDoc(currentPageUrl, c.fetcher, fetch.FetchOpts{Interaction: *i})
 		if err != nil {
 			return false, "", nil, err
 		}
@@ -481,6 +481,7 @@ func fetchToDoc(url string, fetcher fetch.Fetcher, opts fetch.FetchOpts) (*goque
 	if err != nil {
 		return nil, err
 	}
+	// fmt.Println(res)
 	return goquery.NewDocumentFromReader(strings.NewReader(res))
 }
 

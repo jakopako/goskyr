@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -67,6 +68,10 @@ func NewDynamicFetcher(ua string, ms int) *DynamicFetcher {
 		chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.WindowSize(1920, 1080), // init with a desktop view (sometimes pages look different on mobile, eg buttons are missing)
 	)
+	if ua != "" {
+		opts = append(opts,
+			chromedp.UserAgent(ua))
+	}
 	allocContext, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
 	d := &DynamicFetcher{
 		UserAgent:        ua,
@@ -85,10 +90,14 @@ func (d *DynamicFetcher) Cancel() {
 }
 
 func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
-	// start := time.Now()
+	start := time.Now()
 	ctx, cancel := chromedp.NewContext(d.allocContext)
+	// ctx, cancel := chromedp.NewContext(d.allocContext,
+	// 	chromedp.WithLogf(log.Printf),
+	// 	chromedp.WithDebugf(log.Printf),
+	// 	chromedp.WithErrorf(log.Printf),
+	// )
 	defer cancel()
-	// TODO: add user agent
 	var body string
 	sleepTime := time.Duration(d.WaitMilliseconds) * time.Millisecond
 	actions := []chromedp.Action{
@@ -134,7 +143,7 @@ func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 	err := chromedp.Run(ctx,
 		actions...,
 	)
-	// elapsed := time.Since(start)
-	// log.Printf("scraping %s took %s", url, elapsed)
+	elapsed := time.Since(start)
+	log.Printf("fetching %s took %s", url, elapsed)
 	return body, err
 }

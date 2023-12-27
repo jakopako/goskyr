@@ -348,10 +348,16 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 	// year. In that case we still want to set the correct year which would be current year + 1.
 	if len(dateFieldsGuessYear) > 0 {
 		for i, item := range items {
-			if i > 0 {
-				for name, val := range item {
-					if dateFieldsGuessYear[name] {
-						if t, ok := val.(time.Time); ok {
+			for name, val := range item {
+				if dateFieldsGuessYear[name] {
+					if t, ok := val.(time.Time); ok {
+						now := time.Now()
+						if t.Before(now) {
+							newT := time.Date(t.Year()+1, t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
+							item[name] = newT
+							continue
+						}
+						if i > 0 {
 							if prevT, ok := items[i-1][name].(time.Time); ok {
 								// here we do not compare the current date directly to the previous date. There
 								// are cases where we wouldn't want the year to be increased by one even though
@@ -363,8 +369,8 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 								if t.Before(tmpT) {
 									// probably there is still a bug here when we have a list that spans two years
 									// changes..
-									t := time.Date(t.Year()+1, t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
-									item[name] = t
+									newT := time.Date(t.Year()+1, t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
+									item[name] = newT
 								}
 							}
 						}

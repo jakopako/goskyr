@@ -10,6 +10,13 @@
 1. [Installation](#installation)
 1. [Semi-Automatic Configuration](#semi-automatic-configuration)
 1. [Manual Configuration & Usage](#manual-configuration--usage)
+   1. [Static fields](#static-fields)
+   1. [Dynamic fields](#dynamic-fields)
+   1. [JS rendering](#js-rendering)
+   1. [Filters](#filters)
+   1. [Interaction](#interaction)
+   1. [Pagination](#pagination)
+   1. [Output](#output)
 1. [Build ML Model for Improved Auto-Config](#build-ml-model-for-improved-auto-config)
 1. [Related Projects](#related-projects)
 1. [Build & Release](#build--release)
@@ -220,9 +227,93 @@ Dynamic fields are a little more complex as their values are extracted from the 
 ```yml
 fields:
   - name: "quote"
+    type: "text" # defaults to 'text' if ommited
     location:
       selector: ".quoteText"
 ```
+
+A dynamic field can have one of the following three types: `text`, `url` or `date`. The following table shows which options are available for which type.
+
+| Option        | Type `text` | Type `url` | Type `date` | Default value |
+| ------------- | :---------: | :--------: | :---------: | ------------- |
+| can_be_empty  |      X      |     X      |             | `false`       |
+| components    |             |            |      X      | `[]`          |
+| date_language |             |            |      X      | `"de_DE"`     |
+| date_location |             |            |      X      | `"UTC"`       |
+| guess_year    |             |            |      X      | `false`       |
+| hide          |      X      |     X      |      X      | `false`       |
+| location      |      X      |     X      |             | `[]`          |
+| name          |      X      |     X      |      X      | `""`          |
+| on_subpage    |      X      |     X      |      X      | `false`       |
+| separator     |      X      |            |             | `""`          |
+| type          |      X      |     X      |      X      | `"text"`      |
+
+#### Options
+
+**`can_be_empty`**
+
+If set to `false`, an error message will be printed for each item where this field is missing (i.e. the html node does not exist or the corresponding string is empty) and the correspondig item will not be included in the resulting list of items. If set to `true` there won't be an error message and the corresponding value will be an empty string.
+
+**`components`**
+
+This key contains the configuration for the different date components that are needed to extract a valid date. A list of the following form needs to be defined.
+
+```yml
+components:
+  - covers: # what part of the date is covered by the element located at 'location'?
+      day: bool # optional
+      month: bool # optional
+      year: bool # optional
+      time: bool # optional
+    location: # the location has the same configuration as explained under option 'location'.
+      selector: "<selector>"
+      ...
+    layout: ["<layout>"] # a list of layouts that apply to this date component. Needs to be configured the "golang-way" and always in English.
+  - covers:
+      ...
+```
+
+The following example should give you a better idea how such the definition of `components` might actually look like.
+
+```yml
+components:
+  - covers:
+      day: true
+    location:
+      selector: ".commingupEventsList_block2"
+    layout: ["02. "]
+  - covers:
+      month: true
+    location:
+      selector: ".commingupEventsList_block3"
+    layout: ["January"]
+  - covers:
+      time: true
+    location:
+      selector: ".commingupEventsList_block4"
+    layout: ["15Uhr04"]
+```
+
+For more details about the layout check out [this link](https://yourbasic.org/golang/format-parse-string-time-date-example/) or have a look at the numerous examples in the `concerts-config.yml`. Also note that mostly the layout list only contains one element. Only in rare cases where different events on the same site have different layouts it is necessary to define more than one layout.
+
+**`date_language`**
+
+The `date_language` needs to correspond to the language on the website. Note, that this doesn't matter for dates that only contain numbers. The values that are supported are the ones supported by the underlying library, [goodsign/monday](https://github.com/goodsign/monday).
+
+**`date_location`**
+
+`date_location` sets the time zone of the respective date.
+
+**`guess_year`**
+
+When set to `false` and no date component is defined that covers the year, the year of the resulting date defaults to the current year. When set to `true`
+
+**`hide`**
+**`location`**
+**`name`**
+**`on_subpage`**
+**`separator`**
+**`type`**
 
 **Key: `location`**
 
@@ -363,8 +454,6 @@ To get an even better feeling for the location configuration check out the numer
 
 **Key: `can_be_empty`**
 
-This key only applies to dynamic fields of type text. As the name suggests, if set to `true` there won't be an error message if the value is empty.
-
 **Key: `hide`**
 
 This key determines whether a field should be exlcuded from the resulting item. This can be handy when you want to filter based on a field that you don't want to include in the actual item. For more information on filters checkout the **Filters** section below.
@@ -417,7 +506,7 @@ A dynamic field has a field type that can either be `text`, `url` or `date`. The
 
   The `date_language` key needs to correspond to the language on the website. Currently, the default is `de_DE`. Note, that this doesn't matter for dates that only contain numbers. `date_location` sets the time zone of the respective date.
 
-### JS Rendering
+### JS rendering
 
 Since version 0.3.0 js rendering is supported. For this to work the `google-chrome` binary needs to be installed. In the configuration snippet of a scraper just add `render_js: true` and everything will be taken care of. With `page_load_wait_sec: <seconds>` the default waiting time of 2 seconds can be adapted accordingly.
 

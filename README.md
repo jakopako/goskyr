@@ -10,6 +10,13 @@
 1. [Installation](#installation)
 1. [Semi-Automatic Configuration](#semi-automatic-configuration)
 1. [Manual Configuration & Usage](#manual-configuration--usage)
+   1. [Static fields](#static-fields)
+   1. [Dynamic fields](#dynamic-fields)
+   1. [JS rendering](#js-rendering)
+   1. [Filters](#filters)
+   1. [Interaction](#interaction)
+   1. [Pagination](#pagination)
+   1. [Output](#output)
 1. [Build ML Model for Improved Auto-Config](#build-ml-model-for-improved-auto-config)
 1. [Related Projects](#related-projects)
 1. [Build & Release](#build--release)
@@ -220,13 +227,94 @@ Dynamic fields are a little more complex as their values are extracted from the 
 ```yml
 fields:
   - name: "quote"
+    type: "text" # defaults to 'text' if ommited
     location:
       selector: ".quoteText"
 ```
 
-**Key: `location`**
+A dynamic field can have one of the following three types: `text`, `url` or `date`. The following table shows which options are available for which type.
 
-There are two options on how to use the `location` key. Either you define a bunch of subkeys directly under `location` or you define a list of items each containing those subkeys. The latter is useful if you want the value of a field to be juxtaposition of multiple nodes in the html tree. The `separator` key will be used to join the strings. A very simple (imaginary) example could look something like this.
+| Option        | Type `text` | Type `url` | Type `date` | Default value |
+| ------------- | :---------: | :--------: | :---------: | ------------- |
+| can_be_empty  |      X      |     X      |             | `false`       |
+| components    |             |            |      X      | `[]`          |
+| date_language |             |            |      X      | `"de_DE"`     |
+| date_location |             |            |      X      | `"UTC"`       |
+| guess_year    |             |            |      X      | `false`       |
+| hide          |      X      |     X      |      X      | `false`       |
+| location      |      X      |     X      |             | `[]`          |
+| name          |      X      |     X      |      X      | `""`          |
+| on_subpage    |      X      |     X      |      X      | `""`          |
+| separator     |      X      |            |             | `""`          |
+| type          |      X      |     X      |      X      | `"text"`      |
+
+#### Options explained
+
+**`can_be_empty`**
+
+If set to `false`, an error message will be printed for each item where this field is missing (i.e. the html node does not exist or the corresponding string is empty) and the correspondig item will not be included in the resulting list of items. If set to `true` there won't be an error message and the corresponding value will be an empty string.
+
+**`components`**
+
+This key contains the configuration for the different date components that are needed to extract a valid date. A list of the following form needs to be defined.
+
+```yml
+components:
+  - covers: # what part of the date is covered by the element located at 'location'?
+      day: bool # optional
+      month: bool # optional
+      year: bool # optional
+      time: bool # optional
+    location: # the location has the same configuration as explained under option 'location' with the exception that it is not a list but just a single location configuration.
+      selector: "<selector>"
+      ...
+    layout: ["<layout>"] # a list of layouts that apply to this date component. Needs to be configured the "golang-way" and always in English.
+  - covers:
+      ...
+```
+
+The following example should give you a better idea how such the definition of `components` might actually look like.
+
+```yml
+components:
+  - covers:
+      day: true
+    location:
+      selector: ".commingupEventsList_block2"
+    layout: ["02. "]
+  - covers:
+      month: true
+    location:
+      selector: ".commingupEventsList_block3"
+    layout: ["January"]
+  - covers:
+      time: true
+    location:
+      selector: ".commingupEventsList_block4"
+    layout: ["15Uhr04"]
+```
+
+For more details about the layout check out [this link](https://yourbasic.org/golang/format-parse-string-time-date-example/) or have a look at the numerous examples in the `concerts-config.yml`. Also note that mostly the layout list only contains one element. Only in rare cases where different events on the same site have different layouts it is necessary to define more than one layout.
+
+**`date_language`**
+
+The `date_language` needs to correspond to the language on the website. Note, that this doesn't matter for dates that only contain numbers. The values that are supported are the ones supported by the underlying library, [goodsign/monday](https://github.com/goodsign/monday).
+
+**`date_location`**
+
+`date_location` sets the time zone of the respective date.
+
+**`guess_year`**
+
+If set to `false` and no date component is defined that covers the year, the year of the resulting date defaults to the current year. If set to `true` and no date component is defined that covers the year, goskyr will try to be 'smart' in guessing the year. This helps if a scraped list of dates covers more than one year and/or scraped dates are not within the current year but the next. Note that there are definitely more cases where this year guessing does not yet work.
+
+**`hide`**
+
+This option determines whether a field should be exlcuded from the resulting items. This can be handy when you want to filter based on a field that you don't want to include in the actual items. For more information on filters checkout the [Filters](#filters) section below.
+
+**`location`**
+
+There are two options on how to use the `location` key. Either you define a bunch of subkeys directly under `location` or you define a list of items each containing those subkeys. The latter is useful if you want the value of a field to be juxtaposition of multiple nodes in the html tree. The `separator` option will be used to join the strings. A very simple (imaginary) example could look something like this.
 
 ```yaml
 fields:
@@ -247,7 +335,7 @@ The result may look like this.
 
 _Subkey: `regex_extract`_
 
-It might be a bit more complex to extract the desired information. Take for instance the concert scraper configuration for "Kaufleuten", shown above, more specifically the config snippet for the `title` field.
+In some cases, it might be a bit more complex to extract the desired information. Take for instance the concert scraper configuration for "Kaufleuten", shown above, more specifically the config snippet for the `title` field.
 
 ```yml
 fields:
@@ -259,7 +347,7 @@ fields:
         index: 0
 ```
 
-This field is implicitly of type `text`. Other types, such as `url` or `date` would have to be configured with the keyword `type`. The `location` tells the scraper where to look for the field value and how to extract it. In this case the selector on its own would not be enough to extract the desired value as we would get something like this: `Bastian Baker • Konzert`. That's why there is an extra option to define a regular expression to extract a substring. Note that in this example our extracted string would still contain a trainling space which is automatically removed by the scraper. Let's have a look at a few more examples to have a better understanding of the location configuration.
+This field is implicitly of type `text`. The `location` tells the scraper where to look for the field value and how to extract it. In this case the selector on its own would not be enough to extract the desired value as we would get something like this: `Bastian Baker • Konzert`. That's why there is an extra option to define a regular expression to extract a substring. Note that in this example our extracted string would still contain a trailing space which is automatically removed by the scraper. Let's have a look at a few more examples to have a better understanding of the location configuration.
 
 _Subkey: `node_index`_
 
@@ -361,67 +449,41 @@ Resulting json:
 
 To get an even better feeling for the location configuration check out the numerous examples in the `concerts-config.yml` file.
 
-**Key: `can_be_empty`**
+_Subkey: `json_selector`_
 
-This key only applies to dynamic fields of type text. As the name suggests, if set to `true` there won't be an error message if the value is empty.
+If the string extracted from the webpage is a json string, then you can extract data from that json based on the give `json_selector`.
 
-**Key: `hide`**
+**`name`**
 
-This key determines whether a field should be exlcuded from the resulting item. This can be handy when you want to filter based on a field that you don't want to include in the actual item. For more information on filters checkout the **Filters** section below.
+The name of the respective field.
 
-**Key: `on_subpage`**
+**`on_subpage`**
 
-This key indicates that the corresponding field value should be extracted from a subpage defined in another dynamic field of type `url`. In the following example the comment field will be extracted from the subpage who's url is the value of the dynamic field with the name "url".
+If set to the name of another scraped field of type `url`, goskyr will fetch the corresponding page and extract the desired data from that page.
 
-```yml
-dynamic:
-  - name: "comment"
-    location:
-      selector: ".qt-the-content div"
-    can_be_empty: true
-    on_subpage: "url"
-  - name: "url"
-    type: "url"
-    location:
-      selector: ".qt-text-shadow"
-```
+**`separator`**
 
-**Key: `type`**
+This option is only relevant if the `location` option contains a list of locations of length > 1. If it does, the extracted strings (1 per location) will be joined using the defined separator.
 
-A dynamic field has a field type that can either be `text`, `url` or `date`. The default is `text`. In that case the string defined by the `location` is extracted and used 'as is' as the value for the respective field. The other types are:
+**`type`**
 
-- `url`
+This is the type of the field. As mentioned above its value can be `text`, `url` or `date`.
 
-  Setting the type `url` tells the scraper to make sure the extracted field is a valid url and if needed complete it accordingly, eg by prepending the base path. Also, the `location.attr` field is implicetly set to `"href"` if not defined by the user.
+For a field of type `text` the value that is being extracted from the webpage based on the defined location will simply be assigned to the value of the corresponding field in the output.
 
-- `date`
+If a field has type `url`, the resulting value in the output will allways be a full, valid url, meaning that it will contain protocol, hostname, path and query parameters. If the webpage does not provide this, goskyr will 'autocomplete' the url like a browser would. E.g. if a webpage, `https://event-venue.com`, contains `<a href="/events/10-03-2023-krachstock-final-story" >` and we would have a field of type `url` that extracts this url from the href attribute the resulting value would be `https://event-venue.com/events/10-03-2023-krachstock-final-story`. Also, the `location.attr` field is implicetly set to `"href"` if not defined by the user.
 
-  A date field is different from a text field in that the result is a complete, valid date. Internally, this is a `time.Time` object but in the json output it is represented by a string. In order to be able to handle a lot of different cases where date information might be spread across different locations, might be formatted in different ways using different languages a date field has a list of components where each component looks like this:
+A `date` field is different from a text field in that the result is a complete, valid date. Internally, this is a `time.Time` object but in the json output it is represented by a string in RFCXXXX format. In order to be able to handle a lot of different cases where date information might be spread across different locations, might be formatted in different ways using different languages a date field has a list of components and some other optional settings, see table above.
 
-  ```yml
-  components:
-    - covers:
-        day: bool # optional
-        month: bool # optional
-        year: bool # optional
-        time: bool # optional
-      location:
-        selector: "<selector>"
-        ... # the location has the same configuration as explained above.
-      layout: ["<layout>"]
-  date_location: "Europe/Berlin"
-  date_language: "it_IT"
-  ```
+As can be seen, a component has to define which part of the date it covers (at least one part has to be covered). Next, the location of this component has to be defined. This is done the same way as we defined the location for a text field string. Finally, we need to define a list of possible layouts where each layout is defined the 'go-way' as this scraper is written in go. For more details check out [this](https://yourbasic.org/golang/format-parse-string-time-date-example/) link or have a look at the numerous examples in the `concerts-config.yml` file. Note that a layout string is always in English although the date string on the scraped website might be in a different language. Also note that mostly the layout list only contains one element. Only in rare cases where different events on the same site have different layouts it is necessary to define more than one layout.
 
-  As can be seen, a component has to define which part of the date it covers (at least one part has to be covered). Next, the location of this component has to be defined. This is done the same way as we defined the location for a text field string. Finally, we need to define a list of possible layouts where each layout is defined the 'go-way' as this scraper is written in go. For more details check out [this](https://yourbasic.org/golang/format-parse-string-time-date-example/) link or have a look at the numerous examples in the `concerts-config.yml` file. Note that a layout string is always in English although the date string on the scraped website might be in a different language. Also note that mostly the layout list only contains one element. Only in rare cases where different events on the same site have different layouts it is necessary to define more than one layout.
+The `date_language` key needs to correspond to the language on the website. Currently, the default is `de_DE`. Note, that this doesn't matter for dates that only contain numbers. `date_location` sets the time zone of the respective date.
 
-  The `date_language` key needs to correspond to the language on the website. Currently, the default is `de_DE`. Note, that this doesn't matter for dates that only contain numbers. `date_location` sets the time zone of the respective date.
+### JS rendering
 
-### JS Rendering
+Since version 0.3.0 js rendering is supported. For this to work the `google-chrome` binary needs to be installed. In the configuration snippet of a scraper just add `render_js: true` and everything will be taken care of. With `page_load_wait: <milliseconds>` the default waiting time of 2000 ms can be adapted accordingly.
 
-Since version 0.3.0 js rendering is supported. For this to work the `google-chrome` binary needs to be installed. In the configuration snippet of a scraper just add `render_js: true` and everything will be taken care of. With `page_load_wait_sec: <seconds>` the default waiting time of 2 seconds can be adapted accordingly.
-
-User interactions with the page (eg scrolling) might be implemented in the future. Clicking has been implemented. TODO: document.
+User interactions with the page (eg scrolling) might be implemented in the future. Clicking has been implemented, see below section [Interaction](#interaction).
 
 ### Filters
 

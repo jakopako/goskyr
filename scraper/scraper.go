@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -41,8 +44,40 @@ type Config struct {
 
 func NewConfig(configPath string) (*Config, error) {
 	var config Config
-	err := cleanenv.ReadConfig(configPath, &config)
-	return &config, err
+	fileInfo, err := os.Stat(configPath)
+	if err != nil {
+		return nil, err
+	}
+	if fileInfo.IsDir() {
+		err := filepath.WalkDir(configPath, func(path string, d fs.DirEntry, err error) error {
+			if !d.IsDir() {
+				var configTmp Config
+				if err := cleanenv.ReadConfig(path, &configTmp); err != nil {
+					return err
+				}
+				config.Scrapers = append(config.Scrapers, configTmp.Scrapers...)
+				if configTmp.Writer.Type != "" {
+					if config.Writer.Type == "" {
+						config.Writer = configTmp.Writer
+					} else {
+						return fmt.Errorf("ERROR: config files must only contain max. one writer")
+					}
+				}
+			}
+			return nil // skipping everything that is not a file
+		})
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		if err := cleanenv.ReadConfig(configPath, &config); err != nil {
+			return nil, err
+		}
+	}
+	if config.Writer.Type == "" {
+		config.Writer.Type = output.STDOUT_WRITER_TYPE
+	}
+	return &config, nil
 }
 
 // RegexConfig is used for extracting a substring from a string based on the

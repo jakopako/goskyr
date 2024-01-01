@@ -36,7 +36,7 @@ func worker(sc chan scraper.Scraper, ic chan map[string]interface{}, gc *scraper
 func main() {
 	singleScraper := flag.String("s", "", "The name of the scraper to be run.")
 	toStdout := flag.Bool("stdout", false, "If set to true the scraped data will be written to stdout despite any other existing writer configurations. In combination with the -generate flag the newly generated config will be written to stdout instead of to a file.")
-	configFile := flag.String("c", "./config.yml", "The location of the configuration file.")
+	configLoc := flag.String("c", "./config.yml", "The location of the configuration. Can be a directory containing config files or a single config file.")
 	printVersion := flag.Bool("v", false, "The version of goskyr.")
 	generateConfig := flag.String("g", "", "Automatically generate a config file for the given url.")
 	m := flag.Int("m", 20, "The minimum number of items on a page. This is needed to filter out noise. Works in combination with the -g flag.")
@@ -76,7 +76,7 @@ func main() {
 		if *toStdout {
 			fmt.Println(string(yamlData))
 		} else {
-			f, err := os.Create(*configFile)
+			f, err := os.Create(*configLoc)
 			if err != nil {
 				log.Fatalf("ERROR while trying to open file: %v", err)
 			}
@@ -85,7 +85,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("ERROR while trying to write to file: %v", err)
 			}
-			log.Printf("successfully wrote config to file %s", *configFile)
+			log.Printf("successfully wrote config to file %s", *configLoc)
 		}
 		return
 	}
@@ -97,7 +97,7 @@ func main() {
 		return
 	}
 
-	config, err := scraper.NewConfig(*configFile)
+	config, err := scraper.NewConfig(*configLoc)
 	if err != nil {
 		log.Fatal(err)
 	}

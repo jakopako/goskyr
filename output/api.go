@@ -33,13 +33,12 @@ func (f *APIWriter) Write(items chan map[string]interface{}) {
 	apiPassword := f.writerConfig.Password
 
 	deletedSources := map[string]bool{}
-	nrItems := 0
+	nrItemsWritten := 0
 	batch := []map[string]interface{}{}
 
 	// This code assumes that within one source, items are ordered
 	// by date ascending.
 	for item := range items {
-		nrItems++
 		currentSrc := item["sourceUrl"].(string)
 		if _, found := deletedSources[currentSrc]; !found {
 			deletedSources[currentSrc] = true
@@ -55,7 +54,7 @@ func (f *APIWriter) Write(items chan map[string]interface{}) {
 			req.SetBasicAuth(apiUser, apiPassword)
 			resp, err := client.Do(req)
 			if err != nil {
-				log.Printf("error while sending event %+v to the api: %v", item, err)
+				log.Printf("error while deleting items from the api: %v\n", err)
 				continue
 			}
 			if resp.StatusCode != 200 {
@@ -63,25 +62,33 @@ func (f *APIWriter) Write(items chan map[string]interface{}) {
 				if err != nil {
 					log.Fatal(err)
 				}
-				log.Fatalf("error while deleting items. Status Code: %d\nUrl: %s Response: %s", resp.StatusCode, deleteURL, body)
+				log.Fatalf("error while deleting items. Status Code: %d\nUrl: %s Response: %s\n", resp.StatusCode, deleteURL, body)
 			}
 			resp.Body.Close()
 		}
 		batch = append(batch, item)
 		if len(batch) == 100 {
-			postBatch(client, batch, apiURL, apiUser, apiPassword)
+			if err := postBatch(client, batch, apiURL, apiUser, apiPassword); err != nil {
+				fmt.Printf("%v\n", err)
+			} else {
+				nrItemsWritten = nrItemsWritten + 100
+			}
 			batch = []map[string]interface{}{}
 		}
 	}
-	postBatch(client, batch, apiURL, apiUser, apiPassword)
+	if err := postBatch(client, batch, apiURL, apiUser, apiPassword); err != nil {
+		fmt.Printf("%v\n", err)
+	} else {
+		nrItemsWritten = nrItemsWritten + len(batch)
+	}
 
-	log.Printf("wrote %d items from %d sources to the api", nrItems, len(deletedSources))
+	log.Printf("wrote %d items from %d sources to the api", nrItemsWritten, len(deletedSources))
 }
 
-func postBatch(client *http.Client, batch []map[string]interface{}, apiURL, apiUser, apiPassword string) {
+func postBatch(client *http.Client, batch []map[string]interface{}, apiURL, apiUser, apiPassword string) error {
 	concertJSON, err := json.Marshal(batch)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	req, _ := http.NewRequest("POST", apiURL, bytes.NewBuffer(concertJSON))
 	req.Header = map[string][]string{
@@ -90,16 +97,16 @@ func postBatch(client *http.Client, batch []map[string]interface{}, apiURL, apiU
 	req.SetBasicAuth(apiUser, apiPassword)
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("error while sending post request: %v", err)
-		return
+		return fmt.Errorf("error while sending post request: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 201 {
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			log.Printf("error while reading post request respones: %v", err)
+			return fmt.Errorf("error while reading post request respones: %v", err)
 		} else {
-			log.Printf("error while adding new events. Status Code: %d Response: %s", resp.StatusCode, body)
+			return fmt.Errorf("error while adding new events. Status Code: %d Response: %s", resp.StatusCode, body)
 		}
 	}
+	return nil
 }

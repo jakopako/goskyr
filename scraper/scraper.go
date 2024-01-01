@@ -52,21 +52,32 @@ func NewConfig(configPath string) (*Config, error) {
 		err := filepath.WalkDir(configPath, func(path string, d fs.DirEntry, err error) error {
 			if !d.IsDir() {
 				var configTmp Config
-				if err := cleanenv.ReadConfig(path, configTmp); err != nil {
+				if err := cleanenv.ReadConfig(path, &configTmp); err != nil {
 					return err
 				}
 				config.Scrapers = append(config.Scrapers, configTmp.Scrapers...)
 				if configTmp.Writer.Type != "" {
 					if config.Writer.Type == "" {
+						config.Writer = configTmp.Writer
+					} else {
+						return fmt.Errorf("ERROR: config files must only contain max. one writer")
 					}
 				}
 			}
 			return nil // skipping everything that is not a file
 		})
+		if err != nil {
+			return nil, err
+		}
 	} else {
-		err := cleanenv.ReadConfig(configPath, &config)
-		return &config, err
+		if err := cleanenv.ReadConfig(configPath, &config); err != nil {
+			return nil, err
+		}
 	}
+	if config.Writer.Type == "" {
+		config.Writer.Type = output.STDOUT_WRITER_TYPE
+	}
+	return &config, nil
 }
 
 // RegexConfig is used for extracting a substring from a string based on the

@@ -7,3 +7,4 @@ goskyr.class
 goskyr.model
 .release-env
 .local-env
+config-test-dir

@@ -118,11 +118,11 @@ func main() {
 		writer = &output.StdoutWriter{}
 	} else {
 		switch config.Writer.Type {
-		case "stdout":
+		case output.STDOUT_WRITER_TYPE:
 			writer = &output.StdoutWriter{}
-		case "api":
+		case output.API_WRITER_TYPE:
 			writer = output.NewAPIWriter(&config.Writer)
-		case "file":
+		case output.FILE_WRITER_TYPE:
 			writer = output.NewFileWriter(&config.Writer)
 		default:
 			log.Fatalf("writer of type %s not implemented", config.Writer.Type)

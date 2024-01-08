@@ -10,7 +10,7 @@ require (
 	github.com/goodsign/monday v1.0.1
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/rivo/tview v0.0.0-20231206124440-5f078138442e
-	golang.org/x/net v0.19.0
+	golang.org/x/net v0.20.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -23,7 +23,6 @@ require (
 require (
 	github.com/antchfx/xpath v1.2.5 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/protobuf v1.4.0 // indirect
 	github.com/gonum/blas v0.0.0-20181208220705-f22b278b28ac // indirect
 	github.com/gonum/lapack v0.0.0-20181123203213-e4cdc5a0bff9 // indirect
 	github.com/gonum/matrix v0.0.0-20181209220409-c518dec07be9 // indirect
@@ -33,7 +32,6 @@ require (
 	github.com/rocketlaunchr/dataframe-go v0.0.0-20211025052708-a1030444159b // indirect
 	golang.org/x/sync v0.5.0 // indirect
 	gonum.org/v1/gonum v0.14.0 // indirect
-	google.golang.org/protobuf v1.21.0 // indirect
 )
 
 require (
@@ -51,8 +49,8 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
-	golang.org/x/sys v0.15.0 // indirect
-	golang.org/x/term v0.15.0 // indirect
+	golang.org/x/sys v0.16.0 // indirect
+	golang.org/x/term v0.16.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	olympos.io/encoding/edn v0.0.0-20201019073823-d3554ca0b0a3 // indirect
 )

@@ -136,6 +136,8 @@ type Field struct {
 	DateLanguage string          `yaml:"date_language,omitempty"` // applies to date
 	Hide         bool            `yaml:"hide,omitempty"`          // applies to text, url, date
 	GuessYear    bool            `yaml:"guess_year,omitempty"`    // applies to date
+	// This comment is here to avoid a larger whitespace change in my pull request
+	Transform []TransformConfig `yaml:"transform,omitempty"`
 }
 
 type ElementLocations []ElementLocation
@@ -542,6 +544,14 @@ func extractField(field *Field, event map[string]interface{}, s *goquery.Selecti
 		t := strings.Join(parts, field.Separator)
 		if !field.CanBeEmpty && t == "" {
 			return fmt.Errorf("field %s cannot be empty", field.Name)
+		}
+		// transform the string if required
+		for _, tr := range field.Transform {
+			var err error
+			t, err = transformString(&tr, t)
+			if err != nil {
+				return err
+			}
 		}
 		event[field.Name] = t
 	case "url":

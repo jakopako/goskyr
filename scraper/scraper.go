@@ -129,15 +129,14 @@ type Field struct {
 	Separator        string           `yaml:"separator,omitempty"`
 	// If a field can be found on a subpage the following variable has to contain a field name of
 	// a field of type 'url' that is located on the main page.
-	OnSubpage    string          `yaml:"on_subpage,omitempty"`    // applies to text, url, date
-	CanBeEmpty   bool            `yaml:"can_be_empty,omitempty"`  // applies to text, url
-	Components   []DateComponent `yaml:"components,omitempty"`    // applies to date
-	DateLocation string          `yaml:"date_location,omitempty"` // applies to date
-	DateLanguage string          `yaml:"date_language,omitempty"` // applies to date
-	Hide         bool            `yaml:"hide,omitempty"`          // applies to text, url, date
-	GuessYear    bool            `yaml:"guess_year,omitempty"`    // applies to date
-	// This comment is here to avoid a larger whitespace change in my pull request
-	Transform []TransformConfig `yaml:"transform,omitempty"`
+	OnSubpage    string            `yaml:"on_subpage,omitempty"`    // applies to text, url, date
+	CanBeEmpty   bool              `yaml:"can_be_empty,omitempty"`  // applies to text, url
+	Components   []DateComponent   `yaml:"components,omitempty"`    // applies to date
+	DateLocation string            `yaml:"date_location,omitempty"` // applies to date
+	DateLanguage string            `yaml:"date_language,omitempty"` // applies to date
+	Hide         bool              `yaml:"hide,omitempty"`          // applies to text, url, date
+	GuessYear    bool              `yaml:"guess_year,omitempty"`    // applies to date
+	Transform    []TransformConfig `yaml:"transform,omitempty"`     // applies to text
 }
 
 type ElementLocations []ElementLocation

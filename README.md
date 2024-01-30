@@ -234,19 +234,20 @@ fields:
 
 A dynamic field can have one of the following three types: `text`, `url` or `date`. The following table shows which options are available for which type.
 
-| Option        | Type `text` | Type `url` | Type `date` | Default value |
-| ------------- | :---------: | :--------: | :---------: | ------------- |
-| can_be_empty  |      X      |     X      |             | `false`       |
-| components    |             |            |      X      | `[]`          |
-| date_language |             |            |      X      | `"de_DE"`     |
-| date_location |             |            |      X      | `"UTC"`       |
-| guess_year    |             |            |      X      | `false`       |
-| hide          |      X      |     X      |      X      | `false`       |
-| location      |      X      |     X      |             | `[]`          |
-| name          |      X      |     X      |      X      | `""`          |
-| on_subpage    |      X      |     X      |      X      | `""`          |
-| separator     |      X      |            |             | `""`          |
-| type          |      X      |     X      |      X      | `"text"`      |
+| Option        | Type `text` | Type `url` |     Type `date`     | Default value |
+| ------------- | :---------: | :--------: | :-----------------: | ------------- |
+| can_be_empty  |      X      |     X      |                     | `false`       |
+| components    |             |            |          X          | `[]`          |
+| date_language |             |            |          X          | `"de_DE"`     |
+| date_location |             |            |          X          | `"UTC"`       |
+| guess_year    |             |            |          X          | `false`       |
+| hide          |      X      |     X      |          X          | `false`       |
+| location      |      X      |     X      |                     | `[]`          |
+| name          |      X      |     X      |          X          | `""`          |
+| on_subpage    |      X      |     X      |          X          | `""`          |
+| separator     |      X      |            |                     | `""`          |
+| transform     |      X      |            | X (date components) | `[]`          |
+| type          |      X      |     X      |          X          | `"text"`      |
 
 #### Options explained
 
@@ -464,6 +465,41 @@ If set to the name of another scraped field of type `url`, goskyr will fetch the
 **`separator`**
 
 This option is only relevant if the `location` option contains a list of locations of length > 1. If it does, the extracted strings (1 per location) will be joined using the defined separator.
+
+**`transform`**
+
+This option allows you to transform extracted text and date components. Currently, the only transform type is `regex-replace`. As the name suggests, this type allows you to replace a substring that matches the given regular expression with a user defined string. An example usage of this option would be as follows.
+
+```yaml
+- name: title
+  type: text
+  location:
+    - selector: div.event-info.single-day:nth-child(2) > div.event-title > h3 > a
+  transform:
+    - type: regex-replace
+      regex: regex.*
+      replace: New value
+```
+
+Note, that the `transform` can also be used for date components, eg.
+
+```yaml
+- name: date
+  type: date
+  components:
+    - covers:
+        day: true
+        month: true
+      location:
+        selector: div.col-12.col-md-3 > div.g-0.row > div.col-sm-12.p-0 > div.rhp-event-thumb > a.url > div.eventDateListTop > div.eventMonth.mb-0.singleEventDate.text-uppercase
+      layout:
+        - Mon, January 2
+        - Mon, Jan 2
+      transform:
+        - type: regex-replace
+          regex: Sept
+          replace: Sep
+```
 
 **`type`**
 

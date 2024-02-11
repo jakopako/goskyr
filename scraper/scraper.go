@@ -388,7 +388,11 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 				if dateFieldsGuessYear[name] {
 					if t, ok := val.(time.Time); ok {
 						now := time.Now()
-						if t.Before(now) {
+						yesterday := now.AddDate(0, 0, -1)
+						// we compare the date with yesterday, not now, to accomodate for the fact that at the time we scrape
+						// the event might have already taken place but not yet removed from the website. Let's see if 1 day
+						// is a reasonable margin.
+						if t.Before(yesterday) {
 							newT := time.Date(t.Year()+1, t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
 							item[name] = newT
 							continue

@@ -793,6 +793,16 @@ func getURLString(e *ElementLocation, s *goquery.Selection, baseURL string) (str
 	} else if strings.HasPrefix(urlVal, "/") {
 		baseURL := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 		urlRes = fmt.Sprintf("%s%s", baseURL, urlVal)
+	} else if strings.HasPrefix(urlVal, "..") {
+		partsUrlVal := strings.Split(urlVal, "/")
+		partsPath := strings.Split(u.Path, "/")
+		i := 0
+		for ; i < len(partsUrlVal); i++ {
+			if partsUrlVal[i] != ".." {
+				break
+			}
+		}
+		urlRes = fmt.Sprintf("%s://%s%s/%s", u.Scheme, u.Host, strings.Join(partsPath[:len(partsPath)-i-1], "/"), strings.Join(partsUrlVal[i:], "/"))
 	} else {
 		idx := strings.LastIndex(u.Path, "/")
 		if idx > 0 {

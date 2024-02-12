@@ -17,6 +17,10 @@ var longDayNames = []langMap{
 		lang:     "nl_BE",
 		namesMap: longDayNamesNlBE,
 	},
+	{
+		lang:     "sk_SK",
+		namesMap: longDayNamesSkSK,
+	},
 }
 
 var shortDayNames = []langMap{
@@ -35,6 +39,10 @@ var shortDayNames = []langMap{
 	{
 		lang:     "nl_BE",
 		namesMap: shortDayNamesNlBE,
+	},
+	{
+		lang:     "sk_SK",
+		namesMap: shortDayNamesSkSK,
 	},
 }
 
@@ -116,4 +124,24 @@ var longDayNamesNlBE = map[string]bool{
 	"donderdag": true,
 	"vrijdag":   true,
 	"zaterdag":  true,
+}
+
+var shortDayNamesSkSK = map[string]bool{
+	"ne": true,
+	"po": true,
+	"ut": true,
+	"st": true,
+	"št": true,
+	"pi": true,
+	"so": true,
+}
+
+var longDayNamesSkSK = map[string]bool{
+	"nedeľa":   true,
+	"pondelok": true,
+	"utorok":   true,
+	"streda":   true,
+	"štvrtok":  true,
+	"piatok":   true,
+	"sobota":   true,
 }

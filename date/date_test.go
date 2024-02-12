@@ -478,3 +478,35 @@ func TestGetDateFormat16(t *testing.T) {
 		}
 	}
 }
+
+func TestGetDateFormat17(t *testing.T) {
+	dateFormats := []formatTestStruct{
+		{
+			input:        "nedeľa 25.02.2024 @18:00",
+			coveredParts: CoveredDateParts{Day: true, Month: true, Year: true, Time: true},
+			formatString: "Monday 2.1.2006 @15:04",
+			language:     "sk_SK",
+		},
+		{
+			input:        "piatok 01.03.2024 @20:00",
+			coveredParts: CoveredDateParts{Day: true, Month: true, Year: true, Time: true},
+			formatString: "Monday 2.1.2006 @15:04",
+			language:     "sk_SK",
+		},
+		{
+			input:        "štvrtok 07.03.2024 @18:30",
+			coveredParts: CoveredDateParts{Day: true, Month: true, Year: true, Time: true},
+			formatString: "Monday 2.1.2006 @15:04",
+			language:     "sk_SK",
+		},
+	}
+	for _, df := range dateFormats {
+		f, l := GetDateFormat(df.input, df.coveredParts)
+		if f != df.formatString {
+			log.Fatalf("expected %s but got %s", df.formatString, f)
+		}
+		if l != df.language {
+			log.Fatalf("expected date language %s but got %s", df.language, l)
+		}
+	}
+}

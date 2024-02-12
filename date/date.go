@@ -62,7 +62,7 @@ func GetDateFormat(date string, parts CoveredDateParts) (string, string) {
 		return defaultFormat, defaultLanguage
 	}
 
-	separators := []rune{' ', ',', '.', '-', ':'}
+	separators := []rune{' ', ',', '.', '-', ':', '@'}
 
 	tokens := []string{}
 	sepTokens := []string{}

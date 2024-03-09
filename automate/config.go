@@ -501,7 +501,11 @@ parse:
 					allChildren[nodePath.string()] += 1
 					tagChildren[nodePath.string()] = append(tagChildren[nodePath.string()], node{tagName: tnString})
 					moreAttr := true
-					var hrefVal string
+					// var hrefVal string
+					attrs := map[string]string{ // this map can be extended
+						"href": "",
+						"src":  "",
+					}
 					var cls []string
 					if tnString != "body" { // we don't care about classes for the body tag
 						for moreAttr {
@@ -519,8 +523,8 @@ parse:
 								}
 								cls = cls[:j]
 							}
-							if string(k) == "href" {
-								hrefVal = string(v)
+							if _, found := attrs[string(k)]; found {
+								attrs[string(k)] = vString
 							}
 							moreAttr = m
 						}
@@ -543,16 +547,28 @@ parse:
 					nodePath = append(nodePath, newNode)
 					depth++
 					tagChildren[nodePath.string()] = []node{}
-					if tnString == "a" && hrefVal != "" {
-						lp := locationProps{
-							path:     make([]node, len(nodePath)),
-							examples: []string{hrefVal},
-							attr:     "href",
-							count:    1,
+					for attrKey, attrValue := range attrs {
+						if attrValue != "" {
+							lp := locationProps{
+								path:     make([]node, len(nodePath)),
+								examples: []string{attrValue},
+								attr:     attrKey,
+								count:    1,
+							}
+							copy(lp.path, nodePath)
+							locMan = append(locMan, &lp)
 						}
-						copy(lp.path, nodePath)
-						locMan = append(locMan, &lp)
 					}
+					// if tnString == "a" && hrefVal != "" {
+					// 	lp := locationProps{
+					// 		path:     make([]node, len(nodePath)),
+					// 		examples: []string{hrefVal},
+					// 		attr:     "href",
+					// 		count:    1,
+					// 	}
+					// 	copy(lp.path, nodePath)
+					// 	locMan = append(locMan, &lp)
+					// }
 				} else {
 					n := true
 					for n && depth > 0 {
@@ -576,6 +592,7 @@ parse:
 				if tnString == "br" || tnString == "input" || tnString == "img" || tnString == "link" {
 					allChildren[nodePath.string()] += 1
 					tagChildren[nodePath.string()] = append(tagChildren[nodePath.string()], node{tagName: tnString})
+
 					continue
 				}
 			}

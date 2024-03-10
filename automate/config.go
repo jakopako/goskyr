@@ -272,7 +272,7 @@ outer:
 				dateField.DateLanguage = lang
 			}
 		} else {
-			if loc.Attr == "href" {
+			if loc.Attr == "href" || loc.Attr == "src" {
 				fieldType = "url"
 			}
 			d = scraper.Field{
@@ -486,68 +486,37 @@ parse:
 			}
 		case html.StartTagToken, html.EndTagToken:
 			tn, _ := z.TagName()
-			tnString := string(tn)
-			if tnString == "body" {
+			tagNameStr := string(tn)
+			if tagNameStr == "body" {
 				inBody = !inBody
 			}
 			if inBody {
 				// br can also be self closing tag, see later case statement
-				if tnString == "br" || tnString == "input" {
+				if tagNameStr == "br" || tagNameStr == "input" {
 					allChildren[nodePath.string()] += 1
-					tagChildren[nodePath.string()] = append(tagChildren[nodePath.string()], node{tagName: tnString})
+					tagChildren[nodePath.string()] = append(tagChildren[nodePath.string()], node{tagName: tagNameStr})
 					continue
 				}
 				if tt == html.StartTagToken {
 					allChildren[nodePath.string()] += 1
-					tagChildren[nodePath.string()] = append(tagChildren[nodePath.string()], node{tagName: tnString})
-					moreAttr := true
-					var hrefVal string
-					var cls []string
-					if tnString != "body" { // we don't care about classes for the body tag
-						for moreAttr {
-							k, v, m := z.TagAttr()
-							vString := strings.TrimSpace(string(v))
-							if string(k) == "class" && vString != "" {
-								cls = strings.Split(vString, " ")
-								j := 0
-								for _, cl := range cls {
-									// for now we ignore classes that contain dots
-									if cl != "" && !strings.Contains(cl, ".") {
-										cls[j] = cl
-										j++
-									}
-								}
-								cls = cls[:j]
-							}
-							if string(k) == "href" {
-								hrefVal = string(v)
-							}
-							moreAttr = m
-						}
-					}
-					var pCls []string
-					// only add nth-child if there has been another node before at the same
-					// level with same tag
-					for i := 0; i < len(tagChildren[nodePath.string()])-1; i++ { // the last element is skipped because it's the current node itself
-						cn := tagChildren[nodePath.string()][i]
-						if cn.tagName == tnString {
-							pCls = []string{fmt.Sprintf("nth-child(%d)", len(tagChildren[nodePath.string()]))}
-						}
+					tagChildren[nodePath.string()] = append(tagChildren[nodePath.string()], node{tagName: tagNameStr})
 
-					}
+					attrs, cls, pCls := getTagMetadata(tagNameStr, z, tagChildren, nodePath)
+
 					newNode := node{
-						tagName:       tnString,
+						tagName:       tagNameStr,
 						classes:       cls,
 						pseudoClasses: pCls,
 					}
 					nodePath = append(nodePath, newNode)
 					depth++
 					tagChildren[nodePath.string()] = []node{}
-					if tnString == "a" && hrefVal != "" {
+
+					for attrKey, attrValue := range attrs {
 						lp := locationProps{
 							path:     make([]node, len(nodePath)),
-							examples: []string{hrefVal},
-							attr:     "href",
+							examples: []string{attrValue},
+							attr:     attrKey,
 							count:    1,
 						}
 						copy(lp.path, nodePath)
@@ -556,8 +525,8 @@ parse:
 				} else {
 					n := true
 					for n && depth > 0 {
-						if nodePath[len(nodePath)-1].tagName == tnString {
-							if tnString == "body" {
+						if nodePath[len(nodePath)-1].tagName == tagNameStr {
+							if tagNameStr == "body" {
 								break parse
 							}
 							n = false
@@ -572,10 +541,33 @@ parse:
 		case html.SelfClosingTagToken:
 			if inBody {
 				tn, _ := z.TagName()
-				tnString := string(tn)
-				if tnString == "br" || tnString == "input" || tnString == "img" || tnString == "link" {
+				tagNameStr := string(tn)
+				if tagNameStr == "br" || tagNameStr == "input" || tagNameStr == "img" || tagNameStr == "link" {
 					allChildren[nodePath.string()] += 1
-					tagChildren[nodePath.string()] = append(tagChildren[nodePath.string()], node{tagName: tnString})
+					tagChildren[nodePath.string()] = append(tagChildren[nodePath.string()], node{tagName: tagNameStr})
+					attrs, cls, pCls := getTagMetadata(tagNameStr, z, tagChildren, nodePath)
+
+					if len(attrs) > 0 {
+						tmpNodePath := make([]node, len(nodePath))
+						copy(tmpNodePath, nodePath)
+						newNode := node{
+							tagName:       tagNameStr,
+							classes:       cls,
+							pseudoClasses: pCls,
+						}
+						tmpNodePath = append(tmpNodePath, newNode)
+
+						for attrKey, attrValue := range attrs {
+							lp := locationProps{
+								path:     make([]node, len(tmpNodePath)),
+								examples: []string{attrValue},
+								attr:     attrKey,
+								count:    1,
+							}
+							copy(lp.path, tmpNodePath)
+							locMan = append(locMan, &lp)
+						}
+					}
 					continue
 				}
 			}
@@ -594,4 +586,51 @@ parse:
 		return locMan.elementsToConfig(s)
 	}
 	return fmt.Errorf("no fields found")
+}
+
+// getTagMetadata, for a given node returns a map of key value pairs (only for the attriutes we're interested in) and
+// a list of this node's classes and a list of this node's pseudo classes (currently only nth-child).
+func getTagMetadata(tagName string, z *html.Tokenizer, tagChildren map[string][]node, nodePath path) (map[string]string, []string, []string) {
+	allowedAttrs := map[string]map[string]bool{
+		"a":   {"href": true},
+		"img": {"src": true},
+	}
+	moreAttr := true
+	attrs := make(map[string]string)
+	var cls []string
+	if tagName != "body" { // we don't care about classes for the body tag
+		for moreAttr {
+			k, v, m := z.TagAttr()
+			vString := strings.TrimSpace(string(v))
+			if string(k) == "class" && vString != "" {
+				cls = strings.Split(vString, " ")
+				j := 0
+				for _, cl := range cls {
+					// for now we ignore classes that contain dots
+					if cl != "" && !strings.Contains(cl, ".") {
+						cls[j] = cl
+						j++
+					}
+				}
+				cls = cls[:j]
+			}
+			if _, found := allowedAttrs[tagName]; found {
+				if _, found := allowedAttrs[tagName][string(k)]; found {
+					attrs[string(k)] = vString
+				}
+			}
+			moreAttr = m
+		}
+	}
+	var pCls []string
+	// only add nth-child if there has been another node before at the same
+	// level with same tag
+	for i := 0; i < len(tagChildren[nodePath.string()])-1; i++ { // the last element is skipped because it's the current node itself
+		cn := tagChildren[nodePath.string()][i]
+		if cn.tagName == tagName {
+			pCls = []string{fmt.Sprintf("nth-child(%d)", len(tagChildren[nodePath.string()]))}
+		}
+
+	}
+	return attrs, cls, pCls
 }

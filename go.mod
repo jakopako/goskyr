@@ -15,13 +15,13 @@ require (
 )
 
 require (
-	github.com/antchfx/jsonquery v1.3.3
+	github.com/antchfx/jsonquery v1.3.4
 	github.com/sjwhitworth/golearn v0.0.0-20221228163002-74ae077eafb2
 	golang.org/x/exp v0.0.0-20231219180239-dc181d75b848
 )
 
 require (
-	github.com/antchfx/xpath v1.2.5 // indirect
+	github.com/antchfx/xpath v1.3.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/gonum/blas v0.0.0-20181208220705-f22b278b28ac // indirect
 	github.com/gonum/lapack v0.0.0-20181123203213-e4cdc5a0bff9 // indirect

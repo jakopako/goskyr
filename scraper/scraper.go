@@ -306,7 +306,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 					if f.OnSubpage == "" {
 						var err error
 						if rawDyn {
-							err = extractRawField(&f, currentItem, s, baseUrl)
+							err = extractRawField(&f, currentItem, s)
 						} else {
 							err = extractField(&f, currentItem, s, baseUrl)
 						}
@@ -565,8 +565,8 @@ func extractField(field *Field, event map[string]interface{}, s *goquery.Selecti
 		if err != nil {
 			return err
 		}
-		if url == "" {
-			url = baseURL
+		if !field.CanBeEmpty && url == "" {
+			return fmt.Errorf("field %s cannot be empty", field.Name)
 		}
 		event[field.Name] = url
 	case "date":
@@ -581,7 +581,7 @@ func extractField(field *Field, event map[string]interface{}, s *goquery.Selecti
 	return nil
 }
 
-func extractRawField(field *Field, event map[string]interface{}, s *goquery.Selection, baseURL string) error {
+func extractRawField(field *Field, event map[string]interface{}, s *goquery.Selection) error {
 	switch field.Type {
 	case "text", "":
 		parts := []string{}

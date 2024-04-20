@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -28,6 +29,7 @@ type StaticFetcher struct {
 }
 
 func (s *StaticFetcher) Fetch(url string, opts FetchOpts) (string, error) {
+	slog.Debug("fetching page", slog.String("fetcher", "static"), slog.String("url", url), slog.String("user-agent", s.UserAgent))
 	var resString string
 	client := &http.Client{}
 
@@ -89,6 +91,8 @@ func (d *DynamicFetcher) Cancel() {
 }
 
 func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
+	logger := slog.With(slog.String("fetcher", "dynamic"), slog.String("url", url))
+	logger.Debug("fetching page", slog.String("user-agent", d.UserAgent))
 	// start := time.Now()
 	ctx, cancel := chromedp.NewContext(d.allocContext)
 	// ctx, cancel := chromedp.NewContext(d.allocContext,

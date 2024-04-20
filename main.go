@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"os"
 	"sync"
@@ -18,19 +18,21 @@ import (
 var version = "dev"
 
 func worker(sc chan scraper.Scraper, ic chan map[string]interface{}, gc *scraper.GlobalConfig, threadNr int) {
+	workerLogger := slog.With(slog.Int("thread", threadNr))
 	for s := range sc {
-		log.Printf("thread %d: scraping %s\n", threadNr, s.Name)
+		scraperLogger := workerLogger.With(slog.String("name", s.Name))
+		scraperLogger.Info("starting scraping task")
 		items, err := s.GetItems(gc, false)
 		if err != nil {
-			log.Printf("%s ERROR: %s", s.Name, err)
+			scraperLogger.Error(fmt.Sprintf("%s: %s", s.Name, err))
 			continue
 		}
-		log.Printf("thread %d: fetched %d %s items\n", threadNr, len(items), s.Name)
+		scraperLogger.Info(fmt.Sprintf("fetched %d items", len(items)))
 		for _, item := range items {
 			ic <- item
 		}
 	}
-	log.Printf("thread %d: done working\n", threadNr)
+	workerLogger.Info("done working")
 }
 
 func main() {
@@ -41,11 +43,12 @@ func main() {
 	generateConfig := flag.String("g", "", "Automatically generate a config file for the given url.")
 	m := flag.Int("m", 20, "The minimum number of items on a page. This is needed to filter out noise. Works in combination with the -g flag.")
 	f := flag.Bool("f", false, "Only show fields that have varying values across the list of items. Works in combination with the -g flag.")
-	d := flag.Bool("d", false, "Render JS before generating a configuration file. Works in combination with the -g flag.")
+	renderJs := flag.Bool("r", false, "Render JS before generating a configuration file. Works in combination with the -g flag.")
 	extractFeatures := flag.String("e", "", "Extract ML features based on the given configuration file (-c) and write them to the given file in csv format.")
 	wordsDir := flag.String("w", "word-lists", "The directory that contains a number of files containing words of different languages. This is needed for the ML part (use with -e or -b).")
 	buildModel := flag.String("t", "", "Train a ML model based on the given csv features file. This will generate 2 files, goskyr.model and goskyr.class")
 	modelPath := flag.String("model", "", "Use a pre-trained ML model to infer names of extracted fields. Works in combination with the -g flag.")
+	debug := flag.Bool("debug", false, "Set debug mode.")
 
 	flag.Parse()
 
@@ -54,14 +57,27 @@ func main() {
 		return
 	}
 
+	var logLevel slog.Level
+	if *debug {
+		logLevel = slog.LevelDebug
+	} else {
+		logLevel = slog.LevelInfo
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
+	slog.SetDefault(logger)
+
 	if *generateConfig != "" {
+		slog.Debug("starting to generate config")
 		s := &scraper.Scraper{URL: *generateConfig}
-		if *d {
+		if *renderJs {
 			s.RenderJs = true
 		}
+		slog.Debug(fmt.Sprintf("analyzing url %s", s.URL))
 		err := automate.GetDynamicFieldsConfig(s, *m, *f, *modelPath, *wordsDir)
 		if err != nil {
-			log.Fatal(err)
+			slog.Error(fmt.Sprintf("%v", err))
+			os.Exit(1)
 		}
 		c := scraper.Config{
 			Scrapers: []scraper.Scraper{
@@ -70,7 +86,8 @@ func main() {
 		}
 		yamlData, err := yaml.Marshal(&c)
 		if err != nil {
-			log.Fatalf("Error while Marshaling. %v", err)
+			slog.Error(fmt.Sprintf("error while marshaling. %v", err))
+			os.Exit(1)
 		}
 
 		if *toStdout {
@@ -78,33 +95,38 @@ func main() {
 		} else {
 			f, err := os.Create(*configLoc)
 			if err != nil {
-				log.Fatalf("ERROR while trying to open file: %v", err)
+				slog.Error(fmt.Sprintf("error opening file: %v", err))
+				os.Exit(1)
 			}
 			defer f.Close()
 			_, err = f.Write(yamlData)
 			if err != nil {
-				log.Fatalf("ERROR while trying to write to file: %v", err)
+				slog.Error(fmt.Sprintf("error writing to file: %v", err))
+				os.Exit(1)
 			}
-			log.Printf("successfully wrote config to file %s", *configLoc)
+			slog.Info(fmt.Sprintf("successfully wrote config to file %s", *configLoc))
 		}
 		return
 	}
 
 	if *buildModel != "" {
 		if err := ml.TrainModel(*buildModel); err != nil {
-			log.Fatal(err)
+			slog.Error(fmt.Sprintf("%v", err))
+			os.Exit(1)
 		}
 		return
 	}
 
 	config, err := scraper.NewConfig(*configLoc)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error(fmt.Sprintf("%v", err))
+		os.Exit(1)
 	}
 
 	if *extractFeatures != "" {
 		if err := ml.ExtractFeatures(config, *extractFeatures, *wordsDir); err != nil {
-			log.Fatal(err)
+			slog.Error(fmt.Sprintf("%v", err))
+			os.Exit(1)
 		}
 		return
 	}
@@ -125,7 +147,8 @@ func main() {
 		case output.FILE_WRITER_TYPE:
 			writer = output.NewFileWriter(&config.Writer)
 		default:
-			log.Fatalf("writer of type %s not implemented", config.Writer.Type)
+			slog.Error(fmt.Sprintf("writer of type %s not implemented", config.Writer.Type))
+			os.Exit(1)
 		}
 	}
 
@@ -150,8 +173,9 @@ func main() {
 	if *singleScraper == "" {
 		nrWorkers = int(math.Min(20, float64(len(config.Scrapers))))
 	}
-	log.Printf("running with %d threads\n", nrWorkers)
+	slog.Info(fmt.Sprintf("running with %d threads\n", nrWorkers))
 	workerWg.Add(nrWorkers)
+	slog.Debug("starting workers")
 	for i := 0; i < nrWorkers; i++ {
 		go func(j int) {
 			defer workerWg.Done()
@@ -161,6 +185,7 @@ func main() {
 
 	// start writer
 	writerWg.Add(1)
+	slog.Debug("starting writer")
 	go func() {
 		defer writerWg.Done()
 		writer.Write(ic)

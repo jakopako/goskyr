@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -60,7 +60,7 @@ func NewConfig(configPath string) (*Config, error) {
 					if config.Writer.Type == "" {
 						config.Writer = configTmp.Writer
 					} else {
-						return fmt.Errorf("ERROR: config files must only contain max. one writer")
+						return fmt.Errorf("config files must only contain max. one writer")
 					}
 				}
 			}
@@ -257,6 +257,7 @@ type Scraper struct {
 // present on the main page (not subpages). This is used by the ML feature generation.
 func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string]interface{}, error) {
 
+	scrLogger := slog.With(slog.String("name", c.Name))
 	// initialize fetcher
 	if c.RenderJs {
 		dynFetcher := fetch.NewDynamicFetcher(globalConfig.UserAgent, c.PageLoadWait)
@@ -270,6 +271,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 
 	var items []map[string]interface{}
 
+	scrLogger.Debug("initializing filters")
 	if err := c.initializeFilters(); err != nil {
 		return items, err
 	}
@@ -311,7 +313,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 							err = extractField(&f, currentItem, s, baseUrl)
 						}
 						if err != nil {
-							log.Printf("%s ERROR: error while parsing field %s: %v. Skipping item %v.", c.Name, f.Name, err, currentItem)
+							scrLogger.Error(fmt.Sprintf("error while parsing field %s: %v. Skipping item %v.", f.Name, err, currentItem))
 							return
 						}
 					}
@@ -329,12 +331,12 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 						if !found {
 							subRes, err := c.fetcher.Fetch(subpageURL, fetch.FetchOpts{})
 							if err != nil {
-								log.Printf("%s ERROR: %v. Skipping item %v.", c.Name, err, currentItem)
+								scrLogger.Error(fmt.Sprintf("%v. Skipping item %v.", err, currentItem))
 								return
 							}
 							subDoc, err := goquery.NewDocumentFromReader(strings.NewReader(subRes))
 							if err != nil {
-								log.Printf("%s ERROR: error while reading document: %v. Skipping item %v", c.Name, err, currentItem)
+								scrLogger.Error(fmt.Sprintf("error while reading document: %v. Skipping item %v", err, currentItem))
 								return
 							}
 							subDocs[subpageURL] = subDoc
@@ -342,7 +344,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 						baseURLSubpage := getBaseURL(subpageURL, subDocs[subpageURL])
 						err = extractField(&f, currentItem, subDocs[subpageURL].Selection, baseURLSubpage)
 						if err != nil {
-							log.Printf("%s ERROR: error while parsing field %s: %v. Skipping item %v.", c.Name, f.Name, err, currentItem)
+							scrLogger.Error(fmt.Sprintf("error while parsing field %s: %v. Skipping item %v.", f.Name, err, currentItem))
 							return
 						}
 					}
@@ -351,9 +353,6 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 
 			// check if item should be filtered
 			filter := c.filterItem(currentItem)
-			if err != nil {
-				log.Fatalf("%s ERROR: error while applying filter: %v.", c.Name, err)
-			}
 			if filter {
 				currentItem = c.removeHiddenFields(currentItem)
 				items = append(items, currentItem)

@@ -162,6 +162,7 @@ func main() {
 	go func() {
 		for _, s := range config.Scrapers {
 			if *singleScraper == "" || *singleScraper == s.Name {
+				s.Debug = *debug
 				sc <- s
 			}
 		}

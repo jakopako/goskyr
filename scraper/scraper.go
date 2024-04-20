@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"bytes"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -247,6 +248,7 @@ type Scraper struct {
 	PageLoadWait        int               `yaml:"page_load_wait,omitempty"` // milliseconds. Only taken into account when render_js = true
 	Interaction         types.Interaction `yaml:"interaction,omitempty"`
 	fetcher             fetch.Fetcher
+	Debug               bool
 }
 
 // GetItems fetches and returns all items from a website according to the
@@ -476,7 +478,7 @@ func (c *Scraper) removeHiddenFields(item map[string]interface{}) map[string]int
 func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl, userAgent string, i *types.Interaction) (bool, string, *goquery.Document, error) {
 
 	if nextPageI == 0 {
-		newDoc, err := fetchToDoc(currentPageUrl, c.fetcher, fetch.FetchOpts{Interaction: *i})
+		newDoc, err := c.fetchToDoc(currentPageUrl, fetch.FetchOpts{Interaction: *i})
 		if err != nil {
 			return false, "", nil, err
 		}
@@ -493,7 +495,7 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 							Type:     types.InteractionTypeClick,
 							Count:    nextPageI, // we always need to 'restart' the clicks because we always re-fetch the page
 						}
-						nextPageDoc, err := fetchToDoc(currentPageUrl, c.fetcher, fetch.FetchOpts{Interaction: ia})
+						nextPageDoc, err := c.fetchToDoc(currentPageUrl, fetch.FetchOpts{Interaction: ia})
 						if err != nil {
 							return false, "", nil, err
 						}
@@ -507,7 +509,7 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 					return false, "", nil, err
 				}
 				if nextPageUrl != "" {
-					nextPageDoc, err := fetchToDoc(nextPageUrl, c.fetcher, fetch.FetchOpts{})
+					nextPageDoc, err := c.fetchToDoc(nextPageUrl, fetch.FetchOpts{})
 					if err != nil {
 						return false, "", nil, err
 					}
@@ -521,13 +523,41 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 	}
 }
 
-func fetchToDoc(url string, fetcher fetch.Fetcher, opts fetch.FetchOpts) (*goquery.Document, error) {
-	res, err := fetcher.Fetch(url, opts)
+func (c *Scraper) fetchToDoc(url string, opts fetch.FetchOpts) (*goquery.Document, error) {
+	res, err := c.fetcher.Fetch(url, opts)
 	if err != nil {
 		return nil, err
 	}
 	// fmt.Println(res)
-	return goquery.NewDocumentFromReader(strings.NewReader(res))
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(res))
+	if err != nil {
+		return nil, err
+	}
+
+	if c.Debug {
+		bs := make([]byte, 8)
+		_, err := rand.Read(bs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate random bytes for html file name")
+		}
+		filename := fmt.Sprintf("%s-%x.html", c.Name, bs[:8])
+		slog.Debug(fmt.Sprintf("writing html to file %s", filename), slog.String("url", url))
+		htmlStr, err := goquery.OuterHtml(doc.Children())
+		if err != nil {
+			return nil, fmt.Errorf("failed to write html file: %v", err)
+		}
+
+		f, err := os.Create(filename)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write html file: %v", err)
+		}
+		defer f.Close()
+		_, err = f.WriteString(htmlStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write html file: %v", err)
+		}
+	}
+	return doc, nil
 }
 
 func extractField(field *Field, event map[string]interface{}, s *goquery.Selection, baseURL string) error {

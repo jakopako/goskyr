@@ -48,7 +48,7 @@ func main() {
 	wordsDir := flag.String("w", "word-lists", "The directory that contains a number of files containing words of different languages. This is needed for the ML part (use with -e or -b).")
 	buildModel := flag.String("t", "", "Train a ML model based on the given csv features file. This will generate 2 files, goskyr.model and goskyr.class")
 	modelPath := flag.String("model", "", "Use a pre-trained ML model to infer names of extracted fields. Works in combination with the -g flag.")
-	debug := flag.Bool("debug", false, "Set debug mode.")
+	debug := flag.Bool("debug", false, "Prints debug logs and writes scraped html's to files.")
 
 	flag.Parse()
 

@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 )
 
 type StdoutWriter struct{}
 
 func (s *StdoutWriter) Write(items chan map[string]interface{}) {
+	logger := slog.With(slog.String("writer", STDOUT_WRITER_TYPE))
 	for item := range items {
 		// We cannot use the following line of code because it automatically replaces certain html characters
 		// with the corresponding Unicode replacement rune.
@@ -24,13 +25,13 @@ func (s *StdoutWriter) Write(items chan map[string]interface{}) {
 		encoder := json.NewEncoder(buffer)
 		encoder.SetEscapeHTML(false)
 		if err := encoder.Encode(item); err != nil {
-			log.Printf("StdoutWriter ERROR while writing item %v: %v", item, err)
+			logger.Error(fmt.Sprintf("error while writing item %v: %v", item, err))
 			continue
 		}
 
 		var indentBuffer bytes.Buffer
 		if err := json.Indent(&indentBuffer, buffer.Bytes(), "", "  "); err != nil {
-			log.Printf("StdoutWriter ERROR while writing item %v: %v", item, err)
+			logger.Error(fmt.Sprintf("error while writing item %v: %v", item, err))
 			continue
 		}
 		fmt.Print(indentBuffer.String())

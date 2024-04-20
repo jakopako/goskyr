@@ -1,5 +1,5 @@
 PACKAGE_NAME          := github.com/jakopako/goskyr
-GOLANG_CROSS_VERSION  ?= v1.19
+GOLANG_CROSS_VERSION  ?= v1.22
 
 .PHONY: release-dry-run
 release-dry-run:

@@ -2,10 +2,11 @@ package scraper
 
 import (
 	"bytes"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -60,7 +61,7 @@ func NewConfig(configPath string) (*Config, error) {
 					if config.Writer.Type == "" {
 						config.Writer = configTmp.Writer
 					} else {
-						return fmt.Errorf("ERROR: config files must only contain max. one writer")
+						return fmt.Errorf("config files must only contain max. one writer")
 					}
 				}
 			}
@@ -247,6 +248,7 @@ type Scraper struct {
 	PageLoadWait        int               `yaml:"page_load_wait,omitempty"` // milliseconds. Only taken into account when render_js = true
 	Interaction         types.Interaction `yaml:"interaction,omitempty"`
 	fetcher             fetch.Fetcher
+	Debug               bool
 }
 
 // GetItems fetches and returns all items from a website according to the
@@ -257,6 +259,7 @@ type Scraper struct {
 // present on the main page (not subpages). This is used by the ML feature generation.
 func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string]interface{}, error) {
 
+	scrLogger := slog.With(slog.String("name", c.Name))
 	// initialize fetcher
 	if c.RenderJs {
 		dynFetcher := fetch.NewDynamicFetcher(globalConfig.UserAgent, c.PageLoadWait)
@@ -270,6 +273,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 
 	var items []map[string]interface{}
 
+	scrLogger.Debug("initializing filters")
 	if err := c.initializeFilters(); err != nil {
 		return items, err
 	}
@@ -311,7 +315,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 							err = extractField(&f, currentItem, s, baseUrl)
 						}
 						if err != nil {
-							log.Printf("%s ERROR: error while parsing field %s: %v. Skipping item %v.", c.Name, f.Name, err, currentItem)
+							scrLogger.Error(fmt.Sprintf("error while parsing field %s: %v. Skipping item %v.", f.Name, err, currentItem))
 							return
 						}
 					}
@@ -329,12 +333,12 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 						if !found {
 							subRes, err := c.fetcher.Fetch(subpageURL, fetch.FetchOpts{})
 							if err != nil {
-								log.Printf("%s ERROR: %v. Skipping item %v.", c.Name, err, currentItem)
+								scrLogger.Error(fmt.Sprintf("%v. Skipping item %v.", err, currentItem))
 								return
 							}
 							subDoc, err := goquery.NewDocumentFromReader(strings.NewReader(subRes))
 							if err != nil {
-								log.Printf("%s ERROR: error while reading document: %v. Skipping item %v", c.Name, err, currentItem)
+								scrLogger.Error(fmt.Sprintf("error while reading document: %v. Skipping item %v", err, currentItem))
 								return
 							}
 							subDocs[subpageURL] = subDoc
@@ -342,7 +346,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 						baseURLSubpage := getBaseURL(subpageURL, subDocs[subpageURL])
 						err = extractField(&f, currentItem, subDocs[subpageURL].Selection, baseURLSubpage)
 						if err != nil {
-							log.Printf("%s ERROR: error while parsing field %s: %v. Skipping item %v.", c.Name, f.Name, err, currentItem)
+							scrLogger.Error(fmt.Sprintf("error while parsing field %s: %v. Skipping item %v.", f.Name, err, currentItem))
 							return
 						}
 					}
@@ -351,9 +355,6 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 
 			// check if item should be filtered
 			filter := c.filterItem(currentItem)
-			if err != nil {
-				log.Fatalf("%s ERROR: error while applying filter: %v.", c.Name, err)
-			}
 			if filter {
 				currentItem = c.removeHiddenFields(currentItem)
 				items = append(items, currentItem)
@@ -477,7 +478,7 @@ func (c *Scraper) removeHiddenFields(item map[string]interface{}) map[string]int
 func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl, userAgent string, i *types.Interaction) (bool, string, *goquery.Document, error) {
 
 	if nextPageI == 0 {
-		newDoc, err := fetchToDoc(currentPageUrl, c.fetcher, fetch.FetchOpts{Interaction: *i})
+		newDoc, err := c.fetchToDoc(currentPageUrl, fetch.FetchOpts{Interaction: *i})
 		if err != nil {
 			return false, "", nil, err
 		}
@@ -494,7 +495,7 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 							Type:     types.InteractionTypeClick,
 							Count:    nextPageI, // we always need to 'restart' the clicks because we always re-fetch the page
 						}
-						nextPageDoc, err := fetchToDoc(currentPageUrl, c.fetcher, fetch.FetchOpts{Interaction: ia})
+						nextPageDoc, err := c.fetchToDoc(currentPageUrl, fetch.FetchOpts{Interaction: ia})
 						if err != nil {
 							return false, "", nil, err
 						}
@@ -508,7 +509,7 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 					return false, "", nil, err
 				}
 				if nextPageUrl != "" {
-					nextPageDoc, err := fetchToDoc(nextPageUrl, c.fetcher, fetch.FetchOpts{})
+					nextPageDoc, err := c.fetchToDoc(nextPageUrl, fetch.FetchOpts{})
 					if err != nil {
 						return false, "", nil, err
 					}
@@ -522,13 +523,42 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 	}
 }
 
-func fetchToDoc(url string, fetcher fetch.Fetcher, opts fetch.FetchOpts) (*goquery.Document, error) {
-	res, err := fetcher.Fetch(url, opts)
+func (c *Scraper) fetchToDoc(url string, opts fetch.FetchOpts) (*goquery.Document, error) {
+	res, err := c.fetcher.Fetch(url, opts)
 	if err != nil {
 		return nil, err
 	}
 	// fmt.Println(res)
-	return goquery.NewDocumentFromReader(strings.NewReader(res))
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(res))
+	if err != nil {
+		return nil, err
+	}
+
+	// in debug mode we want to write all the html's to files
+	if c.Debug {
+		bs := make([]byte, 8)
+		_, err := rand.Read(bs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate random bytes for html file name")
+		}
+		filename := fmt.Sprintf("%s-%x.html", c.Name, bs[:8])
+		slog.Debug(fmt.Sprintf("writing html to file %s", filename), slog.String("url", url))
+		htmlStr, err := goquery.OuterHtml(doc.Children())
+		if err != nil {
+			return nil, fmt.Errorf("failed to write html file: %v", err)
+		}
+
+		f, err := os.Create(filename)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write html file: %v", err)
+		}
+		defer f.Close()
+		_, err = f.WriteString(htmlStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write html file: %v", err)
+		}
+	}
+	return doc, nil
 }
 
 func extractField(field *Field, event map[string]interface{}, s *goquery.Selection, baseURL string) error {

@@ -3,7 +3,8 @@ package output
 import (
 	"bytes"
 	"encoding/json"
-	"log"
+	"fmt"
+	"log/slog"
 	"os"
 )
 
@@ -18,9 +19,11 @@ func NewFileWriter(wc *WriterConfig) *FileWriter {
 	}
 }
 func (fr *FileWriter) Write(items chan map[string]interface{}) {
+	logger := slog.With(slog.String("writer", FILE_WRITER_TYPE))
 	f, err := os.Create(fr.writerConfig.FilePath)
 	if err != nil {
-		log.Fatalf("FileWriter ERROR while trying to open file: %v", err)
+		logger.Error(fmt.Sprintf("error while trying to open file: %v", err))
+		os.Exit(1)
 	}
 	defer f.Close()
 	allItems := []map[string]interface{}{}
@@ -41,18 +44,18 @@ func (fr *FileWriter) Write(items chan map[string]interface{}) {
 	encoder := json.NewEncoder(buffer)
 	encoder.SetEscapeHTML(false)
 	if err := encoder.Encode(allItems); err != nil {
-		log.Printf("FileWriter ERROR while encoding items: %v", err)
+		logger.Error(fmt.Sprintf("error while encoding items: %v", err))
 		return
 	}
 
 	var indentBuffer bytes.Buffer
 	if err := json.Indent(&indentBuffer, buffer.Bytes(), "", "  "); err != nil {
-		log.Printf("FileWriter ERROR while indenting json: %v", err)
+		logger.Error(fmt.Sprintf("error while indenting json: %v", err))
 		return
 	}
-	_, err = f.Write(indentBuffer.Bytes())
-	if err != nil {
-		log.Printf("FileWriter ERROR while writing json to file: %v", err)
+	if _, err = f.Write(indentBuffer.Bytes()); err != nil {
+		logger.Error(fmt.Sprintf("error while writing json to file: %v", err))
+	} else {
+		logger.Info(fmt.Sprintf("wrote %d items to file %s", len(allItems), fr.writerConfig.FilePath))
 	}
-	log.Printf("wrote %d items to file %s", len(allItems), fr.writerConfig.FilePath)
 }

@@ -97,7 +97,7 @@ Note that the machine learning feature is rather new and might not always work w
 
 ## Manual Configuration & Usage
 
-Despite the option to automatically generate a configuration file for goskyr there are a lot more options that can be configured manually.
+Despite the option to automatically generate a configuration file for goskyr there are a lot more options that can be configured manually. Note that while writing and testing a new configuration it might make sense to use the `-debug` flag when running goskyr, to enable more detailed logging and have the scraped html's written to files.
 
 A very simple configuration would look something like this:
 

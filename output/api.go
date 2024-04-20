@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 )
 
@@ -25,6 +26,7 @@ func NewAPIWriter(wc *WriterConfig) *APIWriter {
 }
 
 func (f *APIWriter) Write(items chan map[string]interface{}) {
+	logger := slog.With(slog.String("writer", API_WRITER_TYPE))
 	client := &http.Client{
 		Timeout: time.Second * 10,
 	}
@@ -45,7 +47,7 @@ func (f *APIWriter) Write(items chan map[string]interface{}) {
 			// delete all items from the given source
 			firstDate, ok := item["date"].(time.Time)
 			if !ok {
-				log.Printf("error while trying to cast the date field of item %v to time.Time", item)
+				logger.Error(fmt.Sprintf("error while trying to cast the date field of item %v to time.Time", item))
 				continue
 			}
 			firstDateUTCF := firstDate.UTC().Format("2006-01-02 15:04")
@@ -54,15 +56,16 @@ func (f *APIWriter) Write(items chan map[string]interface{}) {
 			req.SetBasicAuth(apiUser, apiPassword)
 			resp, err := client.Do(req)
 			if err != nil {
-				log.Printf("error while deleting items from the api: %v\n", err)
+				logger.Error(fmt.Sprintf("error while deleting items from the api: %v\n", err))
 				continue
 			}
 			if resp.StatusCode != 200 {
 				body, err := io.ReadAll(resp.Body)
 				if err != nil {
-					log.Fatal(err)
+					logger.Error(fmt.Sprintf("%v", err))
 				}
-				log.Fatalf("error while deleting items. Status Code: %d\nUrl: %s Response: %s\n", resp.StatusCode, deleteURL, body)
+				logger.Error(fmt.Sprintf("error while deleting items. Status Code: %d\nUrl: %s Response: %s\n", resp.StatusCode, deleteURL, body))
+				os.Exit(1)
 			}
 			resp.Body.Close()
 		}
@@ -82,7 +85,7 @@ func (f *APIWriter) Write(items chan map[string]interface{}) {
 		nrItemsWritten = nrItemsWritten + len(batch)
 	}
 
-	log.Printf("wrote %d items from %d sources to the api", nrItemsWritten, len(deletedSources))
+	logger.Info(fmt.Sprintf("wrote %d items from %d sources to the api", nrItemsWritten, len(deletedSources)))
 }
 
 func postBatch(client *http.Client, batch []map[string]interface{}, apiURL, apiUser, apiPassword string) error {

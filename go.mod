@@ -1,6 +1,6 @@
 module github.com/jakopako/goskyr
 
-go 1.19
+go 1.22
 
 require (
 	github.com/PuerkitoBio/goquery v1.9.1

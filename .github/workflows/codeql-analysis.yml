@@ -67,4 +67,4 @@ jobs:
       #   make release
 
       - name: Perform CodeQL Analysi2
-        uses: github/codeql-action/analyze@v1
+        uses: github/codeql-action/analyze@v2

@@ -534,6 +534,7 @@ func (c *Scraper) fetchToDoc(url string, opts fetch.FetchOpts) (*goquery.Documen
 		return nil, err
 	}
 
+	// in debug mode we want to write all the html's to files
 	if c.Debug {
 		bs := make([]byte, 8)
 		_, err := rand.Read(bs)

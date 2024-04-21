@@ -85,7 +85,7 @@ As shown under [Quick Start](#quick-start) goskyr can be used to automatically e
 - `-g`: Pass the url you want to extract data from to this flag.
 - `-f`: Only show fields that have varying values across the list of items.
 - `-m`: The minimum number of items on a page. This is needed to filter out noise. The default is 20.
-- `-d`: Render JS before starting to extract the configuration.
+- `-r`: Render JS before starting to extract the configuration.
 - `--model`: This option is new since `v0.4.0`. You can pass a reference to a ML model that suggests names for the extracted fields. Note that the model currently consists of two files that have to be named exactly the same except for the ending. The string that you have to pass to the `--model` flag has to be the filename without the ending. Check out the section on [building a ML model](#build-ml-model-for-improved-auto-config).
 - `-w`: Works in combination with `--model`. This flag is used to pass a the name of a directory that contains a bunch of text files with dictionary words. This is needed for feature extraction for the ML stuff. This repository contains an example of such a directory, `word-lists`, although the lists are pretty limited. Default is `word-lists`.
 

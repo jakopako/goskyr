@@ -174,7 +174,7 @@ func main() {
 	if *singleScraper == "" {
 		nrWorkers = int(math.Min(20, float64(len(config.Scrapers))))
 	}
-	slog.Info(fmt.Sprintf("running with %d threads\n", nrWorkers))
+	slog.Info(fmt.Sprintf("running with %d threads", nrWorkers))
 	workerWg.Add(nrWorkers)
 	slog.Debug("starting workers")
 	for i := 0; i < nrWorkers; i++ {

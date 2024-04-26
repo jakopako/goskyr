@@ -248,7 +248,7 @@ type Scraper struct {
 	PageLoadWait        int               `yaml:"page_load_wait,omitempty"` // milliseconds. Only taken into account when render_js = true
 	Interaction         types.Interaction `yaml:"interaction,omitempty"`
 	fetcher             fetch.Fetcher
-	Debug               bool
+	Debug               bool `yaml:"debug,omitempty"`
 }
 
 // GetItems fetches and returns all items from a website according to the

@@ -1,4 +1,4 @@
-package automate
+package autoconfig
 
 import (
 	"errors"
@@ -20,6 +20,7 @@ import (
 	"golang.org/x/net/html"
 )
 
+// A node is our representation of a node in an html tree
 type node struct {
 	tagName       string
 	classes       []string
@@ -55,6 +56,8 @@ func (n node) equals(n2 node) bool {
 	return false
 }
 
+// A path is a list of nodes starting from the root node and going down
+// the html tree to a specific node
 type path []node
 
 func (p path) string() string {
@@ -65,21 +68,23 @@ func (p path) string() string {
 	return strings.Join(nodeStrings, " > ")
 }
 
-func (p path) distanceTo(p2 path) float64 {
+// distance calculates the levenshtein distance between the string represention
+// of two paths
+func (p path) distance(p2 path) float64 {
 	return float64(levenshtein.ComputeDistance(p.string(), p2.string()))
 }
 
 type locationProps struct {
-	path       path
-	attr       string
-	textIndex  int // this will translate into child index within scraper.ElementLocation
-	count      int
-	examples   []string
-	selected   bool
-	color      tcell.Color
-	distance   float64
-	name       string
-	stripIndex int // this is needed for the squashLocationManager function
+	path      path
+	attr      string
+	textIndex int // this will translate into child index within scraper.ElementLocation
+	count     int
+	examples  []string
+	selected  bool
+	color     tcell.Color
+	distance  float64
+	name      string
+	iStrip    int // this is needed for the squashLocationManager function
 }
 
 type locationManager []*locationProps
@@ -90,7 +95,7 @@ func (l locationManager) setColors() {
 	}
 	for i, e := range l {
 		if i != 0 {
-			e.distance = l[i-1].distance + l[i-1].path.distanceTo(e.path)
+			e.distance = l[i-1].distance + l[i-1].path.distance(e.path)
 		}
 	}
 	// scale to 1 and map to rgb
@@ -217,6 +222,8 @@ func (l locationManager) elementsToConfig(s *scraper.Scraper) error {
 	if len(locPropsSel) == 0 {
 		return fmt.Errorf("no fields selected")
 	}
+
+	// find shared root selector
 	var rootSelector path
 outer:
 	for i := 0; ; i++ {
@@ -236,7 +243,7 @@ outer:
 			}
 		}
 	}
-	s.Item = rootSelector.string()
+	s.Item = shortenRootSelector(rootSelector).string()
 	// for now we assume that there will only be one date field
 	t := time.Now()
 	zone, _ := t.Zone()
@@ -289,17 +296,29 @@ outer:
 	return nil
 }
 
+func shortenRootSelector(p path) path {
+	// the following algorithm is a bit arbitrary. Let's
+	// see if it works.
+	nrTotalClasses := 0
+	thresholdTotalClasses := 3
+	for i := len(p) - 1; i >= 0; i-- {
+		nrTotalClasses += len(p[i].classes)
+		if nrTotalClasses >= thresholdTotalClasses {
+			return p[i:]
+		}
+	}
+	return p
+}
+
+// squashLocationManager merges different locationProps into one
+// based on their similarity. The tricky question is 'when are two
+// locationProps close enough to be merged into one?'
 func squashLocationManager(l locationManager, minOcc int) locationManager {
-	// This function merges different locationProps into one
-	// based on their similarity. The tricky question is 'when are two
-	// locationProps close enough to be merged into one?'
 	squashed := locationManager{}
 	for i := len(l) - 1; i >= 0; i-- {
 		lp := l[i]
 		updated := false
 		for _, sp := range squashed {
-			// we need a 'stripIndex' to know which nth-childs we can remove
-			// when trying to merge locationProps
 			updated = checkAndUpdateLocProps(sp, lp)
 			if updated {
 				break
@@ -313,28 +332,39 @@ func squashLocationManager(l locationManager, minOcc int) locationManager {
 	return squashed
 }
 
+// stripNthChild tries to find the index in a locationProps path under which
+// we need to strip the nth-child pseudo class. We need to strip that pseudo
+// class because at a later point we want to find a common base path between
+// different paths but if all paths' base paths look differently (because their
+// nodes have different nth-child pseudo classes) there won't be a common
+// base path.
 func stripNthChild(lp *locationProps, minOcc int) {
-	borderI := 0
-	// a bit arbitrary (and probably not always correct) but
-	// for now we assume that borderI cannot be len(lp.path)-1
+	iStrip := 0
+	// every node in lp.path with index < than iStrip needs no be stripped
+	// of its pseudo classes. iStrip changes during the execution of
+	// this function.
+	// A bit arbitrary (and probably not always correct) but
+	// for now we assume that iStrip cannot be len(lp.path)-1
 	// not correct for https://huxleysneuewelt.com/shows
 	// but needed for http://www.bar-laparenthese.ch/
-	// very hacky:
+	// Therefore by default we substract 1 but in a certain case
+	// we substract 2
 	sub := 1
 	// when minOcc is too small we'd risk stripping the wrong nth-child pseudo classes
 	if minOcc < 6 {
 		sub = 2
 	}
 	for i := len(lp.path) - sub; i >= 0; i-- {
-		if i < borderI {
+		if i < iStrip {
 			lp.path[i].pseudoClasses = []string{}
 		} else if len(lp.path[i].pseudoClasses) > 0 {
 			// nth-child(x)
-			nc, _ := strconv.Atoi(strings.Replace(strings.Split(lp.path[i].pseudoClasses[0], "(")[1], ")", "", 1))
-			if nc >= minOcc {
+			ncIndex, _ := strconv.Atoi(strings.Replace(strings.Split(lp.path[i].pseudoClasses[0], "(")[1], ")", "", 1))
+			if ncIndex >= minOcc {
 				lp.path[i].pseudoClasses = []string{}
-				borderI = i
-				lp.stripIndex = i
+				iStrip = i
+				// we need to pass iStrip to the locationProps too to be used by checkAndUpdateLocProps
+				lp.iStrip = iStrip
 			}
 		}
 	}
@@ -343,7 +373,7 @@ func stripNthChild(lp *locationProps, minOcc int) {
 func checkAndUpdateLocProps(old, new *locationProps) bool {
 	// returns true if the paths overlap and the rest of the
 	// element location is identical. If true is returned
-	// the Selector of a will be updated if necessary.
+	// the Selector of old will be updated if necessary.
 	if old.textIndex == new.textIndex && old.attr == new.attr {
 		if len(old.path) != len(new.path) {
 			return false
@@ -352,7 +382,7 @@ func checkAndUpdateLocProps(old, new *locationProps) bool {
 		for i, on := range old.path {
 			if on.tagName == new.path[i].tagName {
 				pseudoClassesTmp := []string{}
-				if i > old.stripIndex {
+				if i > old.iStrip {
 					pseudoClassesTmp = new.path[i].pseudoClasses
 				}
 				// the following checks are not complete yet but suffice for now
@@ -453,10 +483,12 @@ func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields b
 	if err != nil {
 		return err
 	}
+
+	// start analyzing the html
 	z := html.NewTokenizer(strings.NewReader(htmlStr))
 	locMan := locationManager{}
-	allChildren := map[string]int{}    // the nr of children including non-html-tag nodes (ie text)
-	tagChildren := map[string][]node{} // the children at the specified nodePath; used for :nth-child() logic
+	nrChildren := map[string]int{}    // the nr of children a node (represented by a path) has, including non-html-tag nodes (ie text)
+	childNodes := map[string][]node{} // the children of the node at the specified nodePath; used for :nth-child() logic
 	nodePath := path{}
 	depth := 0
 	inBody := false
@@ -472,7 +504,7 @@ parse:
 				p := nodePath.string()
 				textTrimmed := strings.TrimSpace(text)
 				if len(textTrimmed) > 0 {
-					ti := allChildren[p]
+					ti := nrChildren[p]
 					lp := locationProps{
 						path:      make([]node, len(nodePath)),
 						examples:  []string{textTrimmed},
@@ -482,7 +514,7 @@ parse:
 					copy(lp.path, nodePath)
 					locMan = append(locMan, &lp)
 				}
-				allChildren[p] += 1
+				nrChildren[p] += 1
 			}
 		case html.StartTagToken, html.EndTagToken:
 			tn, _ := z.TagName()
@@ -493,15 +525,14 @@ parse:
 			if inBody {
 				// br can also be self closing tag, see later case statement
 				if tagNameStr == "br" || tagNameStr == "input" {
-					allChildren[nodePath.string()] += 1
-					tagChildren[nodePath.string()] = append(tagChildren[nodePath.string()], node{tagName: tagNameStr})
+					nrChildren[nodePath.string()] += 1
+					childNodes[nodePath.string()] = append(childNodes[nodePath.string()], node{tagName: tagNameStr})
 					continue
 				}
 				if tt == html.StartTagToken {
-					allChildren[nodePath.string()] += 1
-					tagChildren[nodePath.string()] = append(tagChildren[nodePath.string()], node{tagName: tagNameStr})
-
-					attrs, cls, pCls := getTagMetadata(tagNameStr, z, tagChildren, nodePath)
+					attrs, cls, pCls := getTagMetadata(tagNameStr, z, childNodes[nodePath.string()])
+					nrChildren[nodePath.string()] += 1
+					childNodes[nodePath.string()] = append(childNodes[nodePath.string()], node{tagName: tagNameStr, classes: cls})
 
 					newNode := node{
 						tagName:       tagNameStr,
@@ -510,7 +541,7 @@ parse:
 					}
 					nodePath = append(nodePath, newNode)
 					depth++
-					tagChildren[nodePath.string()] = []node{}
+					childNodes[nodePath.string()] = []node{}
 
 					for attrKey, attrValue := range attrs {
 						lp := locationProps{
@@ -531,8 +562,8 @@ parse:
 							}
 							n = false
 						}
-						delete(allChildren, nodePath.string())
-						delete(tagChildren, nodePath.string())
+						delete(nrChildren, nodePath.string())
+						delete(childNodes, nodePath.string())
 						nodePath = nodePath[:len(nodePath)-1]
 						depth--
 					}
@@ -543,9 +574,9 @@ parse:
 				tn, _ := z.TagName()
 				tagNameStr := string(tn)
 				if tagNameStr == "br" || tagNameStr == "input" || tagNameStr == "img" || tagNameStr == "link" {
-					allChildren[nodePath.string()] += 1
-					tagChildren[nodePath.string()] = append(tagChildren[nodePath.string()], node{tagName: tagNameStr})
-					attrs, cls, pCls := getTagMetadata(tagNameStr, z, tagChildren, nodePath)
+					attrs, cls, pCls := getTagMetadata(tagNameStr, z, childNodes[nodePath.string()])
+					nrChildren[nodePath.string()] += 1
+					childNodes[nodePath.string()] = append(childNodes[nodePath.string()], node{tagName: tagNameStr, classes: cls})
 
 					if len(attrs) > 0 {
 						tmpNodePath := make([]node, len(nodePath))
@@ -590,19 +621,20 @@ parse:
 
 // getTagMetadata, for a given node returns a map of key value pairs (only for the attriutes we're interested in) and
 // a list of this node's classes and a list of this node's pseudo classes (currently only nth-child).
-func getTagMetadata(tagName string, z *html.Tokenizer, tagChildren map[string][]node, nodePath path) (map[string]string, []string, []string) {
+func getTagMetadata(tagName string, z *html.Tokenizer, siblingNodes []node) (map[string]string, []string, []string) {
 	allowedAttrs := map[string]map[string]bool{
 		"a":   {"href": true},
 		"img": {"src": true},
 	}
 	moreAttr := true
 	attrs := make(map[string]string)
-	var cls []string
+	var cls []string       // classes
 	if tagName != "body" { // we don't care about classes for the body tag
 		for moreAttr {
 			k, v, m := z.TagAttr()
 			vString := strings.TrimSpace(string(v))
-			if string(k) == "class" && vString != "" {
+			kString := string(k)
+			if kString == "class" && vString != "" {
 				cls = strings.Split(vString, " ")
 				j := 0
 				for _, cl := range cls {
@@ -615,20 +647,23 @@ func getTagMetadata(tagName string, z *html.Tokenizer, tagChildren map[string][]
 				cls = cls[:j]
 			}
 			if _, found := allowedAttrs[tagName]; found {
-				if _, found := allowedAttrs[tagName][string(k)]; found {
-					attrs[string(k)] = vString
+				if _, found := allowedAttrs[tagName][kString]; found {
+					attrs[kString] = vString
 				}
 			}
 			moreAttr = m
 		}
 	}
-	var pCls []string
+	var pCls []string // pseudo classes
 	// only add nth-child if there has been another node before at the same
-	// level with same tag
-	for i := 0; i < len(tagChildren[nodePath.string()])-1; i++ { // the last element is skipped because it's the current node itself
-		cn := tagChildren[nodePath.string()][i]
-		if cn.tagName == tagName {
-			pCls = []string{fmt.Sprintf("nth-child(%d)", len(tagChildren[nodePath.string()]))}
+	// level (sibling node) with same tag and the same classes
+	for i := 0; i < len(siblingNodes); i++ {
+		childNode := siblingNodes[i]
+		if childNode.tagName == tagName {
+			if utils.SliceEquals(childNode.classes, cls) {
+				pCls = []string{fmt.Sprintf("nth-child(%d)", len(siblingNodes)+1)}
+				break
+			}
 		}
 
 	}

@@ -8,7 +8,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/jakopako/goskyr/automate"
+	"github.com/jakopako/goskyr/autoconfig"
 	"github.com/jakopako/goskyr/ml"
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/scraper"
@@ -74,7 +74,7 @@ func main() {
 			s.RenderJs = true
 		}
 		slog.Debug(fmt.Sprintf("analyzing url %s", s.URL))
-		err := automate.GetDynamicFieldsConfig(s, *m, *f, *modelPath, *wordsDir)
+		err := autoconfig.GetDynamicFieldsConfig(s, *m, *f, *modelPath, *wordsDir)
 		if err != nil {
 			slog.Error(fmt.Sprintf("%v", err))
 			os.Exit(1)

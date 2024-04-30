@@ -313,7 +313,8 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 					// to speed things up we check the filter after each field.
 					// Like that we safe time if we already know for sure that
 					// we want to filter out a certain item. Especially, if
-					// certain elements would need to be fetched from subpages
+					// certain elements would need to be fetched from subpages.
+					// filter fast!
 					if !c.filterItem(currentItem) {
 						return
 					}
@@ -345,6 +346,10 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 						err = extractField(&f, currentItem, subDocs[subpageURL].Selection, baseURLSubpage)
 						if err != nil {
 							scrLogger.Error(fmt.Sprintf("error while parsing field %s: %v. Skipping item %v.", f.Name, err, currentItem))
+							return
+						}
+						// filter fast!
+						if !c.filterItem(currentItem) {
 							return
 						}
 					}

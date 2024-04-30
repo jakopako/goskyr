@@ -107,6 +107,7 @@ func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 		chromedp.Navigate(url),
 		chromedp.Sleep(sleepTime),
 	}
+	logger.Debug(fmt.Sprintf("appended chrome actions: Navigate, Sleep(%v)", sleepTime))
 	delay := 500 * time.Millisecond // default is .5 seconds
 	if opts.Interaction.Delay > 0 {
 		delay = time.Duration(opts.Interaction.Delay) * time.Millisecond
@@ -128,9 +129,11 @@ func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 				if len(nodes) == 0 {
 					return nil
 				} // nothing to do
+				logger.Debug(fmt.Sprintf("clicking on node with selector: %s", opts.Interaction.Selector))
 				return chromedp.MouseClickNode(nodes[0]).Do(ctx)
 			}))
 			actions = append(actions, chromedp.Sleep(delay))
+			logger.Debug(fmt.Sprintf("appended chrome actions: ActionFunc, Sleep(%v)", delay))
 		}
 	}
 	actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {

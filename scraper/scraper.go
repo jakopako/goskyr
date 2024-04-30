@@ -237,18 +237,17 @@ type Paginator struct {
 // A Scraper contains all the necessary config parameters and structs needed
 // to extract the desired information from a website
 type Scraper struct {
-	Name                string            `yaml:"name"`
-	URL                 string            `yaml:"url"`
-	Item                string            `yaml:"item"`
-	ExcludeWithSelector []string          `yaml:"exclude_with_selector,omitempty"`
-	Fields              []Field           `yaml:"fields,omitempty"`
-	Filters             []*Filter         `yaml:"filters,omitempty"`
-	Paginator           Paginator         `yaml:"paginator,omitempty"`
-	RenderJs            bool              `yaml:"render_js,omitempty"`
-	PageLoadWait        int               `yaml:"page_load_wait,omitempty"` // milliseconds. Only taken into account when render_js = true
-	Interaction         types.Interaction `yaml:"interaction,omitempty"`
-	fetcher             fetch.Fetcher
-	Debug               bool `yaml:"debug,omitempty"`
+	Name         string            `yaml:"name"`
+	URL          string            `yaml:"url"`
+	Item         string            `yaml:"item"`
+	Fields       []Field           `yaml:"fields,omitempty"`
+	Filters      []*Filter         `yaml:"filters,omitempty"`
+	Paginator    Paginator         `yaml:"paginator,omitempty"`
+	RenderJs     bool              `yaml:"render_js,omitempty"`
+	PageLoadWait int               `yaml:"page_load_wait,omitempty"` // milliseconds. Only taken into account when render_js = true
+	Interaction  types.Interaction `yaml:"interaction,omitempty"`
+	fetcher      fetch.Fetcher
+	Debug        bool `yaml:"debug,omitempty"`
 }
 
 // GetItems fetches and returns all items from a website according to the
@@ -292,12 +291,6 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 		baseUrl := getBaseURL(pageURL, doc)
 
 		doc.Find(c.Item).Each(func(i int, s *goquery.Selection) {
-			for _, excludeSelector := range c.ExcludeWithSelector {
-				if s.Find(excludeSelector).Length() > 0 || s.Is(excludeSelector) {
-					return
-				}
-			}
-
 			currentItem := make(map[string]interface{})
 			for _, f := range c.Fields {
 				if f.Value != "" {
@@ -318,6 +311,13 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 							scrLogger.Error(fmt.Sprintf("error while parsing field %s: %v. Skipping item %v.", f.Name, err, currentItem))
 							return
 						}
+					}
+					// to speed things up we check the filter after each field.
+					// Like that we safe time if we already know for sure that
+					// we want to filter out a certain item. Especially, if
+					// certain elements would need to be fetched from subpages
+					if !c.filterItem(currentItem) {
+						return
 					}
 				}
 			}

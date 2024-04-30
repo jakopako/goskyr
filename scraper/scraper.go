@@ -287,9 +287,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 	}
 
 	for hasNextPage {
-
 		baseUrl := getBaseURL(pageURL, doc)
-
 		doc.Find(c.Item).Each(func(i int, s *goquery.Selection) {
 			currentItem := make(map[string]interface{})
 			for _, f := range c.Fields {

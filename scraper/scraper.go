@@ -92,7 +92,6 @@ type RegexConfig struct {
 type ElementLocation struct {
 	Selector      string      `yaml:"selector,omitempty"`
 	JsonSelector  string      `yaml:"json_selector,omitempty"`
-	NodeIndex     int         `yaml:"node_index,omitempty"`
 	ChildIndex    int         `yaml:"child_index,omitempty"`
 	RegexExtract  RegexConfig `yaml:"regex_extract,omitempty"`
 	Attr          string      `yaml:"attr,omitempty"`
@@ -858,7 +857,7 @@ func getTextString(e *ElementLocation, s *goquery.Selection) (string, error) {
 	} else {
 		fieldSelection = s.Find(e.Selector)
 	}
-	if len(fieldSelection.Nodes) > e.NodeIndex {
+	if len(fieldSelection.Nodes) > 0 {
 		if e.Attr == "" {
 			if e.EntireSubtree {
 				// copied from https://github.com/PuerkitoBio/goquery/blob/v1.8.0/property.go#L62
@@ -882,7 +881,7 @@ func getTextString(e *ElementLocation, s *goquery.Selection) (string, error) {
 						buf.Reset()
 					}
 				} else {
-					f(fieldSelection.Get(e.NodeIndex))
+					f(fieldSelection.Get(0))
 					fieldStrings = append(fieldStrings, buf.String())
 				}
 			} else {
@@ -896,7 +895,7 @@ func getTextString(e *ElementLocation, s *goquery.Selection) (string, error) {
 						}
 					}
 				} else {
-					fieldNode := fieldSelection.Get(e.NodeIndex).FirstChild
+					fieldNode := fieldSelection.Get(0).FirstChild
 					if fieldNode != nil {
 						fieldNodes = append(fieldNodes, fieldNode)
 					}

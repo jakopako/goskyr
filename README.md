@@ -350,32 +350,6 @@ fields:
 
 This field is implicitly of type `text`. The `location` tells the scraper where to look for the field value and how to extract it. In this case the selector on its own would not be enough to extract the desired value as we would get something like this: `Bastian Baker • Konzert`. That's why there is an extra option to define a regular expression to extract a substring. Note that in this example our extracted string would still contain a trailing space which is automatically removed by the scraper. Let's have a look at a few more examples to have a better understanding of the location configuration.
 
-_Subkey: `node_index`_
-
-Let's say we want to extract "Tonhalle-Orchester Zürich" from the following html snippet.
-
-```html
-<div class="member">
-  <span class="member-name"></span>
-  <span class="member-name"> Tonhalle-Orchester Zürich</span
-  ><span class="member-function">, </span>
-  <span class="member-name"> Yi-Chen Lin</span
-  ><span class="member-function"> Leitung und Konzept,</span>
-  <span class="composer"> Der Feuervogel </span>
-  <span class="veranstalter"> Organizer: Tonhalle-Gesellschaft Zürich AG </span>
-</div>
-```
-
-We can do this by configuring the location like this:
-
-```yml
-location:
-  selector: ".member .member-name"
-  node_index: 1 # This indicates that we want the second node (indexing starts at 0)
-```
-
-Note that the same result can be achieved with the `:nth-child()` selector so `node_index` might be removed in the future, see issue [#119](https://github.com/jakopako/goskyr/issues/119)
-
 _Subkey: `child_index`_
 
 Next, let's say we want to extract the time "20h00" from the following html snippet.
@@ -572,7 +546,6 @@ In case `render_js` is set to `false` by default the value of the `href` key is 
 paginator:
   location:
     selector: ".pagination .selector"
-    node_index: <number>
     attr: <string>
   max_pages: <number>
 ```

@@ -56,7 +56,7 @@ func main() {
 	if *printVersion {
 		buildInfo, ok := debug.ReadBuildInfo()
 		if ok {
-			if buildInfo.Main.Version != "" {
+			if buildInfo.Main.Version != "" && buildInfo.Main.Version != "(devel)" {
 				fmt.Println(buildInfo.Main.Version)
 				return
 			}

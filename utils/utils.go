@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"crypto/rand"
 	"fmt"
 	"math"
 	"sort"
@@ -141,4 +142,13 @@ func ReverseSlice[T any](s []T) {
 	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
 		s[i], s[j] = s[j], s[i]
 	}
+}
+
+func RandomString(base string) (string, error) {
+	bs := make([]byte, 8)
+	_, err := rand.Read(bs)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %v", err)
+	}
+	return fmt.Sprintf("%s-%x", base, bs[:8]), nil
 }

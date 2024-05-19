@@ -6,16 +6,20 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"os"
 	"time"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/chromedp"
+	"github.com/jakopako/goskyr/config"
 	"github.com/jakopako/goskyr/types"
+	"github.com/jakopako/goskyr/utils"
 )
 
 type FetchOpts struct {
-	Interaction types.Interaction
+	Interaction []*types.Interaction
 }
 
 // A Fetcher allows to fetch the content of a web page
@@ -90,8 +94,8 @@ func (d *DynamicFetcher) Cancel() {
 	d.cancelAlloc()
 }
 
-func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
-	logger := slog.With(slog.String("fetcher", "dynamic"), slog.String("url", url))
+func (d *DynamicFetcher) Fetch(urlStr string, opts FetchOpts) (string, error) {
+	logger := slog.With(slog.String("fetcher", "dynamic"), slog.String("url", urlStr))
 	logger.Debug("fetching page", slog.String("user-agent", d.UserAgent))
 	// start := time.Now()
 	ctx, cancel := chromedp.NewContext(d.allocContext)
@@ -104,36 +108,37 @@ func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 	var body string
 	sleepTime := time.Duration(d.WaitMilliseconds) * time.Millisecond
 	actions := []chromedp.Action{
-		chromedp.Navigate(url),
+		chromedp.Navigate(urlStr),
 		chromedp.Sleep(sleepTime),
 	}
 	logger.Debug(fmt.Sprintf("appended chrome actions: Navigate, Sleep(%v)", sleepTime))
-	delay := 500 * time.Millisecond // default is .5 seconds
-	if opts.Interaction.Delay > 0 {
-		delay = time.Duration(opts.Interaction.Delay) * time.Millisecond
-	}
-	if opts.Interaction.Type == types.InteractionTypeClick {
-		count := 1 // default is 1
-		if opts.Interaction.Count > 0 {
-			count = opts.Interaction.Count
+	for j, ia := range opts.Interaction {
+		logger.Debug(fmt.Sprintf("processing interaction nr %d, type %s", j, ia.Type))
+		delay := 500 * time.Millisecond // default is .5 seconds
+		if ia.Delay > 0 {
+			delay = time.Duration(ia.Delay) * time.Millisecond
 		}
-		for i := 0; i < count; i++ {
-			// we only click the button if it exists. Do we really need this check here?
-			// TODO: should we click as many times as possible if count == 0? How would we implement this?
-			// actions = append(actions, chromedp.Click(d.Interaction.Selector, chromedp.ByQuery))
-			actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
-				var nodes []*cdp.Node
-				if err := chromedp.Nodes(opts.Interaction.Selector, &nodes, chromedp.AtLeast(0)).Do(ctx); err != nil {
-					return err
-				}
-				if len(nodes) == 0 {
-					return nil
-				} // nothing to do
-				logger.Debug(fmt.Sprintf("clicking on node with selector: %s", opts.Interaction.Selector))
-				return chromedp.MouseClickNode(nodes[0]).Do(ctx)
-			}))
-			actions = append(actions, chromedp.Sleep(delay))
-			logger.Debug(fmt.Sprintf("appended chrome actions: ActionFunc, Sleep(%v)", delay))
+		if ia.Type == types.InteractionTypeClick {
+			count := 1 // default is 1
+			if ia.Count > 0 {
+				count = ia.Count
+			}
+			for i := 0; i < count; i++ {
+				// we only click the button if it exists. Do we really need this check here?
+				actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
+					var nodes []*cdp.Node
+					if err := chromedp.Nodes(ia.Selector, &nodes, chromedp.AtLeast(0)).Do(ctx); err != nil {
+						return err
+					}
+					if len(nodes) == 0 {
+						return nil
+					} // nothing to do
+					logger.Debug(fmt.Sprintf("clicking on node with selector: %s", ia.Selector))
+					return chromedp.MouseClickNode(nodes[0]).Do(ctx)
+				}))
+				actions = append(actions, chromedp.Sleep(delay))
+				logger.Debug(fmt.Sprintf("appended chrome actions: ActionFunc (mouse click), Sleep(%v)", delay))
+			}
 		}
 	}
 	actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
@@ -144,6 +149,23 @@ func (d *DynamicFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 		body, err = dom.GetOuterHTML().WithNodeID(node.NodeID).Do(ctx)
 		return err
 	}))
+
+	if config.Debug {
+		u, _ := url.Parse(urlStr)
+		var buf []byte
+		r, err := utils.RandomString(u.Host)
+		if err != nil {
+			return "", err
+		}
+		filename := fmt.Sprintf("%s.png", r)
+		actions = append(actions, chromedp.CaptureScreenshot(&buf))
+		actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
+			// log.Printf("Write %v", fileName)
+			logger.Debug(fmt.Sprintf("writing screenshot to file %s", filename))
+			return os.WriteFile(filename, buf, 0644)
+		}))
+		logger.Debug("appended chrome actions: CaptureScreenshot, ActionFunc (save screenshot)")
+	}
 
 	// run task list
 	err := chromedp.Run(ctx,

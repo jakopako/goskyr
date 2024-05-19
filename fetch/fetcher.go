@@ -160,7 +160,6 @@ func (d *DynamicFetcher) Fetch(urlStr string, opts FetchOpts) (string, error) {
 		filename := fmt.Sprintf("%s.png", r)
 		actions = append(actions, chromedp.CaptureScreenshot(&buf))
 		actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
-			// log.Printf("Write %v", fileName)
 			logger.Debug(fmt.Sprintf("writing screenshot to file %s", filename))
 			return os.WriteFile(filename, buf, 0644)
 		}))

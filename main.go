@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"math"
 	"os"
+	"runtime/debug"
 	"sync"
 
 	"github.com/jakopako/goskyr/autoconfig"
@@ -48,17 +49,24 @@ func main() {
 	wordsDir := flag.String("w", "word-lists", "The directory that contains a number of files containing words of different languages. This is needed for the ML part (use with -e or -b).")
 	buildModel := flag.String("t", "", "Train a ML model based on the given csv features file. This will generate 2 files, goskyr.model and goskyr.class")
 	modelPath := flag.String("model", "", "Use a pre-trained ML model to infer names of extracted fields. Works in combination with the -g flag.")
-	debug := flag.Bool("debug", false, "Prints debug logs and writes scraped html's to files.")
+	debugFlag := flag.Bool("debug", false, "Prints debug logs and writes scraped html's to files.")
 
 	flag.Parse()
 
 	if *printVersion {
+		buildInfo, ok := debug.ReadBuildInfo()
+		if ok {
+			if buildInfo.Main.Version != "" {
+				fmt.Println(buildInfo.Main.Version)
+				return
+			}
+		}
 		fmt.Println(version)
 		return
 	}
 
 	var logLevel slog.Level
-	if *debug {
+	if *debugFlag {
 		logLevel = slog.LevelDebug
 	} else {
 		logLevel = slog.LevelInfo
@@ -162,7 +170,7 @@ func main() {
 	go func() {
 		for _, s := range config.Scrapers {
 			if *singleScraper == "" || *singleScraper == s.Name {
-				s.Debug = *debug
+				s.Debug = *debugFlag
 				sc <- s
 			}
 		}

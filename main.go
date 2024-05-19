@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/jakopako/goskyr/autoconfig"
+	"github.com/jakopako/goskyr/config"
 	"github.com/jakopako/goskyr/ml"
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/scraper"
@@ -65,6 +66,7 @@ func main() {
 		return
 	}
 
+	config.Debug = *debugFlag
 	var logLevel slog.Level
 	if *debugFlag {
 		logLevel = slog.LevelDebug
@@ -170,7 +172,7 @@ func main() {
 	go func() {
 		for _, s := range config.Scrapers {
 			if *singleScraper == "" || *singleScraper == s.Name {
-				s.Debug = *debugFlag
+				// s.Debug = *debugFlag
 				sc <- s
 			}
 		}

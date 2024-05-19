@@ -2,7 +2,6 @@ package scraper
 
 import (
 	"bytes"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -19,6 +18,7 @@ import (
 	"github.com/antchfx/jsonquery"
 	"github.com/goodsign/monday"
 	"github.com/ilyakaznacheev/cleanenv"
+	"github.com/jakopako/goskyr/config"
 	"github.com/jakopako/goskyr/date"
 	"github.com/jakopako/goskyr/fetch"
 	"github.com/jakopako/goskyr/output"
@@ -236,17 +236,16 @@ type Paginator struct {
 // A Scraper contains all the necessary config parameters and structs needed
 // to extract the desired information from a website
 type Scraper struct {
-	Name         string            `yaml:"name"`
-	URL          string            `yaml:"url"`
-	Item         string            `yaml:"item"`
-	Fields       []Field           `yaml:"fields,omitempty"`
-	Filters      []*Filter         `yaml:"filters,omitempty"`
-	Paginator    Paginator         `yaml:"paginator,omitempty"`
-	RenderJs     bool              `yaml:"render_js,omitempty"`
-	PageLoadWait int               `yaml:"page_load_wait,omitempty"` // milliseconds. Only taken into account when render_js = true
-	Interaction  types.Interaction `yaml:"interaction,omitempty"`
+	Name         string               `yaml:"name"`
+	URL          string               `yaml:"url"`
+	Item         string               `yaml:"item"`
+	Fields       []Field              `yaml:"fields,omitempty"`
+	Filters      []*Filter            `yaml:"filters,omitempty"`
+	Paginator    Paginator            `yaml:"paginator,omitempty"`
+	RenderJs     bool                 `yaml:"render_js,omitempty"`
+	PageLoadWait int                  `yaml:"page_load_wait,omitempty"` // milliseconds. Only taken into account when render_js = true
+	Interaction  []*types.Interaction `yaml:"interaction,omitempty"`
 	fetcher      fetch.Fetcher
-	Debug        bool `yaml:"debug,omitempty"`
 }
 
 // GetItems fetches and returns all items from a website according to the
@@ -280,7 +279,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 	currentPage := 0
 	var doc *goquery.Document
 
-	hasNextPage, pageURL, doc, err := c.fetchPage(nil, currentPage, c.URL, globalConfig.UserAgent, &c.Interaction)
+	hasNextPage, pageURL, doc, err := c.fetchPage(nil, currentPage, c.URL, globalConfig.UserAgent, c.Interaction)
 	if err != nil {
 		return items, err
 	}
@@ -477,10 +476,10 @@ func (c *Scraper) removeHiddenFields(item map[string]interface{}) map[string]int
 	return item
 }
 
-func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl, userAgent string, i *types.Interaction) (bool, string, *goquery.Document, error) {
+func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl, userAgent string, i []*types.Interaction) (bool, string, *goquery.Document, error) {
 
 	if nextPageI == 0 {
-		newDoc, err := c.fetchToDoc(currentPageUrl, fetch.FetchOpts{Interaction: *i})
+		newDoc, err := c.fetchToDoc(currentPageUrl, fetch.FetchOpts{Interaction: i})
 		if err != nil {
 			return false, "", nil, err
 		}
@@ -492,10 +491,12 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 				pagSelector := doc.Find(c.Paginator.Location.Selector)
 				if len(pagSelector.Nodes) > 0 {
 					if nextPageI < c.Paginator.MaxPages || c.Paginator.MaxPages == 0 {
-						ia := types.Interaction{
-							Selector: c.Paginator.Location.Selector,
-							Type:     types.InteractionTypeClick,
-							Count:    nextPageI, // we always need to 'restart' the clicks because we always re-fetch the page
+						ia := []*types.Interaction{
+							{
+								Selector: c.Paginator.Location.Selector,
+								Type:     types.InteractionTypeClick,
+								Count:    nextPageI, // we always need to 'restart' the clicks because we always re-fetch the page
+							},
 						}
 						nextPageDoc, err := c.fetchToDoc(currentPageUrl, fetch.FetchOpts{Interaction: ia})
 						if err != nil {
@@ -525,8 +526,8 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 	}
 }
 
-func (c *Scraper) fetchToDoc(url string, opts fetch.FetchOpts) (*goquery.Document, error) {
-	res, err := c.fetcher.Fetch(url, opts)
+func (c *Scraper) fetchToDoc(urlStr string, opts fetch.FetchOpts) (*goquery.Document, error) {
+	res, err := c.fetcher.Fetch(urlStr, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -537,14 +538,14 @@ func (c *Scraper) fetchToDoc(url string, opts fetch.FetchOpts) (*goquery.Documen
 	}
 
 	// in debug mode we want to write all the html's to files
-	if c.Debug {
-		bs := make([]byte, 8)
-		_, err := rand.Read(bs)
+	if config.Debug {
+		u, _ := url.Parse(urlStr)
+		r, err := utils.RandomString(u.Host)
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate random bytes for html file name")
+			return nil, err
 		}
-		filename := fmt.Sprintf("%s-%x.html", c.Name, bs[:8])
-		slog.Debug(fmt.Sprintf("writing html to file %s", filename), slog.String("url", url))
+		filename := fmt.Sprintf("%s.html", r)
+		slog.Debug(fmt.Sprintf("writing html to file %s", filename), slog.String("url", urlStr))
 		htmlStr, err := goquery.OuterHtml(doc.Children())
 		if err != nil {
 			return nil, fmt.Errorf("failed to write html file: %v", err)

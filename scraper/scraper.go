@@ -125,7 +125,8 @@ type Field struct {
 	Name             string           `yaml:"name"`
 	Value            string           `yaml:"value,omitempty"`
 	Type             string           `yaml:"type,omitempty"`     // can currently be text, url or date
-	ElementLocations ElementLocations `yaml:"location,omitempty"` // elements are string joined using the given Separator
+	ElementLocations ElementLocations `yaml:"location,omitempty"` // elements are extracted strings joined using the given Separator
+	Default          string           `yaml:"default,omitempty"`  // the default for a dynamic field (text or url) if no value is found
 	Separator        string           `yaml:"separator,omitempty"`
 	// If a field can be found on a subpage the following variable has to contain a field name of
 	// a field of type 'url' that is located on the main page.
@@ -578,8 +579,13 @@ func extractField(field *Field, event map[string]interface{}, s *goquery.Selecti
 			}
 		}
 		t := strings.Join(parts, field.Separator)
-		if !field.CanBeEmpty && t == "" {
-			return fmt.Errorf("field %s cannot be empty", field.Name)
+		if t == "" {
+			// if the extracted value is an empty string assign the default value
+			t = field.Default
+			if !field.CanBeEmpty && t == "" {
+				// if it's still empty and must not be empty return an error
+				return fmt.Errorf("field %s cannot be empty", field.Name)
+			}
 		}
 		// transform the string if required
 		for _, tr := range field.Transform {
@@ -598,8 +604,13 @@ func extractField(field *Field, event map[string]interface{}, s *goquery.Selecti
 		if err != nil {
 			return err
 		}
-		if !field.CanBeEmpty && url == "" {
-			return fmt.Errorf("field %s cannot be empty", field.Name)
+		if url == "" {
+			// if the extracted value is an empty string assign the default value
+			url = field.Default
+			if !field.CanBeEmpty && url == "" {
+				// if it's still empty and must not be empty return an error
+				return fmt.Errorf("field %s cannot be empty", field.Name)
+			}
 		}
 		event[field.Name] = url
 	case "date":

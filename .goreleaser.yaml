@@ -11,6 +11,7 @@ builds:
       - CXX=o64-clang++
     flags:
       - -mod=readonly
+      - -tags=timetzdata
     ldflags:
       - -s -w -X main.version={{.Version}}
   - id: darwin-arm64
@@ -25,6 +26,7 @@ builds:
       - CXX=oa64-clang++
     flags:
       - -mod=readonly
+      - -tags=timetzdata
     ldflags:
       - -s -w -X main.version={{.Version}}
   - id: linux-amd64
@@ -39,6 +41,7 @@ builds:
       - CXX=x86_64-linux-gnu-g++
     flags:
       - -mod=readonly
+      - -tags=timetzdata
     ldflags:
       - -s -w -X main.version={{.Version}}
   - id: linux-armhf
@@ -55,6 +58,7 @@ builds:
       - CXX=arm-linux-gnueabihf-g++
     flags:
       - -mod=readonly
+      - -tags=timetzdata
     ldflags:
       - -s -w -X main.version={{.Version}}
   - id: windows-amd64
@@ -69,6 +73,7 @@ builds:
       - CXX=x86_64-w64-mingw32-g++
     flags:
       - -mod=readonly
+      - -tags=timetzdata
     ldflags:
       - -s -w -X main.version={{.Version}}
   - id: windows-arm64
@@ -83,6 +88,7 @@ builds:
       - CXX=/llvm-mingw/bin/aarch64-w64-mingw32-g++
     flags:
       - -mod=readonly
+      - -tags=timetzdata
     ldflags:
       - -s -w -X main.version={{.Version}}
 archives:

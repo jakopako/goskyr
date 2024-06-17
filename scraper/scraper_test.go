@@ -648,3 +648,196 @@ func TestExtractFieldDate29Feb(t *testing.T) {
 		t.Fatalf("expected '2024' as year of date but got '%d'", dt.Year())
 	}
 }
+
+func TestGuessYearSimple(t *testing.T) {
+	// items dates span period around change of year
+	s := &Scraper{
+		Fields: []Field{
+			{
+				Type:      "date",
+				GuessYear: true,
+				Name:      "date",
+			},
+		},
+	}
+	loc, _ := time.LoadLocation("CET")
+	items := []map[string]interface{}{
+		{
+			"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2023, 12, 24, 21, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2023, 1, 2, 20, 0, 0, 0, loc),
+		},
+	}
+	expectedItems := []map[string]interface{}{
+		{
+			"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2023, 12, 24, 21, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2024, 1, 2, 20, 0, 0, 0, loc),
+		},
+	}
+	s.guessYear(items, time.Date(2023, 11, 30, 20, 30, 0, 0, loc))
+	for i, d := range items {
+		if d["date"] != expectedItems[i]["date"] {
+			t.Fatalf("expected '%v' as year of date but got '%v'", expectedItems[i]["date"], d["date"])
+		}
+	}
+}
+
+func TestGuessYearUnordered(t *testing.T) {
+	// items dates are not perfectly ordered and span
+	// period around change of year
+	s := &Scraper{
+		Fields: []Field{
+			{
+				Type:      "date",
+				GuessYear: true,
+				Name:      "date",
+			},
+		},
+	}
+	loc, _ := time.LoadLocation("CET")
+	items := []map[string]interface{}{
+		{
+			"date": time.Date(2023, 11, 2, 20, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2023, 12, 14, 20, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2023, 12, 24, 21, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2023, 1, 2, 20, 0, 0, 0, loc),
+		},
+	}
+	expectedItems := []map[string]interface{}{
+		{
+			"date": time.Date(2023, 11, 2, 20, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2023, 12, 14, 20, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2023, 12, 24, 21, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2024, 1, 2, 20, 0, 0, 0, loc),
+		},
+	}
+	s.guessYear(items, time.Date(2023, 11, 1, 20, 30, 0, 0, loc))
+	for i, d := range items {
+		if d["date"] != expectedItems[i]["date"] {
+			t.Fatalf("expected '%v' as year of date but got '%v'", expectedItems[i]["date"], d["date"])
+		}
+	}
+}
+
+func TestGuessYear2Years(t *testing.T) {
+	// items dates span more than 2 years
+	s := &Scraper{
+		Fields: []Field{
+			{
+				Type:      "date",
+				GuessYear: true,
+				Name:      "date",
+			},
+		},
+	}
+	loc, _ := time.LoadLocation("CET")
+	items := []map[string]interface{}{
+		{
+			"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2023, 1, 14, 20, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2023, 5, 2, 20, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2023, 9, 24, 21, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2023, 2, 2, 20, 0, 0, 0, loc),
+		},
+	}
+	expectedItems := []map[string]interface{}{
+		{
+			"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2024, 1, 14, 20, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2024, 5, 2, 20, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2024, 9, 24, 21, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2025, 2, 2, 20, 0, 0, 0, loc),
+		},
+	}
+	s.guessYear(items, time.Date(2023, 11, 1, 20, 30, 0, 0, loc))
+	for i, d := range items {
+		if d["date"] != expectedItems[i]["date"] {
+			t.Fatalf("expected '%v' as year of date but got '%v'", expectedItems[i]["date"], d["date"])
+		}
+	}
+}
+
+func TestGuessYearStartBeforeReference(t *testing.T) {
+	// items date start before given reference
+	s := &Scraper{
+		Fields: []Field{
+			{
+				Type:      "date",
+				GuessYear: true,
+				Name:      "date",
+			},
+		},
+	}
+	loc, _ := time.LoadLocation("CET")
+	items := []map[string]interface{}{
+		{
+			"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2023, 12, 24, 21, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2023, 1, 2, 20, 0, 0, 0, loc),
+		},
+	}
+	expectedItems := []map[string]interface{}{
+		{
+			"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2023, 12, 24, 21, 30, 0, 0, loc),
+		},
+		{
+			"date": time.Date(2024, 1, 2, 20, 0, 0, 0, loc),
+		},
+	}
+	s.guessYear(items, time.Date(2024, 1, 30, 20, 30, 0, 0, loc))
+	for i, d := range items {
+		if d["date"] != expectedItems[i]["date"] {
+			t.Fatalf("expected '%v' as year of date but got '%v'", expectedItems[i]["date"], d["date"])
+		}
+	}
+}

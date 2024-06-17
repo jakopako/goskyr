@@ -370,6 +370,12 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 		}
 	}
 
+	c.GuessYear(items)
+
+	return items, nil
+}
+
+func (c *Scraper) GuessYear(items []map[string]interface{}) {
 	// get date field names where we need to adapt the year
 	dateFieldsGuessYear := map[string]bool{}
 	for _, f := range c.Fields {
@@ -384,46 +390,42 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 	// event websites mostly contain a list of events ordered by date. Sometimes the date does
 	// not contain the year. In that case we could simply set the year to the current year but
 	// it might happen that the list of events spans across more than one year into the next
-	// year. In that case we still want to set the correct year which would be current year + 1.
+	// year. In that case we still want to set the correct year which would be current year + n.
+	// Moreover, the list might not be ordered at all. In that case we also want to try to set
+	// the correct year.
 	if len(dateFieldsGuessYear) > 0 {
 		for i, item := range items {
 			for name, val := range item {
 				if dateFieldsGuessYear[name] {
 					if t, ok := val.(time.Time); ok {
-						now := time.Now()
-						yesterday := now.AddDate(0, 0, -1)
-						// we compare the date with yesterday, not now, to accomodate for the fact that at the time we scrape
-						// the event might have already taken place but not yet removed from the website. Let's see if 1 day
-						// is a reasonable margin.
-						if t.Before(yesterday) {
-							newT := time.Date(t.Year()+1, t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
-							item[name] = newT
-							continue
+
+						// for the first item we compare this item's date with 'now' and try
+						// to find the most suitable year, ie the year that brings this item's
+						// date closest to now.
+						// for the remaining items we do the same as with the first item except
+						// that we compare this item's date to the previous item's date instead
+						// of 'now'.
+						var prev time.Time
+						if i == 0 {
+							prev = time.Now()
+						} else {
+							prev, _ = items[i-1][name].(time.Time)
 						}
-						if i > 0 {
-							if prevT, ok := items[i-1][name].(time.Time); ok {
-								// here we do not compare the current date directly to the previous date. There
-								// are cases where we wouldn't want the year to be increased by one even though
-								// the previous date is bigger than the current one. Such cases occur when a
-								// website contains a list of items that are sorted by date but within a day are
-								// not sorted by time. To prevent the year from being increased wrongly in that
-								// case we introduce a min delta of 1 day.
-								tmpT := prevT.AddDate(0, 0, -1)
-								if t.Before(tmpT) {
-									// probably there is still a bug here when we have a list that spans two years
-									// changes..
-									newT := time.Date(t.Year()+1, t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
-									item[name] = newT
-								}
+						diff := time.Since(time.Unix(0, 0))
+						newDate := t
+						for y := prev.Year() - 1; y <= prev.Year()+1; y++ {
+							tmpT := time.Date(y, t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
+							if newDiff := tmpT.Sub(prev).Abs(); newDiff < diff {
+								diff = newDiff
+								newDate = time.Date(y, t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
 							}
 						}
+						item[name] = newDate
 					}
 				}
 			}
 		}
 	}
-
-	return items, nil
 }
 
 func (c *Scraper) initializeFilters() error {

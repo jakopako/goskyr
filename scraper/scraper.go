@@ -370,12 +370,12 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 		}
 	}
 
-	c.GuessYear(items)
+	c.guessYear(items, time.Now())
 
 	return items, nil
 }
 
-func (c *Scraper) GuessYear(items []map[string]interface{}) {
+func (c *Scraper) guessYear(items []map[string]interface{}, ref time.Time) {
 	// get date field names where we need to adapt the year
 	dateFieldsGuessYear := map[string]bool{}
 	for _, f := range c.Fields {
@@ -405,17 +405,14 @@ func (c *Scraper) GuessYear(items []map[string]interface{}) {
 						// for the remaining items we do the same as with the first item except
 						// that we compare this item's date to the previous item's date instead
 						// of 'now'.
-						var prev time.Time
-						if i == 0 {
-							prev = time.Now()
-						} else {
-							prev, _ = items[i-1][name].(time.Time)
+						if i > 0 {
+							ref, _ = items[i-1][name].(time.Time)
 						}
 						diff := time.Since(time.Unix(0, 0))
 						newDate := t
-						for y := prev.Year() - 1; y <= prev.Year()+1; y++ {
+						for y := ref.Year() - 1; y <= ref.Year()+1; y++ {
 							tmpT := time.Date(y, t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
-							if newDiff := tmpT.Sub(prev).Abs(); newDiff < diff {
+							if newDiff := tmpT.Sub(ref).Abs(); newDiff < diff {
 								diff = newDiff
 								newDate = time.Date(y, t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
 							}

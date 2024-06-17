@@ -648,3 +648,16 @@ func TestExtractFieldDate29Feb(t *testing.T) {
 		t.Fatalf("expected '2024' as year of date but got '%d'", dt.Year())
 	}
 }
+
+func TestGuessYearSimple(t *testing.T) {
+	// events span period around change of year
+
+}
+
+func TestGuessYearUnordered(t *testing.T) {
+	// events are not perfectly ordered
+}
+
+func TestGuessYear2Years(t *testing.T) {
+	// events span more than 2 years
+}

@@ -22,21 +22,11 @@
 1. [Build & Release](#build--release)
 1. [Contributing](#contributing)
 1. [Naming](#naming)
+1. [Similar Projects](#similar-projects)
 
-This project's goal is to make it easier to **scrape list-like structured data** from web pages.
-This could be a list of books from an online book store, a list of plays in a public theater, a list of newspaper articles, etc. Currently, the biggest use-case that I know of is [croncert](https://github.com/jakopako/croncert-config) which is also the main motivation behind this project.
+This project's goal is to make it easier to **scrape list-like structured data** from web pages. This could be a list of books from an online book store, a list of plays in a public theater, a list of newspaper articles, etc. Currently, the biggest use-case that I know of is [croncert](https://github.com/jakopako/croncert-config) which is also the main motivation behind this project.
 
-Since version 0.3.0 basic **js rendering** is supported. Additionally, next to [manually configuring](#manual-configuration--usage) the scraper there is an option of (semi-)automatically generating a configuration file, see [quick start](#quick-start) and [Semi-Automatic Configuration](#semi-automatic-configuration).
-
-Since version 0.4.0 **machine learning** can be leveraged to predict field names more or less accurately. For more details check out the sections [Semi-Automatic Configuration](#semi-automatic-configuration) and [Build ML Model for Improved Auto-Config](#build-ml-model-for-improved-auto-config).
-
-Note that there are already similar projects that might do a better job in certain cases or are more generic tools. However, on the one hand this is a personal project to make myself familiar with webscraping and Go and on the other hand goskyr supports certain features that I haven't found in any other projects. For instance, the way dates can be extracted from websites and the notion of scraping information from subpages defined by previously at runtime extracted urls.
-
-Similar projects:
-
-- [MontFerret/ferret](https://github.com/MontFerret/ferret)
-- [slotix/dataflowkit](https://github.com/slotix/dataflowkit)
-- [andrewstuart/goq](https://github.com/andrewstuart/goq)
+Next to [manually configuring](#manual-configuration--usage) the scraper there is an option of (semi-)automatically generating a configuration file, see [quick start](#quick-start) and [Semi-Automatic Configuration](#semi-automatic-configuration). **Machine learning** can be leveraged to predict field names more or less accurately, see section [Build ML Model for Improved Auto-Config](#build-ml-model-for-improved-auto-config).
 
 ## Quick Start
 
@@ -240,6 +230,7 @@ A dynamic field can have one of the following three types: `text`, `url` or `dat
 | components    |             |            |          X          | `[]`          |
 | date_language |             |            |          X          | `"de_DE"`     |
 | date_location |             |            |          X          | `"UTC"`       |
+| default       |      X      |     X      |                     | `""`          |
 | guess_year    |             |            |          X          | `false`       |
 | hide          |      X      |     X      |          X          | `false`       |
 | location      |      X      |     X      |                     | `[]`          |
@@ -305,9 +296,13 @@ The `date_language` needs to correspond to the language on the website. Note, th
 
 `date_location` sets the time zone of the respective date.
 
+**`default`**
+
+If no value is found on the website the field's value defaults to this `default`.
+
 **`guess_year`**
 
-If set to `false` and no date component is defined that covers the year, the year of the resulting date defaults to the current year. If set to `true` and no date component is defined that covers the year, goskyr will try to be 'smart' in guessing the year. This helps if a scraped list of dates covers more than one year and/or scraped dates are not within the current year but the next. Note that there are definitely more cases where this year guessing does not yet work.
+If set to `false` and no date component is defined that covers the year, the year of the resulting date defaults to the current year. If set to `true` and no date component is defined that covers the year, goskyr will try to be 'smart' in guessing the year. This helps if a scraped list of dates covers more than one year and/or scraped dates are not within the current year but the next. Note that there are definitely some cases where this year guessing does not yet work.
 
 **`hide`**
 
@@ -564,7 +559,7 @@ writer:
 
 ## Build ML Model for Improved Auto-Config
 
-In order for the auto configuration feature to find suitable names for the extracted fields, since `v0.4.0` machine learning can be used. Goskyr allows you to extract a fixed set of features based on an existing goskyr configuration. Basically, goskyr scrapes all the websites you configured, extracts the raw text values based on the configured fields per site and then calculates the features for each extracted value, labeling the resulting vector with the field name you defined in the configuration. Currently, all features are based on the extracted text only, ie not on the location within the website. Checkout the `Features` struct in the `ml/ml.go` file if you want to know what exactly those features are. Extraction command:
+In order for the auto configuration feature to find suitable names for the extracted fields, since `v0.4.0` machine learning can be used. Goskyr allows you to extract a fixed set of features based on an existing goskyr configuration. Basically, goskyr scrapes all the websites you configured, extracts the raw text values based on the configured fields per site and then calculates the features for each extracted value, labeling the resulting vector with the field name you defined in the configuration. Currently, all features are based on the extracted text only, i.e. not on the location within the website. Checkout the `Features` struct in the `ml/ml.go` file if you want to know what exactly those features are. Extraction command:
 
 ```bash
 goskyr -e features.csv -w word-lists -c some-goskyr-config.yml
@@ -587,11 +582,11 @@ A real life example can be found in the [jakopako/croncert-config](https://githu
 The main motivation to start this project was a website idea that I wanted to implement. Currently, there are four
 repositories involved in this idea. The first one is of course this one, goskyr. The other three are:
 
-- [croncert-web](https://github.com/jakopako/croncert-web): a website that shows concerts in your area, deployed to [croncert.ch](https://croncert.ch).
+- [croncert-web](https://github.com/jakopako/croncert-web): a website that shows concerts in your area, deployed to [concertcloud.live](https://concertcloud.live).
 - [croncert-config](https://github.com/jakopako/croncert-config): a repository that contains a big configuration file for
-  goskyr, where all the concert venue websites that are part of [croncert.ch](https://croncert.ch) are configured. If you're interested, check out this repository to find out how to add new concert locations and to make yourself more familiar with how to use goskyr.
+  goskyr, where all the concert venue websites that are part of [concertcloud.live](https://concertcloud.live) are configured. If you're interested, check out this repository to find out how to add new concert locations and to make yourself more familiar with how to use goskyr.
 - [event-api](https://github.com/jakopako/event-api): an API to store and fetch concert info, that serves as backend for
-  [croncert.ch](https://croncert.ch).
+  [concertcloud.live](https://concertcloud.live).
 
 ## Build & Release
 
@@ -629,3 +624,13 @@ Feel free to contribute in any way you want! Help is always welcome.
 ## Naming
 
 Go Scraper > Go Scr > Go Skyr > goskyr
+
+## Similar Projects
+
+There are similar projects that might do a better job in certain cases or are more generic tools. However, on the one hand this is a personal project to make myself familiar with webscraping and Go and on the other hand goskyr supports certain features that I haven't found in any other projects. For instance, the way dates can be extracted from websites, the notion of scraping information from subpages defined by previously at runtime extracted urls and how a website's structure can be automatically detected to decrease manual configuration effort.
+
+Similar projects:
+
+- [MontFerret/ferret](https://github.com/MontFerret/ferret)
+- [slotix/dataflowkit](https://github.com/slotix/dataflowkit)
+- [andrewstuart/goq](https://github.com/andrewstuart/goq)

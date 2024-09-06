@@ -1,16 +1,17 @@
 module github.com/jakopako/goskyr
 
 go 1.22
+toolchain go1.23.1
 
 require (
-	github.com/PuerkitoBio/goquery v1.9.2
+	github.com/PuerkitoBio/goquery v1.10.0
 	github.com/chromedp/cdproto v0.0.0-20240801214329-3f85d328b335
 	github.com/chromedp/chromedp v0.10.0
 	github.com/gdamore/tcell/v2 v2.7.4
 	github.com/goodsign/monday v1.0.2
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/rivo/tview v0.0.0-20231206124440-5f078138442e
-	golang.org/x/net v0.28.0
+	golang.org/x/net v0.29.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -49,8 +50,8 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
-	golang.org/x/sys v0.23.0 // indirect
-	golang.org/x/term v0.23.0 // indirect
-	golang.org/x/text v0.17.0 // indirect
+	golang.org/x/sys v0.25.0 // indirect
+	golang.org/x/term v0.24.0 // indirect
+	golang.org/x/text v0.18.0 // indirect
 	olympos.io/encoding/edn v0.0.0-20201019073823-d3554ca0b0a3 // indirect
 )

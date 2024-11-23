@@ -249,13 +249,24 @@ type Scraper struct {
 	fetcher      fetch.Fetcher
 }
 
-// GetItems fetches and returns all items from a website according to the
+type ScrapingStats struct {
+	Name     string
+	NrItems  int
+	NrErrors int
+}
+
+type ScrapingResult struct {
+	Items []map[string]interface{}
+	Stats *ScrapingStats
+}
+
+// Scrape fetches and returns all items from a website according to the
 // Scraper's paramaters. When rawDyn is set to true the items returned are
 // not processed according to their type but instead the raw values based
 // only on the location are returned (ignore regex_extract??). And only those
 // of dynamic fields, ie fields that don't have a predefined value and that are
 // present on the main page (not subpages). This is used by the ML feature generation.
-func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string]interface{}, error) {
+func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScrapingResult, error) {
 
 	scrLogger := slog.With(slog.String("name", c.Name))
 	// initialize fetcher
@@ -269,11 +280,16 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 		}
 	}
 
-	var items []map[string]interface{}
+	result := &ScrapingResult{
+		Items: []map[string]interface{}{},
+		Stats: &ScrapingStats{
+			Name: c.Name,
+		},
+	}
 
 	scrLogger.Debug("initializing filters")
 	if err := c.initializeFilters(); err != nil {
-		return items, err
+		return result, err
 	}
 
 	hasNextPage := true
@@ -282,7 +298,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 
 	hasNextPage, pageURL, doc, err := c.fetchPage(nil, currentPage, c.URL, globalConfig.UserAgent, c.Interaction)
 	if err != nil {
-		return items, err
+		return result, err
 	}
 
 	for hasNextPage {
@@ -306,6 +322,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 						}
 						if err != nil {
 							scrLogger.Error(fmt.Sprintf("error while parsing field %s: %v. Skipping item %v.", f.Name, err, currentItem))
+							result.Stats.NrErrors++
 							return
 						}
 					}
@@ -332,11 +349,13 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 							subRes, err := c.fetcher.Fetch(subpageURL, fetch.FetchOpts{})
 							if err != nil {
 								scrLogger.Error(fmt.Sprintf("%v. Skipping item %v.", err, currentItem))
+								result.Stats.NrErrors++
 								return
 							}
 							subDoc, err := goquery.NewDocumentFromReader(strings.NewReader(subRes))
 							if err != nil {
 								scrLogger.Error(fmt.Sprintf("error while reading document: %v. Skipping item %v", err, currentItem))
+								result.Stats.NrErrors++
 								return
 							}
 							subDocs[subpageURL] = subDoc
@@ -345,6 +364,7 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 						err = extractField(&f, currentItem, subDocs[subpageURL].Selection, baseURLSubpage)
 						if err != nil {
 							scrLogger.Error(fmt.Sprintf("error while parsing field %s: %v. Skipping item %v.", f.Name, err, currentItem))
+							result.Stats.NrErrors++
 							return
 						}
 						// filter fast!
@@ -359,20 +379,21 @@ func (c Scraper) GetItems(globalConfig *GlobalConfig, rawDyn bool) ([]map[string
 			filter := c.filterItem(currentItem)
 			if filter {
 				currentItem = c.removeHiddenFields(currentItem)
-				items = append(items, currentItem)
+				result.Items = append(result.Items, currentItem)
+				result.Stats.NrItems++
 			}
 		})
 
 		currentPage++
 		hasNextPage, pageURL, doc, err = c.fetchPage(doc, currentPage, pageURL, globalConfig.UserAgent, nil)
 		if err != nil {
-			return items, err
+			return result, err
 		}
 	}
 
-	c.guessYear(items, time.Now())
+	c.guessYear(result.Items, time.Now())
 
-	return items, nil
+	return result, nil
 }
 
 func (c *Scraper) guessYear(items []map[string]interface{}, ref time.Time) {

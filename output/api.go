@@ -72,7 +72,8 @@ func (f *APIWriter) Write(items chan map[string]interface{}) {
 		batch = append(batch, item)
 		if len(batch) == 100 {
 			if err := postBatch(client, batch, apiURL, apiUser, apiPassword); err != nil {
-				fmt.Printf("%v\n", err)
+				logger.Error(fmt.Sprintf("%v\n", err))
+				// fmt.Printf("%v\n", err)
 			} else {
 				nrItemsWritten = nrItemsWritten + 100
 			}

@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"runtime/debug"
+	"sort"
 	"sync"
 
 	"github.com/jakopako/goskyr/autoconfig"
@@ -19,22 +20,45 @@ import (
 
 var version = "dev"
 
-func worker(sc chan scraper.Scraper, ic chan map[string]interface{}, gc *scraper.GlobalConfig, threadNr int) {
+func worker(sc <-chan scraper.Scraper, ic chan<- map[string]interface{}, stc chan<- scraper.ScrapingStats, gc *scraper.GlobalConfig, threadNr int) {
 	workerLogger := slog.With(slog.Int("thread", threadNr))
 	for s := range sc {
 		scraperLogger := workerLogger.With(slog.String("name", s.Name))
 		scraperLogger.Info("starting scraping task")
-		items, err := s.GetItems(gc, false)
+		result, err := s.Scrape(gc, false)
 		if err != nil {
 			scraperLogger.Error(fmt.Sprintf("%s: %s", s.Name, err))
 			continue
 		}
-		scraperLogger.Info(fmt.Sprintf("fetched %d items", len(items)))
-		for _, item := range items {
+		scraperLogger.Info(fmt.Sprintf("fetched %d items", result.Stats.NrItems))
+		for _, item := range result.Items {
 			ic <- item
 		}
+		stc <- *result.Stats
 	}
 	workerLogger.Info("done working")
+}
+
+func collectAllStats(stc <-chan scraper.ScrapingStats) []scraper.ScrapingStats {
+	result := []scraper.ScrapingStats{}
+	for st := range stc {
+		result = append(result, st)
+	}
+	return result
+}
+
+func printAllStats(stats []scraper.ScrapingStats) {
+	// TODO: nicer format/layout, table format and colors depending on nrs, e.g. red for errors
+	statsString := ""
+	// sort by name alphabetically
+	sort.Slice(stats, func(i, j int) bool {
+		return stats[i].Name < stats[j].Name
+	})
+	for _, s := range stats {
+		statsString += fmt.Sprintf("name: %s, items: %d, errors: %d\n", s.Name, s.NrItems, s.NrErrors)
+	}
+	// TODO add total of everything
+	fmt.Println(statsString)
 }
 
 func main() {
@@ -143,6 +167,7 @@ func main() {
 
 	var workerWg sync.WaitGroup
 	var writerWg sync.WaitGroup
+	var statsWg sync.WaitGroup
 	ic := make(chan map[string]interface{})
 
 	var writer output.Writer
@@ -167,6 +192,7 @@ func main() {
 	}
 
 	sc := make(chan scraper.Scraper)
+	stc := make(chan scraper.ScrapingStats)
 
 	// fill worker queue
 	go func() {
@@ -190,7 +216,7 @@ func main() {
 	for i := 0; i < nrWorkers; i++ {
 		go func(j int) {
 			defer workerWg.Done()
-			worker(sc, ic, &config.Global, j)
+			worker(sc, ic, stc, &config.Global, j)
 		}(i)
 	}
 
@@ -201,7 +227,20 @@ func main() {
 		defer writerWg.Done()
 		writer.Write(ic)
 	}()
+
+	// start stats collection
+	statsWg.Add(1)
+	slog.Debug("starting stats collection")
+	go func() {
+		defer statsWg.Done()
+		allStats := collectAllStats(stc)
+		writerWg.Wait() // only print stats in the end
+		printAllStats(allStats)
+	}()
+
 	workerWg.Wait()
 	close(ic)
+	close(stc)
 	writerWg.Wait()
+	statsWg.Wait()
 }

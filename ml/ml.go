@@ -138,12 +138,12 @@ func writeFeaturesToFile(filename string, featuresChan <-chan *Features, wg *syn
 func calculateScraperFeatures(s scraper.Scraper, featuresChan chan<- *Features, wordMap map[string]bool, globalConfig *scraper.GlobalConfig, wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Printf("calculating features for %s\n", s.Name)
-	items, err := s.GetItems(globalConfig, true)
+	result, err := s.Scrape(globalConfig, true)
 	if err != nil {
 		log.Printf("%s ERROR: %s", s.Name, err)
 		return
 	}
-	for _, item := range items {
+	for _, item := range result.Items {
 		for fName, fValue := range item {
 			fValueString := fValue.(string)
 			f := calculateFeatures(fName, fValueString, wordMap)

@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime/debug"
 	"sort"
+	"strconv"
 	"sync"
 
 	"github.com/jakopako/goskyr/autoconfig"
@@ -15,6 +16,7 @@ import (
 	"github.com/jakopako/goskyr/ml"
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/scraper"
+	"github.com/olekukonko/tablewriter"
 	"gopkg.in/yaml.v3"
 )
 
@@ -48,17 +50,35 @@ func collectAllStats(stc <-chan scraper.ScrapingStats) []scraper.ScrapingStats {
 }
 
 func printAllStats(stats []scraper.ScrapingStats) {
-	// TODO: nicer format/layout, table format and colors depending on nrs, e.g. red for errors
-	statsString := ""
+	slog.Info("printing scraper summary")
 	// sort by name alphabetically
 	sort.Slice(stats, func(i, j int) bool {
 		return stats[i].Name < stats[j].Name
 	})
-	for _, s := range stats {
-		statsString += fmt.Sprintf("name: %s, items: %d, errors: %d\n", s.Name, s.NrItems, s.NrErrors)
+
+	total := scraper.ScrapingStats{
+		Name: "total",
 	}
-	// TODO add total of everything
-	fmt.Println(statsString)
+
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Name", "Items", "Errors"})
+
+	for _, s := range stats {
+		row := []string{s.Name, strconv.Itoa(s.NrItems), strconv.Itoa(s.NrErrors)}
+		if s.NrErrors > 0 {
+			table.Rich(row, []tablewriter.Colors{{tablewriter.Normal, tablewriter.FgRedColor}, {tablewriter.Normal, tablewriter.FgRedColor}, {tablewriter.Normal, tablewriter.FgRedColor}})
+		} else if s.NrErrors == 0 && s.NrItems == 0 {
+			table.Rich(row, []tablewriter.Colors{{tablewriter.Normal, tablewriter.FgYellowColor}, {tablewriter.Normal, tablewriter.FgYellowColor}, {tablewriter.Normal, tablewriter.FgYellowColor}})
+		} else {
+			table.Append(row)
+		}
+		total.NrErrors += s.NrErrors
+		total.NrItems += s.NrItems
+	}
+	table.SetFooter([]string{total.Name, strconv.Itoa(total.NrItems), strconv.Itoa(total.NrErrors)})
+	table.SetColumnAlignment([]int{tablewriter.ALIGN_LEFT, tablewriter.ALIGN_RIGHT, tablewriter.ALIGN_RIGHT})
+	table.SetBorder(false)
+	table.Render()
 }
 
 func main() {
@@ -75,6 +95,7 @@ func main() {
 	buildModel := flag.String("t", "", "Train a ML model based on the given csv features file. This will generate 2 files, goskyr.model and goskyr.class")
 	modelPath := flag.String("model", "", "Use a pre-trained ML model to infer names of extracted fields. Works in combination with the -g flag.")
 	debugFlag := flag.Bool("debug", false, "Prints debug logs and writes scraped html's to files.")
+	summaryFlag := flag.Bool("summary", false, "Print scraper summary at the end.")
 
 	flag.Parse()
 
@@ -235,7 +256,12 @@ func main() {
 		defer statsWg.Done()
 		allStats := collectAllStats(stc)
 		writerWg.Wait() // only print stats in the end
-		printAllStats(allStats)
+		// a bit ugly to just check here and do the collection
+		// of the stats even though they might not be needed.
+		// But this is easier for now, coding-wise.
+		if *summaryFlag {
+			printAllStats(allStats)
+		}
 	}()
 
 	workerWg.Wait()

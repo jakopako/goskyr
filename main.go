@@ -7,6 +7,8 @@ import (
 	"math"
 	"os"
 	"runtime/debug"
+	"sort"
+	"strconv"
 	"sync"
 
 	"github.com/jakopako/goskyr/autoconfig"
@@ -14,27 +16,69 @@ import (
 	"github.com/jakopako/goskyr/ml"
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/scraper"
+	"github.com/olekukonko/tablewriter"
 	"gopkg.in/yaml.v3"
 )
 
 var version = "dev"
 
-func worker(sc chan scraper.Scraper, ic chan map[string]interface{}, gc *scraper.GlobalConfig, threadNr int) {
+func worker(sc <-chan scraper.Scraper, ic chan<- map[string]interface{}, stc chan<- scraper.ScrapingStats, gc *scraper.GlobalConfig, threadNr int) {
 	workerLogger := slog.With(slog.Int("thread", threadNr))
 	for s := range sc {
 		scraperLogger := workerLogger.With(slog.String("name", s.Name))
 		scraperLogger.Info("starting scraping task")
-		items, err := s.GetItems(gc, false)
+		result, err := s.Scrape(gc, false)
 		if err != nil {
 			scraperLogger.Error(fmt.Sprintf("%s: %s", s.Name, err))
 			continue
 		}
-		scraperLogger.Info(fmt.Sprintf("fetched %d items", len(items)))
-		for _, item := range items {
+		scraperLogger.Info(fmt.Sprintf("fetched %d items", result.Stats.NrItems))
+		for _, item := range result.Items {
 			ic <- item
 		}
+		stc <- *result.Stats
 	}
 	workerLogger.Info("done working")
+}
+
+func collectAllStats(stc <-chan scraper.ScrapingStats) []scraper.ScrapingStats {
+	result := []scraper.ScrapingStats{}
+	for st := range stc {
+		result = append(result, st)
+	}
+	return result
+}
+
+func printAllStats(stats []scraper.ScrapingStats) {
+	slog.Info("printing scraper summary")
+	// sort by name alphabetically
+	sort.Slice(stats, func(i, j int) bool {
+		return stats[i].Name < stats[j].Name
+	})
+
+	total := scraper.ScrapingStats{
+		Name: "total",
+	}
+
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Name", "Items", "Errors"})
+
+	for _, s := range stats {
+		row := []string{s.Name, strconv.Itoa(s.NrItems), strconv.Itoa(s.NrErrors)}
+		if s.NrErrors > 0 {
+			table.Rich(row, []tablewriter.Colors{{tablewriter.Normal, tablewriter.FgRedColor}, {tablewriter.Normal, tablewriter.FgRedColor}, {tablewriter.Normal, tablewriter.FgRedColor}})
+		} else if s.NrErrors == 0 && s.NrItems == 0 {
+			table.Rich(row, []tablewriter.Colors{{tablewriter.Normal, tablewriter.FgYellowColor}, {tablewriter.Normal, tablewriter.FgYellowColor}, {tablewriter.Normal, tablewriter.FgYellowColor}})
+		} else {
+			table.Append(row)
+		}
+		total.NrErrors += s.NrErrors
+		total.NrItems += s.NrItems
+	}
+	table.SetFooter([]string{total.Name, strconv.Itoa(total.NrItems), strconv.Itoa(total.NrErrors)})
+	table.SetColumnAlignment([]int{tablewriter.ALIGN_LEFT, tablewriter.ALIGN_RIGHT, tablewriter.ALIGN_RIGHT})
+	table.SetBorder(false)
+	table.Render()
 }
 
 func main() {
@@ -51,6 +95,7 @@ func main() {
 	buildModel := flag.String("t", "", "Train a ML model based on the given csv features file. This will generate 2 files, goskyr.model and goskyr.class")
 	modelPath := flag.String("model", "", "Use a pre-trained ML model to infer names of extracted fields. Works in combination with the -g flag.")
 	debugFlag := flag.Bool("debug", false, "Prints debug logs and writes scraped html's to files.")
+	summaryFlag := flag.Bool("summary", false, "Print scraper summary at the end.")
 
 	flag.Parse()
 
@@ -143,6 +188,7 @@ func main() {
 
 	var workerWg sync.WaitGroup
 	var writerWg sync.WaitGroup
+	var statsWg sync.WaitGroup
 	ic := make(chan map[string]interface{})
 
 	var writer output.Writer
@@ -167,6 +213,7 @@ func main() {
 	}
 
 	sc := make(chan scraper.Scraper)
+	stc := make(chan scraper.ScrapingStats)
 
 	// fill worker queue
 	go func() {
@@ -190,7 +237,7 @@ func main() {
 	for i := 0; i < nrWorkers; i++ {
 		go func(j int) {
 			defer workerWg.Done()
-			worker(sc, ic, &config.Global, j)
+			worker(sc, ic, stc, &config.Global, j)
 		}(i)
 	}
 
@@ -201,7 +248,25 @@ func main() {
 		defer writerWg.Done()
 		writer.Write(ic)
 	}()
+
+	// start stats collection
+	statsWg.Add(1)
+	slog.Debug("starting stats collection")
+	go func() {
+		defer statsWg.Done()
+		allStats := collectAllStats(stc)
+		writerWg.Wait() // only print stats in the end
+		// a bit ugly to just check here and do the collection
+		// of the stats even though they might not be needed.
+		// But this is easier for now, coding-wise.
+		if *summaryFlag {
+			printAllStats(allStats)
+		}
+	}()
+
 	workerWg.Wait()
 	close(ic)
+	close(stc)
 	writerWg.Wait()
+	statsWg.Wait()
 }

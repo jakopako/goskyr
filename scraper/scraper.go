@@ -466,10 +466,12 @@ func (c *Scraper) initializeFilters() error {
 
 func (c *Scraper) filterItem(item map[string]interface{}) bool {
 	nrMatchTrue := 0
+	foundFields := 0
 	filterMatchTrue := false
 	filterMatchFalse := true
 	for _, f := range c.Filters {
 		if fieldValue, found := item[f.Field]; found {
+			foundFields++
 			if f.Match {
 				nrMatchTrue++
 				if f.FilterMatch(fieldValue) {
@@ -484,6 +486,14 @@ func (c *Scraper) filterItem(item map[string]interface{}) bool {
 	}
 	if nrMatchTrue == 0 {
 		filterMatchTrue = true
+	}
+	// if foundFields < len(c.Filters) that means that we did not get the full item
+	// with _all_ fields as input to this function and hence we only want
+	// to return false if we are _sure_ that this item should not be part
+	// of the final results. And we are only sure if we have a 'match: false'
+	// match, i.e. filterMatchFalse has been set to false
+	if foundFields < len(c.Filters) {
+		return filterMatchFalse
 	}
 	return filterMatchTrue && filterMatchFalse
 }

@@ -296,7 +296,7 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScrapingResul
 	currentPage := 0
 	var doc *goquery.Document
 
-	hasNextPage, pageURL, doc, err := c.fetchPage(nil, currentPage, c.URL, globalConfig.UserAgent, c.Interaction)
+	hasNextPage, pageURL, doc, err := c.fetchPage(nil, currentPage, c.URL, c.Interaction)
 	if err != nil {
 		return result, err
 	}
@@ -385,7 +385,7 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScrapingResul
 		})
 
 		currentPage++
-		hasNextPage, pageURL, doc, err = c.fetchPage(doc, currentPage, pageURL, globalConfig.UserAgent, nil)
+		hasNextPage, pageURL, doc, err = c.fetchPage(doc, currentPage, pageURL, nil)
 		if err != nil {
 			return result, err
 		}
@@ -507,8 +507,7 @@ func (c *Scraper) removeHiddenFields(item map[string]interface{}) map[string]int
 	return item
 }
 
-func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl, userAgent string, i []*types.Interaction) (bool, string, *goquery.Document, error) {
-
+func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl string, i []*types.Interaction) (bool, string, *goquery.Document, error) {
 	if nextPageI == 0 {
 		newDoc, err := c.fetchToDoc(currentPageUrl, fetch.FetchOpts{Interaction: i})
 		if err != nil {

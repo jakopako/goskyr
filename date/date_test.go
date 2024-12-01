@@ -510,3 +510,35 @@ func TestGetDateFormat17(t *testing.T) {
 		}
 	}
 }
+
+func TestGetDateFormat18(t *testing.T) {
+	dateFormats := []formatTestStruct{
+		{
+			input:        "Mi. 04/12/2024",
+			coveredParts: CoveredDateParts{Day: true, Month: true, Year: true},
+			formatString: "Mon. 2/1/2006",
+			language:     "de_DE",
+		},
+		{
+			input:        "Sa. 07/12/2024",
+			coveredParts: CoveredDateParts{Day: true, Month: true, Year: true},
+			formatString: "Mon. 2/1/2006",
+			language:     "de_DE",
+		},
+		{
+			input:        "Sa. 18/01/2024",
+			coveredParts: CoveredDateParts{Day: true, Month: true, Year: true},
+			formatString: "Mon. 2/1/2006",
+			language:     "de_DE",
+		},
+	}
+	for _, df := range dateFormats {
+		f, l := GetDateFormat(df.input, df.coveredParts)
+		if f != df.formatString {
+			log.Fatalf("expected %s but got %s", df.formatString, f)
+		}
+		if l != df.language {
+			log.Fatalf("expected date language %s but got %s", df.language, l)
+		}
+	}
+}

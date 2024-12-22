@@ -10,7 +10,7 @@ require (
 	github.com/goodsign/monday v1.0.2
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/rivo/tview v0.0.0-20241103174730-c76f7879f592
-	golang.org/x/net v0.32.0
+	golang.org/x/net v0.33.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

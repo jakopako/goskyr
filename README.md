@@ -230,10 +230,9 @@ A dynamic field can have one of the following three types: `text`, `url` or `dat
 | components    |             |            |          X          | `[]`          |
 | date_language |             |            |          X          | `"de_DE"`     |
 | date_location |             |            |          X          | `"UTC"`       |
-| default       |      X      |     X      |                     | `""`          |
 | guess_year    |             |            |          X          | `false`       |
 | hide          |      X      |     X      |          X          | `false`       |
-| location      |      X      |     X      |                     | `[]`          |
+| location      |      X      |     X      | X (date components) | `[]`          |
 | name          |      X      |     X      |          X          | `""`          |
 | on_subpage    |      X      |     X      |          X          | `""`          |
 | separator     |      X      |            |                     | `""`          |
@@ -296,10 +295,6 @@ The `date_language` needs to correspond to the language on the website. Note, th
 
 `date_location` sets the time zone of the respective date.
 
-**`default`**
-
-If no value is found on the website the field's value defaults to this `default`.
-
 **`guess_year`**
 
 If set to `false` and no date component is defined that covers the year, the year of the resulting date defaults to the current year. If set to `true` and no date component is defined that covers the year, goskyr will try to be 'smart' in guessing the year. This helps if a scraped list of dates covers more than one year and/or scraped dates are not within the current year but the next. Note that there are definitely some cases where this year guessing does not yet work.
@@ -341,9 +336,10 @@ fields:
       regex_extract:
         exp: "[^•]*"
         index: 0
+        ignore_errors: false # default is false
 ```
 
-This field is implicitly of type `text`. The `location` tells the scraper where to look for the field value and how to extract it. In this case the selector on its own would not be enough to extract the desired value as we would get something like this: `Bastian Baker • Konzert`. That's why there is an extra option to define a regular expression to extract a substring. Note that in this example our extracted string would still contain a trailing space which is automatically removed by the scraper. Let's have a look at a few more examples to have a better understanding of the location configuration.
+This field is implicitly of type `text`. The `location` tells the scraper where to look for the field value and how to extract it. In this case the selector on its own would not be enough to extract the desired value as we would get something like this: `Bastian Baker • Konzert`. That's why there is an extra option to define a regular expression to extract a substring. Note that in this example our extracted string would still contain a trailing space which is automatically removed by the scraper. Moreover, if `ignore_errors` is set to true, the scraper would not skip the given field throwing an error but would return an empty string instead. Let's have a look at a few more examples to have a better understanding of the location configuration.
 
 _Subkey: `child_index`_
 
@@ -422,6 +418,10 @@ To get an even better feeling for the location configuration check out the numer
 _Subkey: `json_selector`_
 
 If the string extracted from the webpage is a json string, then you can extract data from that json based on the give `json_selector`.
+
+_Subkey: `default`_
+
+If no value is found with the given configuration of this `location` the value defaults to `default`.
 
 **`name`**
 

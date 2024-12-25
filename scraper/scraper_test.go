@@ -91,6 +91,13 @@ const (
 			<span>29.02.</span><span>Heinz Rudolf Kunze &amp; Verstärkung
 				&#8211; ABGESAGT</span> </a>
 	</h2>`
+	htmlString7 = `                                        
+	<h2>
+		<a href="../site/event/id/165"
+			title="Heinz Rudolf Kunze &amp; Verstärkung &#8211; ABGESAGT">
+			<span>20.02.</span><span>Heinz Rudolf Kunze &amp; Verstärkung
+				&#8211; ABGESAGT</span> </a>
+	</h2>`
 )
 
 func TestFilterItemMatchTrue(t *testing.T) {
@@ -636,6 +643,17 @@ func TestExtractFieldDate29Feb(t *testing.T) {
 					"02.01.",
 				},
 			},
+			{
+				Covers: date.CoveredDateParts{
+					Time: true,
+				},
+				ElementLocation: ElementLocation{
+					Default: "19:30",
+				},
+				Layout: []string{
+					"15:04",
+				},
+			},
 		},
 		DateLocation: "Europe/Berlin",
 		GuessYear:    true,
@@ -839,5 +857,147 @@ func TestGuessYearStartBeforeReference(t *testing.T) {
 		if d["date"] != expectedItems[i]["date"] {
 			t.Fatalf("expected '%v' as year of date but got '%v'", expectedItems[i]["date"], d["date"])
 		}
+	}
+}
+
+func TestDefaultTextValue(t *testing.T) {
+	d := "default text"
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString5))
+	if err != nil {
+		t.Fatalf("unexpected error while reading html string: %v", err)
+	}
+	l := &ElementLocation{
+		Selector: ".non-existent",
+		Default:  d,
+	}
+	v, err := getTextString(l, doc.Selection)
+	if err != nil {
+		t.Fatalf("unexpected error while extracting the element: %v", err)
+	}
+	if v != d {
+		t.Fatalf("expected '%s' but got '%s'", d, v)
+	}
+}
+
+func TestDefaultTextValueExistentValue(t *testing.T) {
+	d := "default text"
+	e := "Treffpunkt"
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString4))
+	if err != nil {
+		t.Fatalf("unexpected error while reading html string: %v", err)
+	}
+	l := &ElementLocation{
+		Selector: "div > a > div",
+		Default:  d,
+	}
+	v, err := getTextString(l, doc.Selection)
+	if err != nil {
+		t.Fatalf("unexpected error while extracting the element: %v", err)
+	}
+	if v != e {
+		t.Fatalf("expected '%s' but got '%s'", e, v)
+	}
+}
+
+func TestDefaultValueDateComponentNonExistent(t *testing.T) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString7))
+	if err != nil {
+		t.Fatalf("unexpected error while reading html string: %v", err)
+	}
+	f := &Field{
+		Name: "date",
+		Type: "date",
+		Components: []DateComponent{
+			{
+				Covers: date.CoveredDateParts{
+					Day:   true,
+					Month: true,
+				},
+				ElementLocation: ElementLocation{
+					Selector: "h2 > a > span",
+				},
+				Layout: []string{
+					"02.01.",
+				},
+			},
+			{
+				Covers: date.CoveredDateParts{
+					Time: true,
+				},
+				ElementLocation: ElementLocation{
+					Selector: ".non-existent",
+					Default:  "19:30",
+				},
+				Layout: []string{
+					"15:04",
+				},
+			},
+		},
+		DateLocation: "Europe/Berlin",
+		GuessYear:    true,
+	}
+	dt, err := getDate(f, doc.Selection, dateDefaults{})
+	if err != nil {
+		t.Fatalf("unexpected error while extracting the date field: %v", err)
+	}
+	if dt.Hour() != 19 {
+		t.Fatalf("expected hour to be %d but got %d", 19, dt.Hour())
+	}
+	if dt.Minute() != 30 {
+		t.Fatalf("expected minute to be %d but got %d", 30, dt.Minute())
+	}
+}
+
+func TestDefaultValueDateComponentRegexExtractError(t *testing.T) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString7))
+	if err != nil {
+		t.Fatalf("unexpected error while reading html string: %v", err)
+	}
+	f := &Field{
+		Name: "date",
+		Type: "date",
+		Components: []DateComponent{
+			{
+				Covers: date.CoveredDateParts{
+					Day:   true,
+					Month: true,
+				},
+				ElementLocation: ElementLocation{
+					Selector: "h2 > a > span",
+					Default:  "1. April",
+					RegexExtract: RegexConfig{
+						RegexPattern: "[A-Z]{20}", // non-matching regex
+						IgnoreErrors: true,        // will make sure the selector returns an empty string in case of an error in which case we default to the given default
+					},
+				},
+				Layout: []string{
+					"2. January",
+				},
+			},
+			{
+				Covers: date.CoveredDateParts{
+					Time: true,
+				},
+				ElementLocation: ElementLocation{
+					Selector: ".non-existent",
+					Default:  "19:30",
+				},
+				Layout: []string{
+					"15:04",
+				},
+			},
+		},
+		DateLocation: "Europe/Berlin",
+		GuessYear:    true,
+	}
+	dt, err := getDate(f, doc.Selection, dateDefaults{})
+	if err != nil {
+		t.Fatalf("unexpected error while extracting the date field: %v", err)
+	}
+	if dt.Day() != 1 {
+		t.Fatalf("expected day to be %d but got %d", 1, dt.Day())
+	}
+	if dt.Month() != 4 {
+		t.Fatalf("expected month to be %d but got %d", 4, dt.Month())
 	}
 }

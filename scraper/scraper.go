@@ -86,6 +86,7 @@ func NewConfig(configPath string) (*Config, error) {
 type RegexConfig struct {
 	RegexPattern string `yaml:"exp"`
 	Index        int    `yaml:"index"`
+	IgnoreErrors bool   `yaml:"ignore_errors"`
 }
 
 // ElementLocation is used to find a specific string in a html document
@@ -99,6 +100,7 @@ type ElementLocation struct {
 	EntireSubtree bool        `yaml:"entire_subtree,omitempty"`
 	AllNodes      bool        `yaml:"all_nodes,omitempty"`
 	Separator     string      `yaml:"separator,omitempty"`
+	Default       string      `yaml:"default,omitempty"`
 }
 
 // TransformConfig is used to replace an existing substring with some other
@@ -126,7 +128,6 @@ type Field struct {
 	Value            string           `yaml:"value,omitempty"`
 	Type             string           `yaml:"type,omitempty"`     // can currently be text, url or date
 	ElementLocations ElementLocations `yaml:"location,omitempty"` // elements are extracted strings joined using the given Separator
-	Default          string           `yaml:"default,omitempty"`  // the default for a dynamic field (text or url) if no value is found
 	Separator        string           `yaml:"separator,omitempty"`
 	// If a field can be found on a subpage the following variable has to contain a field name of
 	// a field of type 'url' that is located on the main page.
@@ -608,13 +609,8 @@ func extractField(field *Field, event map[string]interface{}, s *goquery.Selecti
 			}
 		}
 		t := strings.Join(parts, field.Separator)
-		if t == "" {
-			// if the extracted value is an empty string assign the default value
-			t = field.Default
-			if !field.CanBeEmpty && t == "" {
-				// if it's still empty and must not be empty return an error
-				return fmt.Errorf("field %s cannot be empty", field.Name)
-			}
+		if !field.CanBeEmpty && t == "" {
+			return fmt.Errorf("field %s cannot be empty", field.Name)
 		}
 		// transform the string if required
 		for _, tr := range field.Transform {
@@ -633,13 +629,8 @@ func extractField(field *Field, event map[string]interface{}, s *goquery.Selecti
 		if err != nil {
 			return err
 		}
-		if url == "" {
-			// if the extracted value is an empty string assign the default value
-			url = field.Default
-			if !field.CanBeEmpty && url == "" {
-				// if it's still empty and must not be empty return an error
-				return fmt.Errorf("field %s cannot be empty", field.Name)
-			}
+		if !field.CanBeEmpty && url == "" {
+			return fmt.Errorf("field %s cannot be empty", field.Name)
 		}
 		event[field.Name] = url
 	case "date":
@@ -707,9 +698,10 @@ type datePart struct {
 	layoutParts []string
 }
 
+// not very nice because we only need this
+// to be able to test deterministically
 type dateDefaults struct {
-	year int
-	time string // should be format 15:04
+	year int // format: 2006
 }
 
 func getDate(f *Field, s *goquery.Selection, dd dateDefaults) (time.Time, error) {
@@ -757,11 +749,12 @@ func getDate(f *Field, s *goquery.Selection, dd dateDefaults) (time.Time, error)
 	}
 
 	// currently not all date parts have default values
-	if !combinedParts.Day || !combinedParts.Month {
-		return t, errors.New("date parsing error: to generate a date at least a day and a month is needed")
+	if !combinedParts.Day || !combinedParts.Month || !combinedParts.Time {
+		return t, errors.New("date parsing error: to generate a date at least a time, a day and a month are needed")
 	}
 
-	// adding default values where necessary
+	// year is special in the sense that it defaults to the current year
+	// if nothing is specified
 	if !combinedParts.Year {
 		if dd.year == 0 {
 			dd.year = time.Now().Year()
@@ -769,15 +762,6 @@ func getDate(f *Field, s *goquery.Selection, dd dateDefaults) (time.Time, error)
 		dateParts = append(dateParts, datePart{
 			stringPart:  strconv.Itoa(dd.year),
 			layoutParts: []string{"2006"},
-		})
-	}
-	if !combinedParts.Time {
-		if dd.time == "" {
-			dd.time = "20:00"
-		}
-		dateParts = append(dateParts, datePart{
-			stringPart:  dd.time,
-			layoutParts: []string{"15:04"},
 		})
 	}
 
@@ -987,7 +971,12 @@ func getTextString(e *ElementLocation, s *goquery.Selection) (string, error) {
 	for i, f := range fieldStrings {
 		fieldStrings[i] = utils.ShortenString(f, e.MaxLength)
 	}
-	return strings.Join(fieldStrings, e.Separator), nil
+	finalString := strings.Join(fieldStrings, e.Separator)
+
+	if finalString == "" && e.Default != "" {
+		return e.Default, nil
+	}
+	return finalString, nil
 }
 
 func extractStringRegex(rc *RegexConfig, s string) (string, error) {
@@ -998,18 +987,25 @@ func extractStringRegex(rc *RegexConfig, s string) (string, error) {
 			return "", err
 		}
 		matchingStrings := regex.FindAllString(s, -1)
+		errMsg := ""
 		if len(matchingStrings) == 0 {
-			msg := fmt.Sprintf("no matching strings found for regex: %s", rc.RegexPattern)
-			return "", errors.New(msg)
-		}
-		if rc.Index == -1 {
+			errMsg = fmt.Sprintf("no matching strings found for regex: %s", rc.RegexPattern)
+		} else if rc.Index == -1 {
 			extractedString = matchingStrings[len(matchingStrings)-1]
 		} else {
 			if rc.Index >= len(matchingStrings) {
-				msg := fmt.Sprintf("regex index out of bounds. regex '%s' gave only %d matches", rc.RegexPattern, len(matchingStrings))
-				return "", errors.New(msg)
+				errMsg = fmt.Sprintf("regex index out of bounds. regex '%s' gave only %d matches", rc.RegexPattern, len(matchingStrings))
+			} else {
+				extractedString = matchingStrings[rc.Index]
 			}
-			extractedString = matchingStrings[rc.Index]
+		}
+		if errMsg != "" {
+			if rc.IgnoreErrors {
+				slog.Info(fmt.Sprintf("ignoring regex error: %s", errMsg))
+				return "", nil
+			} else {
+				return "", errors.New(errMsg)
+			}
 		}
 	}
 	return extractedString, nil

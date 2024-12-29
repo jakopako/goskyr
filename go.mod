@@ -3,7 +3,7 @@ module github.com/jakopako/goskyr
 go 1.23
 
 require (
-	github.com/PuerkitoBio/goquery v1.10.0
+	github.com/PuerkitoBio/goquery v1.10.1
 	github.com/chromedp/cdproto v0.0.0-20241110205750-a72e6703cd9b
 	github.com/chromedp/chromedp v0.11.2
 	github.com/gdamore/tcell/v2 v2.7.4
@@ -37,7 +37,7 @@ require (
 require (
 	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/agnivade/levenshtein v1.2.0
-	github.com/andybalholm/cascadia v1.3.2 // indirect
+	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/gdamore/encoding v1.0.1 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect

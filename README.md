@@ -58,6 +58,16 @@ Note that the feature to (semi-)automatically generate a configuration file is c
 
 ## Installation
 
+### Arch Linux
+
+[goskyr](https://aur.archlinux.org/packages/goskyr) is available as a package in the AUR. Install it with your favorite AUR helper (eg. `yay`):
+
+```bash
+yay -S goskyr
+```
+
+### Other
+
 [Download](https://github.com/jakopako/goskyr/releases/latest) a prebuilt binary from the [releases page](https://github.com/jakopako/goskyr/releases), unpack and run!
 
 Or if you have recent go compiler installed download goskyr by running

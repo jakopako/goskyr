@@ -28,7 +28,7 @@ func NewAPIWriter(wc *WriterConfig) *APIWriter {
 func (f *APIWriter) Write(items chan map[string]interface{}) {
 	logger := slog.With(slog.String("writer", API_WRITER_TYPE))
 	client := &http.Client{
-		Timeout: time.Second * 10,
+		Timeout: time.Second * 60,
 	}
 	apiURL := f.writerConfig.Uri
 	apiUser := f.writerConfig.User

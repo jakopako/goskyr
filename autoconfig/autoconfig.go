@@ -402,13 +402,22 @@ func checkAndUpdateLocProps(old, new *locationProps) bool {
 						continue
 					}
 					ovClasses := utils.IntersectionSlices(on.classes, new.path[i].classes)
-					// if nodes have more than 0 classes there has to be at least 1 overlapping class
-					// does this make sense?
 					if len(ovClasses) > 0 {
-						newNode.classes = ovClasses
-						newPath = append(newPath, newNode)
-						continue
+						if i > old.iStrip {
+							// if we're past iStrip we only consider nodes equal if they have the same classes
+							if len(ovClasses) == len(on.classes) {
+								newNode.classes = on.classes
+								newPath = append(newPath, newNode)
+								continue
+							}
+						} else {
+							// if nodes have more than 0 classes and we're not past iStrip there has to be at least 1 overlapping class
+							newNode.classes = ovClasses
+							newPath = append(newPath, newNode)
+							continue
+						}
 					}
+					// }
 				}
 			}
 			return false

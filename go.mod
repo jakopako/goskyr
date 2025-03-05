@@ -1,7 +1,6 @@
 module github.com/jakopako/goskyr
 
 go 1.23
-
 require (
 	github.com/PuerkitoBio/goquery v1.10.2
 	github.com/chromedp/cdproto v0.0.0-20250222051814-50c6cb17f10a
@@ -10,7 +9,7 @@ require (
 	github.com/goodsign/monday v1.0.2
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/rivo/tview v0.0.0-20241103174730-c76f7879f592
-	golang.org/x/net v0.35.0
+	golang.org/x/net v0.36.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

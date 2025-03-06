@@ -1,7 +1,6 @@
 module github.com/jakopako/goskyr
 
 go 1.23
-
 require (
 	github.com/PuerkitoBio/goquery v1.10.2
 	github.com/chromedp/cdproto v0.0.0-20250222051814-50c6cb17f10a
@@ -10,7 +9,7 @@ require (
 	github.com/goodsign/monday v1.0.2
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/rivo/tview v0.0.0-20241103174730-c76f7879f592
-	golang.org/x/net v0.35.0
+	golang.org/x/net v0.37.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -31,7 +30,7 @@ require (
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/guptarohit/asciigraph v0.7.3 // indirect
 	github.com/rocketlaunchr/dataframe-go v0.0.0-20211025052708-a1030444159b // indirect
-	golang.org/x/sync v0.11.0 // indirect
+	golang.org/x/sync v0.12.0 // indirect
 	gonum.org/v1/gonum v0.15.1 // indirect
 )
 
@@ -48,8 +47,8 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	golang.org/x/sys v0.30.0 // indirect
-	golang.org/x/term v0.29.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/term v0.30.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
 	olympos.io/encoding/edn v0.0.0-20201019073823-d3554ca0b0a3 // indirect
 )

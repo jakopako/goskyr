@@ -4,8 +4,8 @@ go 1.23
 
 require (
 	github.com/PuerkitoBio/goquery v1.10.2
-	github.com/chromedp/cdproto v0.0.0-20250401205909-91afd104e2b8
-	github.com/chromedp/chromedp v0.13.5
+	github.com/chromedp/cdproto v0.0.0-20250403032234-65de8f5d025b
+	github.com/chromedp/chromedp v0.13.6
 	github.com/gdamore/tcell/v2 v2.8.1
 	github.com/goodsign/monday v1.0.2
 	github.com/ilyakaznacheev/cleanenv v1.5.0

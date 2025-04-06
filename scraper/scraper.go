@@ -733,6 +733,10 @@ func getDate(f *Field, s *goquery.Selection, dd dateDefaults) (time.Time, error)
 				}
 			}
 			if sp != "" {
+				if c.Layout == nil {
+					// layout needs to be set
+					return t, fmt.Errorf("date parsing error: a date component of field '%s' has no layout set", f.Name)
+				}
 				dateParts = append(dateParts, datePart{
 					stringPart:  sp,
 					layoutParts: c.Layout,

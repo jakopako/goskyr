@@ -30,7 +30,7 @@ Next to [manually configuring](#manual-configuration--usage) the scraper there i
 
 ## Quick Start
 
-https://user-images.githubusercontent.com/26999089/210244250-09a11b64-0981-40d1-8f81-9fbb00e17164.mp4
+<https://user-images.githubusercontent.com/26999089/210244250-09a11b64-0981-40d1-8f81-9fbb00e17164.mp4>
 
 To reproduce what happens above [install goskyr](#installation) and then run the following steps:
 

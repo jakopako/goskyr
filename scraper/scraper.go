@@ -173,7 +173,7 @@ type Filter struct {
 	Match      bool `yaml:"match"`
 }
 
-func (f *Filter) FilterMatch(value interface{}) bool {
+func (f *Filter) FilterMatch(value any) bool {
 	switch f.Type {
 	case "regex":
 		return f.RegexComp.MatchString(fmt.Sprint(value))
@@ -257,7 +257,7 @@ type ScrapingStats struct {
 }
 
 type ScrapingResult struct {
-	Items []map[string]interface{}
+	Items []map[string]any
 	Stats *ScrapingStats
 }
 
@@ -282,7 +282,7 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScrapingResul
 	}
 
 	result := &ScrapingResult{
-		Items: []map[string]interface{}{},
+		Items: []map[string]any{},
 		Stats: &ScrapingStats{
 			Name: c.Name,
 		},
@@ -305,7 +305,7 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScrapingResul
 	for hasNextPage {
 		baseUrl := getBaseURL(pageURL, doc)
 		doc.Find(c.Item).Each(func(i int, s *goquery.Selection) {
-			currentItem := make(map[string]interface{})
+			currentItem := make(map[string]any)
 			for _, f := range c.Fields {
 				if f.Value != "" {
 					if !rawDyn {
@@ -347,15 +347,9 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScrapingResul
 						subpageURL := fmt.Sprint(currentItem[f.OnSubpage])
 						_, found := subDocs[subpageURL]
 						if !found {
-							subRes, err := c.fetcher.Fetch(subpageURL, fetch.FetchOpts{})
+							subDoc, err := c.fetchToDoc(subpageURL, fetch.FetchOpts{})
 							if err != nil {
 								scrLogger.Error(fmt.Sprintf("%v. Skipping item %v.", err, currentItem))
-								result.Stats.NrErrors++
-								return
-							}
-							subDoc, err := goquery.NewDocumentFromReader(strings.NewReader(subRes))
-							if err != nil {
-								scrLogger.Error(fmt.Sprintf("error while reading document: %v. Skipping item %v", err, currentItem))
 								result.Stats.NrErrors++
 								return
 							}
@@ -397,7 +391,7 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScrapingResul
 	return result, nil
 }
 
-func (c *Scraper) guessYear(items []map[string]interface{}, ref time.Time) {
+func (c *Scraper) guessYear(items []map[string]any, ref time.Time) {
 	// get date field names where we need to adapt the year
 	dateFieldsGuessYear := map[string]bool{}
 	for _, f := range c.Fields {
@@ -465,7 +459,7 @@ func (c *Scraper) initializeFilters() error {
 	return nil
 }
 
-func (c *Scraper) filterItem(item map[string]interface{}) bool {
+func (c *Scraper) filterItem(item map[string]any) bool {
 	nrMatchTrue := 0
 	foundFields := 0
 	filterMatchTrue := false
@@ -499,7 +493,7 @@ func (c *Scraper) filterItem(item map[string]interface{}) bool {
 	return filterMatchTrue && filterMatchFalse
 }
 
-func (c *Scraper) removeHiddenFields(item map[string]interface{}) map[string]interface{} {
+func (c *Scraper) removeHiddenFields(item map[string]any) map[string]any {
 	for _, f := range c.Fields {
 		if f.Hide {
 			delete(item, f.Name)
@@ -595,7 +589,7 @@ func (c *Scraper) fetchToDoc(urlStr string, opts fetch.FetchOpts) (*goquery.Docu
 	return doc, nil
 }
 
-func extractField(field *Field, event map[string]interface{}, s *goquery.Selection, baseURL string) error {
+func extractField(field *Field, event map[string]any, s *goquery.Selection, baseURL string) error {
 	switch field.Type {
 	case "text", "": // the default, ie when type is not configured, is 'text'
 		parts := []string{}
@@ -645,7 +639,7 @@ func extractField(field *Field, event map[string]interface{}, s *goquery.Selecti
 	return nil
 }
 
-func extractRawField(field *Field, event map[string]interface{}, s *goquery.Selection) error {
+func extractRawField(field *Field, event map[string]any, s *goquery.Selection) error {
 	switch field.Type {
 	case "text", "":
 		parts := []string{}

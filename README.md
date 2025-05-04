@@ -530,7 +530,7 @@ interaction:
   - type: click # for now only click is supported.
     selector: .some > div.selector
     count: 1 # number of clicks. Default is 1
-    delay: 2000 # milliseconds that the scraper waits after each click. Default is 1000
+    delay: 2000 # milliseconds that the scraper waits after each click. Default is 500
 ```
 
 Note that these clicks are executed before the data is scraped. Also the interaction configuration will be ignored if `render_js` is not set to `true` because only in that case is the website actually run within a headless browser.

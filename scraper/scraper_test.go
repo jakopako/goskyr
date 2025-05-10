@@ -658,12 +658,12 @@ func TestExtractFieldDate29Feb(t *testing.T) {
 		DateLocation: "Europe/Berlin",
 		GuessYear:    true,
 	}
-	dt, err := getDate(f, doc.Selection, dateDefaults{year: 2023})
+	dt, err := getDates(f, doc.Selection, dateDefaults{year: 2023})
 	if err != nil {
 		t.Fatalf("unexpected error while extracting the date field: %v", err)
 	}
-	if dt.Year() != 2024 {
-		t.Fatalf("expected '2024' as year of date but got '%d'", dt.Year())
+	if dt[0].Year() != 2024 {
+		t.Fatalf("expected '2024' as year of date but got '%d'", dt[0].Year())
 	}
 }
 
@@ -936,15 +936,15 @@ func TestDefaultValueDateComponentNonExistent(t *testing.T) {
 		DateLocation: "Europe/Berlin",
 		GuessYear:    true,
 	}
-	dt, err := getDate(f, doc.Selection, dateDefaults{})
+	dt, err := getDates(f, doc.Selection, dateDefaults{})
 	if err != nil {
 		t.Fatalf("unexpected error while extracting the date field: %v", err)
 	}
-	if dt.Hour() != 19 {
-		t.Fatalf("expected hour to be %d but got %d", 19, dt.Hour())
+	if dt[0].Hour() != 19 {
+		t.Fatalf("expected hour to be %d but got %d", 19, dt[0].Hour())
 	}
-	if dt.Minute() != 30 {
-		t.Fatalf("expected minute to be %d but got %d", 30, dt.Minute())
+	if dt[0].Minute() != 30 {
+		t.Fatalf("expected minute to be %d but got %d", 30, dt[0].Minute())
 	}
 }
 
@@ -990,14 +990,14 @@ func TestDefaultValueDateComponentRegexExtractError(t *testing.T) {
 		DateLocation: "Europe/Berlin",
 		GuessYear:    true,
 	}
-	dt, err := getDate(f, doc.Selection, dateDefaults{})
+	dt, err := getDates(f, doc.Selection, dateDefaults{})
 	if err != nil {
 		t.Fatalf("unexpected error while extracting the date field: %v", err)
 	}
-	if dt.Day() != 1 {
-		t.Fatalf("expected day to be %d but got %d", 1, dt.Day())
+	if dt[0].Day() != 1 {
+		t.Fatalf("expected day to be %d but got %d", 1, dt[0].Day())
 	}
-	if dt.Month() != 4 {
-		t.Fatalf("expected month to be %d but got %d", 4, dt.Month())
+	if dt[0].Month() != 4 {
+		t.Fatalf("expected month to be %d but got %d", 4, dt[0].Month())
 	}
 }

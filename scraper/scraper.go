@@ -628,7 +628,7 @@ func extractField(field *Field, event map[string]any, s *goquery.Selection, base
 		}
 		event[field.Name] = url
 	case "date":
-		d, err := getDate(field, s, dateDefaults{})
+		d, err := getDates(field, s, dateDefaults{})
 		if err != nil {
 			return err
 		}
@@ -698,9 +698,10 @@ type dateDefaults struct {
 	year int // format: 2006
 }
 
-func getDate(f *Field, s *goquery.Selection, dd dateDefaults) (time.Time, error) {
+func getDates(f *Field, s *goquery.Selection, dd dateDefaults) ([]time.Time, error) {
 	// time zone
-	var t time.Time
+	var t []time.Time
+	var dateCount int = 0
 	loc, err := time.LoadLocation(f.DateLocation)
 	if err != nil {
 		return t, err
@@ -713,87 +714,108 @@ func getDate(f *Field, s *goquery.Selection, dd dateDefaults) (time.Time, error)
 	}
 
 	// collect all the date parts
-	dateParts := []datePart{}
-	combinedParts := date.CoveredDateParts{}
+	dateParts := [][]datePart{}
+	allCombinedParts := []date.CoveredDateParts{}
 	for _, c := range f.Components {
-		if !date.HasAllDateParts(combinedParts) {
-			if err := date.CheckForDoubleDateParts(c.Covers, combinedParts); err != nil {
-				return t, err
-			}
-			sp, err := getTextString(&c.ElementLocation, s)
+		if len(allCombinedParts) == 0 || !date.HasAllDateParts(allCombinedParts[dateCount-1]) {
+			// if err := date.CheckForDoubleDateParts(c.Covers, allCombinedParts[dateCount]); err != nil {
+			// 	return t, err
+			// }
+			sp, err := getTextStrings(&c.ElementLocation, s)
 			if err != nil {
 				return t, err
 			}
 			for _, tr := range c.Transform {
-				sp, err = transformString(&tr, sp)
-				// we have to return the error here instead of after the loop
-				// otherwise errors might be overwritten and hence ignored.
-				if err != nil {
-					return t, err
+				for _, str := range sp {
+					str, err = transformString(&tr, str)
+					// we have to return the error here instead of after the loop
+					// otherwise errors might be overwritten and hence ignored.
+					if err != nil {
+						return t, err
+					}
 				}
 			}
-			if sp != "" {
+			if len(sp) > 0 {
 				if c.Layout == nil {
 					// layout needs to be set
 					return t, fmt.Errorf("date parsing error: a date component of field '%s' has no layout set", f.Name)
 				}
-				dateParts = append(dateParts, datePart{
-					stringPart:  sp,
-					layoutParts: c.Layout,
-				})
-				combinedParts = date.MergeDateParts(combinedParts, c.Covers)
-			}
-		}
-	}
+				for index, str := range sp {
+					if(len(allCombinedParts) > index)  {
+						dateParts[index] = append(dateParts[index], datePart{
+							stringPart:  str,
+							layoutParts: c.Layout,
+						})
+						allCombinedParts[index] = date.MergeDateParts(allCombinedParts[index], c.Covers)
+					} else {
+						// dP := []datePart{}
+						// dP = append(dP, datePart{
+						// 	stringPart:  str,
+						// 	layoutParts: c.Layout,
+						// })
+						dateParts = append(dateParts, append([]datePart{}, datePart{
+							stringPart:  str,
+							layoutParts: c.Layout,
+						}))
 
-	// currently not all date parts have default values
-	if !combinedParts.Day || !combinedParts.Month || !combinedParts.Time {
-		return t, errors.New("date parsing error: to generate a date at least a time, a day and a month are needed")
-	}
-
-	// year is special in the sense that it defaults to the current year
-	// if nothing is specified
-	if !combinedParts.Year {
-		if dd.year == 0 {
-			dd.year = time.Now().Year()
-		}
-		dateParts = append(dateParts, datePart{
-			stringPart:  strconv.Itoa(dd.year),
-			layoutParts: []string{"2006"},
-		})
-	}
-
-	var dateTimeString string
-	dateTimeLayouts := []string{""}
-	for _, dp := range dateParts {
-		tmpDateTimeLayouts := dateTimeLayouts
-		dateTimeLayouts = []string{}
-		for _, tlp := range tmpDateTimeLayouts {
-			for _, lp := range dp.layoutParts {
-				dateTimeLayouts = append(dateTimeLayouts, tlp+lp+" ")
-			}
-		}
-		dateTimeString += dp.stringPart + " "
-	}
-
-	for _, dateTimeLayout := range dateTimeLayouts {
-		t, err = monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
-		if err == nil {
-			return t, nil
-		} else if !combinedParts.Year && f.GuessYear {
-			// edge case, parsing time "29.02. 20:00 2023 ": day out of range
-			// We set the year to the current year but it should actually be 2024
-			// We only update the year string in case guess_year is set to true
-			// to not confuse the user too much
-			if strings.HasSuffix(err.Error(), "day out of range") && strings.Contains(err.Error(), "29") {
-				for i := 1; i < 4; i++ {
-					dateTimeString = strings.Replace(dateTimeString, strconv.Itoa(dd.year), strconv.Itoa(dd.year+i), 1)
-					t, err = monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
-					if err == nil {
-						return t, nil
+						allCombinedParts = append(allCombinedParts, date.MergeDateParts(date.CoveredDateParts{}, c.Covers))
+						dateCount++
 					}
 				}
 			}
+		}
+	}
+
+	for index, combinedParts := range allCombinedParts {
+		// currently not all date parts have default values
+		if !combinedParts.Day || !combinedParts.Month || !combinedParts.Time {
+			return t, errors.New("date parsing error: to generate a date at least a time, a day and a month are needed")
+		}
+
+		// year is special in the sense that it defaults to the current year
+		// if nothing is specified
+		if !combinedParts.Year {
+			if dd.year == 0 {
+				dd.year = time.Now().Year()
+			}
+			dateParts[index] = append(dateParts[index], datePart{
+				stringPart:  strconv.Itoa(dd.year),
+				layoutParts: []string{"2006"},
+			})
+		}
+
+		var dateTimeString string
+		dateTimeLayouts := []string{""}
+		for _, dp := range dateParts[index] {
+			tmpDateTimeLayouts := dateTimeLayouts
+			dateTimeLayouts = []string{}
+			for _, tlp := range tmpDateTimeLayouts {
+				for _, lp := range dp.layoutParts {
+					dateTimeLayouts = append(dateTimeLayouts, tlp+lp+" ")
+				}
+			}
+			dateTimeString += dp.stringPart + " "
+		}
+
+		for _, dateTimeLayout := range dateTimeLayouts {
+			var tTmp time.Time
+			tTmp, err = monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
+			if err != nil  && !combinedParts.Year && f.GuessYear {
+				// edge case, parsing time "29.02. 20:00 2023 ": day out of range
+				// We set the year to the current year but it should actually be 2024
+				// We only update the year string in case guess_year is set to true
+				// to not confuse the user too much
+				if strings.HasSuffix(err.Error(), "day out of range") && strings.Contains(err.Error(), "29") {
+					for i := 1; i < 4; i++ {
+						dateTimeString = strings.Replace(dateTimeString, strconv.Itoa(dd.year), strconv.Itoa(dd.year+i), 1)
+						tTmp, err = monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
+						if err == nil {
+							return t, nil
+						}
+					}
+				}
+			}
+			t = append(t, tTmp)
 		}
 	}
 	return t, err
@@ -872,7 +894,7 @@ func getURLString(e *ElementLocation, s *goquery.Selection, baseURL string) (str
 	return urlRes, nil
 }
 
-func getTextString(e *ElementLocation, s *goquery.Selection) (string, error) {
+func getTextStrings(e *ElementLocation, s *goquery.Selection) ([]string, error) {
 	var fieldStrings []string
 	var fieldSelection *goquery.Selection
 	if e.Selector == "" {
@@ -948,7 +970,7 @@ func getTextString(e *ElementLocation, s *goquery.Selection) (string, error) {
 	for i, f := range fieldStrings {
 		fieldString, err := extractJsonField(e.JsonSelector, f)
 		if err != nil {
-			return "", err
+			return []string{}, err
 		}
 		fieldStrings[i] = fieldString
 	}
@@ -956,7 +978,7 @@ func getTextString(e *ElementLocation, s *goquery.Selection) (string, error) {
 	for i, f := range fieldStrings {
 		fieldString, err := extractStringRegex(&e.RegexExtract, f)
 		if err != nil {
-			return "", err
+			return []string{}, err
 		}
 		fieldStrings[i] = fieldString
 	}
@@ -969,11 +991,21 @@ func getTextString(e *ElementLocation, s *goquery.Selection) (string, error) {
 	for i, f := range fieldStrings {
 		fieldStrings[i] = utils.ShortenString(f, e.MaxLength)
 	}
+
+	return fieldStrings, nil
+}
+func getTextString(e *ElementLocation, s *goquery.Selection) (string, error) {
+	fieldStrings, err := getTextStrings(e, s)
+	if err != nil {
+		return "", nil
+	}
+	
 	finalString := strings.Join(fieldStrings, e.Separator)
 
 	if finalString == "" && e.Default != "" {
 		return e.Default, nil
 	}
+
 	return finalString, nil
 }
 

@@ -22,7 +22,7 @@ import (
 
 var version = "dev"
 
-func worker(sc <-chan scraper.Scraper, ic chan<- map[string]interface{}, stc chan<- scraper.ScrapingStats, gc *scraper.GlobalConfig, threadNr int) {
+func worker(sc <-chan scraper.Scraper, ic chan<- map[string]any, stc chan<- scraper.ScrapingStats, gc *scraper.GlobalConfig, threadNr int) {
 	workerLogger := slog.With(slog.Int("thread", threadNr))
 	for s := range sc {
 		scraperLogger := workerLogger.With(slog.String("name", s.Name))
@@ -96,6 +96,7 @@ func main() {
 	modelPath := flag.String("model", "", "Use a pre-trained ML model to infer names of extracted fields. Works in combination with the -g flag.")
 	debugFlag := flag.Bool("debug", false, "Prints debug logs and writes scraped html's to files.")
 	summaryFlag := flag.Bool("summary", false, "Print scraper summary at the end.")
+	dryRunFlag := flag.Bool("dryrun", false, "If set to true, the writer will just do a dry run (currently only has an effect on the api writer). Useful for testing purposes.")
 
 	flag.Parse()
 
@@ -189,12 +190,15 @@ func main() {
 	var workerWg sync.WaitGroup
 	var writerWg sync.WaitGroup
 	var statsWg sync.WaitGroup
-	ic := make(chan map[string]interface{})
+	ic := make(chan map[string]any)
 
 	var writer output.Writer
 	if *toStdout {
 		writer = &output.StdoutWriter{}
 	} else {
+		if *dryRunFlag {
+			config.Writer.DryRun = true
+		}
 		switch config.Writer.Type {
 		case output.STDOUT_WRITER_TYPE:
 			writer = &output.StdoutWriter{}
@@ -217,12 +221,19 @@ func main() {
 
 	// fill worker queue
 	go func() {
+		queuedScrapers := 0
 		for _, s := range config.Scrapers {
 			if *singleScraper == "" || *singleScraper == s.Name {
 				// s.Debug = *debugFlag
 				sc <- s
+				queuedScrapers++
 			}
 		}
+		if queuedScrapers == 0 {
+			slog.Error(fmt.Sprintf("no scrapers found for name %s", *singleScraper))
+			os.Exit(1)
+		}
+		slog.Info(fmt.Sprintf("queued %d scrapers", queuedScrapers))
 		close(sc)
 	}()
 
@@ -234,7 +245,7 @@ func main() {
 	slog.Info(fmt.Sprintf("running with %d threads", nrWorkers))
 	workerWg.Add(nrWorkers)
 	slog.Debug("starting workers")
-	for i := 0; i < nrWorkers; i++ {
+	for i := range nrWorkers {
 		go func(j int) {
 			defer workerWg.Done()
 			worker(sc, ic, stc, &config.Global, j)

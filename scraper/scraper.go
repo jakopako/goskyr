@@ -421,6 +421,8 @@ func (c *Scraper) guessYear(items []map[string]any, ref time.Time) {
 						// for the remaining items we do the same as with the first item except
 						// that we compare this item's date to the previous item's date instead
 						// of 'now'.
+						// Obviously, this is still far from perfect and it only works in a certain
+						// number of cases.
 						if i > 0 {
 							ref, _ = items[i-1][name].(time.Time)
 						}

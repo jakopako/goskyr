@@ -56,16 +56,18 @@ func (f *APIWriter) Write(items chan map[string]any) {
 				req, _ := http.NewRequest("DELETE", deleteURL, nil)
 				req.SetBasicAuth(f.writerConfig.User, f.writerConfig.Password)
 				resp, err := client.Do(req)
+				// the following errors are considered fatal. If they occur we assume that there's something fundamentally wrong.
 				if err != nil {
 					f.logger.Error(fmt.Sprintf("error while deleting items from the api: %v\n", err))
-					continue
+					os.Exit(1)
 				}
 				if resp.StatusCode != 200 {
 					body, err := io.ReadAll(resp.Body)
 					if err != nil {
 						f.logger.Error(fmt.Sprintf("%v", err))
+					} else {
+						f.logger.Error(fmt.Sprintf("error while deleting items. Status Code: %d\nUrl: %s Response: %s\n", resp.StatusCode, deleteURL, body))
 					}
-					f.logger.Error(fmt.Sprintf("error while deleting items. Status Code: %d\nUrl: %s Response: %s\n", resp.StatusCode, deleteURL, body))
 					os.Exit(1)
 				}
 				resp.Body.Close()

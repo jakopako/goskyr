@@ -9,7 +9,7 @@ import (
 
 type StdoutWriter struct{}
 
-func (s *StdoutWriter) Write(items chan map[string]interface{}) {
+func (s *StdoutWriter) Write(items chan map[string]any) {
 	logger := slog.With(slog.String("writer", STDOUT_WRITER_TYPE))
 	for item := range items {
 		// We cannot use the following line of code because it automatically replaces certain html characters

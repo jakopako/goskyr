@@ -30,9 +30,15 @@ type node struct {
 func (n node) string() string {
 	nodeString := n.tagName
 	for _, cl := range n.classes {
+		// escape special characters
 		// https://www.itsupportguides.com/knowledge-base/website-tips/css-colon-in-id/
 		cl = strings.ReplaceAll(cl, ":", "\\:")
 		cl = strings.ReplaceAll(cl, ">", "\\>")
+		cl = strings.ReplaceAll(cl, "[", "\\[")
+		cl = strings.ReplaceAll(cl, "]", "\\]")
+		cl = strings.ReplaceAll(cl, "/", "\\/")
+		cl = strings.ReplaceAll(cl, "!", "\\!")
+		cl = strings.ReplaceAll(cl, "%", "\\%")
 		// https://stackoverflow.com/questions/45293534/css-class-starting-with-number-is-not-getting-applied
 		if unicode.IsDigit(rune(cl[0])) {
 			cl = fmt.Sprintf(`\3%s `, string(cl[1:]))

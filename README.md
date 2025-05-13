@@ -246,7 +246,7 @@ A dynamic field can have one of the following three types: `text`, `url` or `dat
 | name          |      X      |     X      |          X          | `""`          |
 | on_subpage    |      X      |     X      |          X          | `""`          |
 | separator     |      X      |            |                     | `""`          |
-| transform     |      X      |            | X (date components) | `[]`          |
+| transform     |      X      |     X      | X (date components) | `[]`          |
 | type          |      X      |     X      |          X          | `"text"`      |
 
 #### Options explained
@@ -447,7 +447,7 @@ This option is only relevant if the `location` option contains a list of locatio
 
 **`transform`**
 
-This option allows you to transform extracted text and date components. Currently, the only transform type is `regex-replace`. As the name suggests, this type allows you to replace a substring that matches the given regular expression with a user defined string. An example usage of this option would be as follows.
+This option allows you to transform extracted text, urls and date components. Currently, the only transform type is `regex-replace`. As the name suggests, this type allows you to replace a substring that matches the given regular expression with a user defined string. An example usage of this option would be as follows.
 
 ```yaml
 - name: title

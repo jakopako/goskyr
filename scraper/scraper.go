@@ -608,6 +608,7 @@ func extractField(field *Field, event map[string]any, s *goquery.Selection, base
 		if !field.CanBeEmpty && t == "" {
 			return fmt.Errorf("field %s cannot be empty", field.Name)
 		}
+
 		// transform the string if required
 		for _, tr := range field.Transform {
 			var err error
@@ -616,6 +617,7 @@ func extractField(field *Field, event map[string]any, s *goquery.Selection, base
 				return err
 			}
 		}
+
 		event[field.Name] = t
 	case "url":
 		if len(field.ElementLocations) != 1 {
@@ -628,12 +630,23 @@ func extractField(field *Field, event map[string]any, s *goquery.Selection, base
 		if !field.CanBeEmpty && url == "" {
 			return fmt.Errorf("field %s cannot be empty", field.Name)
 		}
+
+		// transform the url if required
+		for _, tr := range field.Transform {
+			var err error
+			url, err = transformString(&tr, url)
+			if err != nil {
+				return err
+			}
+		}
+
 		event[field.Name] = url
 	case "date":
 		d, err := getDate(field, s, dateDefaults{})
 		if err != nil {
 			return err
 		}
+
 		event[field.Name] = d
 	default:
 		return fmt.Errorf("field type '%s' does not exist", field.Type)

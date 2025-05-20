@@ -1,6 +1,7 @@
 package scraper
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -100,426 +101,406 @@ const (
 	</h2>`
 )
 
-func TestFilterItemMatchTrue(t *testing.T) {
-	item := map[string]interface{}{"title": "Jacob Collier - Concert"}
-	s := &Scraper{
-		Fields: []Field{
-			{
-				Name: "title",
-			},
-		},
-		Filters: []*Filter{
-			{
-				Field:      "title",
-				Expression: ".*Concert",
-				Match:      true,
-			},
-		},
-	}
-	err := s.initializeFilters()
-	if err != nil {
-		t.Fatalf("got unexpected error: %v", err)
-	}
-	f := s.filterItem(item)
-	if !f {
-		t.Fatalf("expected 'true' but got 'false'")
-	}
-}
-
-func TestFilterItemMatchFalse(t *testing.T) {
-	item := map[string]interface{}{"title": "Jacob Collier - Cancelled"}
-	s := &Scraper{
-		Fields: []Field{
-			{
-				Name: "title",
-			},
-		},
-		Filters: []*Filter{
-			{
-				Field:      "title",
-				Expression: ".*Cancelled",
-				Match:      false,
-			},
-		},
-	}
-	err := s.initializeFilters()
-	if err != nil {
-		t.Fatalf("got unexpected error: %v", err)
-	}
-	f := s.filterItem(item)
-	if f {
-		t.Fatalf("expected 'false' but got 'true'")
-	}
-}
-
-func TestFilterItemByDateMatchTrue(t *testing.T) {
+func TestFilters(t *testing.T) {
+	// prep
 	loc, _ := time.LoadLocation("UTC")
-	item := map[string]interface{}{"date": time.Date(2023, 10, 20, 19, 1, 0, 0, loc)}
-	s := &Scraper{
-		Fields: []Field{
-			{
-				Name: "date",
-				Type: "date",
-			},
-		},
-		Filters: []*Filter{
-			{
-				Field:      "date",
-				Expression: "> 2023-10-20T19:00",
-				Match:      true,
-			},
-		},
-	}
-	err := s.initializeFilters()
-	if err != nil {
-		t.Fatalf("got unexpected error: %v", err)
-	}
-	f := s.filterItem(item)
-	if !f {
-		t.Fatalf("expected 'true' but got 'false'")
-	}
-}
 
-func TestFilterItemByDateMatchTrue2(t *testing.T) {
-	loc, _ := time.LoadLocation("UTC")
-	item := map[string]interface{}{"date": time.Date(2023, 10, 20, 19, 0, 0, 0, loc)}
-	s := &Scraper{
-		Fields: []Field{
-			{
-				Name: "date",
-				Type: "date",
-			},
-		},
-		Filters: []*Filter{
-			{
-				Field:      "date",
-				Expression: "> 2023-10-20T19:00",
-				Match:      true,
-			},
-		},
-	}
-	err := s.initializeFilters()
-	if err != nil {
-		t.Fatalf("got unexpected error: %v", err)
-	}
-	f := s.filterItem(item)
-	if f {
-		t.Fatalf("expected 'false' but got 'true'")
-	}
-}
-
-func TestFilterItemByDateMatchFalse(t *testing.T) {
-	loc, _ := time.LoadLocation("UTC")
-	item := map[string]interface{}{"date": time.Date(2023, 10, 20, 19, 1, 0, 0, loc)}
-	s := &Scraper{
-		Fields: []Field{
-			{
-				Name: "date",
-				Type: "date",
-			},
-		},
-		Filters: []*Filter{
-			{
-				Field:      "date",
-				Expression: "> 2023-10-20T19:00",
-				Match:      false,
-			},
-		},
-	}
-	err := s.initializeFilters()
-	if err != nil {
-		t.Fatalf("got unexpected error: %v", err)
-	}
-	f := s.filterItem(item)
-	if f {
-		t.Fatalf("expected 'false' but got 'true'")
-	}
-}
-
-func TestRemoveHiddenFields(t *testing.T) {
-	s := &Scraper{
-		Fields: []Field{
-			{
-				Name: "hidden",
-				Hide: true,
-			},
-			{
-				Name: "visible",
-				Hide: false,
-			},
-		},
-	}
-	item := map[string]interface{}{"hidden": "bli", "visible": "bla"}
-	r := s.removeHiddenFields(item)
-	if _, ok := r["hidden"]; ok {
-		t.Fatal("the field 'hidden' should have been removed from the item")
-	}
-	if _, ok := r["visible"]; !ok {
-		t.Fatal("the field 'visible' should not have been removed from the item")
-	}
-}
-
-func TestExtractFieldText(t *testing.T) {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString))
-	if err != nil {
-		t.Fatalf("unexpected error while reading html string: %v", err)
-	}
-	f := &Field{
-		Name: "title",
-		ElementLocations: []ElementLocation{
-			{
-				Selector: ".artist-name",
-			},
-		},
-	}
-	event := map[string]interface{}{}
-	err = extractField(f, event, doc.Selection, "")
-	if err != nil {
-		t.Fatalf("unexpected error while extracting the text field: %v", err)
-	}
-	if v, ok := event["title"]; !ok {
-		t.Fatal("event doesn't contain the expected title field")
-	} else {
-		expected := "Final Story"
-		if v != expected {
-			t.Fatalf("expected '%s' for title but got '%s'", expected, v)
-		}
-	}
-}
-
-func TestExtractFieldTextEntireSubtree(t *testing.T) {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString))
-	if err != nil {
-		t.Fatalf("unexpected error while reading html string: %v", err)
-	}
-	f := &Field{
-		Name: "title",
-		ElementLocations: []ElementLocation{
-			{
-				Selector:      ".artist-teaser",
-				EntireSubtree: true,
-			},
-		},
-	}
-	event := map[string]interface{}{}
-	err = extractField(f, event, doc.Selection, "")
-	if err != nil {
-		t.Fatalf("unexpected error while extracting the text field: %v", err)
-	}
-	if v, ok := event["title"]; !ok {
-		t.Fatal("event doesn't contain the expected title field")
-	} else {
-		expected := `Final Story
-                                                    Aargau`
-		if v != expected {
-			t.Fatalf("expected '%s' for title but got '%s'", expected, v)
-		}
-	}
-}
-
-func TestExtractFieldTextAllNodes(t *testing.T) {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString))
-	if err != nil {
-		t.Fatalf("unexpected error while reading html string: %v", err)
-	}
-	f := &Field{
-		Name: "title",
-		ElementLocations: []ElementLocation{
-			{
-				Selector:  ".artist-name",
-				AllNodes:  true,
-				Separator: ", ",
-			},
-		},
-	}
-	event := map[string]interface{}{}
-	err = extractField(f, event, doc.Selection, "")
-	if err != nil {
-		t.Fatalf("unexpected error while extracting the text field: %v", err)
-	}
-	if v, ok := event["title"]; !ok {
-		t.Fatal("event doesn't contain the expected title field")
-	} else {
-		expected := "Final Story, Moment Of Madness, Irony of Fate"
-		if v != expected {
-			t.Fatalf("expected '%s' for title but got '%s'", expected, v)
-		}
-	}
-}
-
-func TestExtractFieldTextRegex(t *testing.T) {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString))
-	if err != nil {
-		t.Fatalf("unexpected error while reading html string: %v", err)
-	}
-	f := &Field{
-		Name: "time",
-		ElementLocations: []ElementLocation{
-			{
-				Selector: "a.event-date",
-				RegexExtract: RegexConfig{
-					RegexPattern: "[0-9]{2}:[0-9]{2}",
+	t.Parallel()
+	tests := map[string]struct {
+		item    map[string]any
+		scraper *Scraper
+		want    bool
+		err     error
+	}{
+		"match true filter true": {
+			item: map[string]any{"title": "Jacob Collier - Concert"},
+			scraper: &Scraper{
+				Fields: []Field{
+					{
+						Name: "title",
+					},
+				},
+				Filters: []*Filter{
+					{
+						Field:      "title",
+						Expression: ".*Concert",
+						Match:      true,
+					},
 				},
 			},
+			want: true,
+		},
+		"match false filter false": {
+			item: map[string]any{"title": "Jacob Collier - Cancelled"},
+			scraper: &Scraper{
+				Fields: []Field{
+					{
+						Name: "title",
+					},
+				},
+				Filters: []*Filter{
+					{
+						Field:      "title",
+						Expression: ".*Cancelled",
+						Match:      false,
+					},
+				},
+			},
+			want: false,
+		},
+		"date match true filter true": {
+			item: map[string]any{"date": time.Date(2023, 10, 20, 19, 1, 0, 0, loc)},
+			scraper: &Scraper{
+				Fields: []Field{
+					{
+						Name: "date",
+						Type: "date",
+					},
+				},
+				Filters: []*Filter{
+					{
+						Field:      "date",
+						Expression: "> 2023-10-20T19:00",
+						Match:      true,
+					},
+				},
+			},
+			want: true,
+		},
+		"date match true filter false": {
+			item: map[string]any{"date": time.Date(2023, 10, 20, 19, 0, 0, 0, loc)},
+			scraper: &Scraper{
+				Fields: []Field{
+					{
+						Name: "date",
+						Type: "date",
+					},
+				},
+				Filters: []*Filter{
+					{
+						Field:      "date",
+						Expression: "> 2023-10-20T19:00",
+						Match:      true,
+					},
+				},
+			},
+			want: false,
+		},
+		"date match false filter false": {
+			item: map[string]any{"date": time.Date(2023, 10, 20, 19, 1, 0, 0, loc)},
+			scraper: &Scraper{
+				Fields: []Field{
+					{
+						Name: "date",
+						Type: "date",
+					},
+				},
+				Filters: []*Filter{
+					{
+						Field:      "date",
+						Expression: "> 2023-10-20T19:00",
+						Match:      false,
+					},
+				},
+			},
+			want: false,
+		},
+		"date match false filter false lt": {
+			item: map[string]any{"date": time.Date(2023, 10, 20, 18, 59, 0, 0, loc)},
+			scraper: &Scraper{
+				Fields: []Field{
+					{
+						Name: "date",
+						Type: "date",
+					},
+				},
+				Filters: []*Filter{
+					{
+						Field:      "date",
+						Expression: "< 2023-10-20T19:00",
+						Match:      false,
+					},
+				},
+			},
+			want: false,
+		},
+		"date match false filter false now": {
+			item: map[string]any{"date": time.Date(2023, 10, 20, 18, 59, 0, 0, loc)},
+			scraper: &Scraper{
+				Fields: []Field{
+					{
+						Name: "date",
+						Type: "date",
+					},
+				},
+				Filters: []*Filter{
+					{
+						Field:      "date",
+						Expression: "< now",
+						Match:      false,
+					},
+				},
+			},
+			want: false,
+		},
+		"field not found": {
+			scraper: &Scraper{
+				Fields: []Field{},
+				Filters: []*Filter{
+					{
+						Field:      "title",
+						Expression: ".*Concert",
+						Match:      true,
+					},
+				},
+			},
+			err: fmt.Errorf("filter error. There is no field with the name 'title'"),
+		},
+		"date expression error": {
+			scraper: &Scraper{
+				Fields: []Field{
+					{
+						Name: "date",
+						Type: "date",
+					},
+				},
+				Filters: []*Filter{
+					{
+						Field:      "date",
+						Expression: "not a valid date filter expression",
+						Match:      false,
+					},
+				},
+			},
+			err: fmt.Errorf("the expression for filtering by date should be of the following format: '<|> now|YYYY-MM-ddTHH:mm'"),
+		},
+		"date expression error eq": {
+			scraper: &Scraper{
+				Fields: []Field{
+					{
+						Name: "date",
+						Type: "date",
+					},
+				},
+				Filters: []*Filter{
+					{
+						Field:      "date",
+						Expression: "= 2023-10-20T19:00",
+						Match:      false,
+					},
+				},
+			},
+			err: fmt.Errorf("the expression for filtering by date should be of the following format: '<|> now|YYYY-MM-ddTHH:mm'"),
+		},
+		"date expression wrong date format": {
+			scraper: &Scraper{
+				Fields: []Field{
+					{
+						Name: "date",
+						Type: "date",
+					},
+				},
+				Filters: []*Filter{
+					{
+						Field:      "date",
+						Expression: "> 2023-10-20",
+						Match:      false,
+					},
+				},
+			},
+			err: fmt.Errorf("the expression for filtering by date should be of the following format: '<|> now|YYYY-MM-ddTHH:mm'"),
 		},
 	}
-	event := map[string]interface{}{}
-	err = extractField(f, event, doc.Selection, "")
-	if err != nil {
-		t.Fatalf("unexpected error while extracting the time field: %v", err)
-	}
-	if v, ok := event["time"]; !ok {
-		t.Fatal("event doesn't contain the expected time field")
-	} else {
-		expected := "20:00"
-		if v != expected {
-			t.Fatalf("expected '%s' for title but got '%s'", expected, v)
-		}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			err := test.scraper.initializeFilters()
+			if err != nil {
+				if test.err == nil {
+					t.Fatalf("unexpected error while initializing filters: %v", err)
+				}
+				if test.err.Error() != err.Error() {
+					t.Fatalf("expected error '%v' but got '%v'", test.err, err)
+				}
+				return
+			} else {
+				if test.err != nil {
+					t.Fatalf("expected error '%v' but got nil", test.err)
+				}
+			}
+			got := test.scraper.filterItem(test.item)
+			if got != test.want {
+				t.Fatalf("expected '%v' but got '%v'", test.want, got)
+			}
+		})
 	}
 }
 
-func TestExtractFieldUrl(t *testing.T) {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString))
-	if err != nil {
-		t.Fatalf("unexpected error while reading html string: %v", err)
-	}
-	f := &Field{
-		Name: "url",
-		Type: "url",
-		ElementLocations: []ElementLocation{
-			{
-				Selector: "a.event-date",
+func TestExtractFieldUrlOrText(t *testing.T) {
+	tests := map[string]struct {
+		htmlString string
+		baseUrl    string
+		field      *Field
+		expected   string
+		err        error
+	}{
+		"text": {
+			htmlString: htmlString,
+			field: &Field{
+				Name: "title",
+				ElementLocations: []ElementLocation{
+					{
+						Selector: ".artist-name",
+					},
+				},
 			},
+			expected: "Final Story",
+		},
+		"text entire subtree": {
+			htmlString: htmlString,
+			field: &Field{
+				Name: "title",
+				ElementLocations: []ElementLocation{
+					{
+						Selector:      ".artist-teaser",
+						EntireSubtree: true,
+					},
+				},
+			},
+			expected: `Final Story
+                                                    Aargau`,
+		},
+		"text all nodes": {
+			htmlString: htmlString,
+			field: &Field{
+				Name: "title",
+				ElementLocations: []ElementLocation{
+					{
+						Selector:  ".artist-name",
+						AllNodes:  true,
+						Separator: ", ",
+					},
+				},
+			},
+			expected: "Final Story, Moment Of Madness, Irony of Fate",
+		},
+		"text regex": {
+			htmlString: htmlString,
+			field: &Field{
+				Name: "time",
+				ElementLocations: []ElementLocation{
+					{
+						Selector: "a.event-date",
+						RegexExtract: RegexConfig{
+							RegexPattern: "[0-9]{2}:[0-9]{2}",
+						},
+					},
+				},
+			},
+			expected: "20:00",
+		},
+		"url needs base url": {
+			htmlString: htmlString,
+			field: &Field{
+				Name: "url",
+				Type: "url",
+				ElementLocations: []ElementLocation{
+					{
+						Selector: "a.event-date",
+					},
+				},
+			},
+			baseUrl:  "https://www.dachstock.ch/events",
+			expected: "https://www.dachstock.ch/events/10-03-2023-krachstock-final-story",
+		},
+		"url no base url": {
+			htmlString: htmlString2,
+			field: &Field{
+				Name: "url",
+				Type: "url",
+				ElementLocations: []ElementLocation{
+					{
+						Selector: "h2 > a",
+					},
+				},
+			},
+			baseUrl:  "https://www.eventfabrik-muenchen.de/events?s=&tribe_events_cat=konzert&tribe_events_venue=&tribe_events_month=",
+			expected: "https://www.eventfabrik-muenchen.de/event/heinz-rudolf-kunze-verstaerkung-2/",
+		},
+		"url only query params": {
+			htmlString: htmlString3,
+			field: &Field{
+				Name: "url",
+				Type: "url",
+				ElementLocations: []ElementLocation{
+					{
+						Selector: "h2 > a",
+					},
+				},
+			},
+			baseUrl:  "https://www.eventfabrik-muenchen.de/events?s=&tribe_events_cat=konzert&tribe_events_venue=&tribe_events_month=",
+			expected: "https://www.eventfabrik-muenchen.de/events?bli=bla",
+		},
+		"url file": {
+			htmlString: htmlString4,
+			field: &Field{
+				Name: "url",
+				Type: "url",
+				ElementLocations: []ElementLocation{
+					{
+						Selector: "div > a",
+					},
+				},
+			},
+			baseUrl:  "https://www.roxy.ulm.de/programm/programm.php",
+			expected: "https://www.roxy.ulm.de/programm/programm.php?m=4&j=2023&vid=4378",
+		},
+		"url parent dir": {
+			htmlString: htmlString6,
+			field: &Field{
+				Name: "url",
+				Type: "url",
+				ElementLocations: []ElementLocation{
+					{
+						Selector: "h2 > a",
+					},
+				},
+			},
+			baseUrl:  "http://point11.ch/site/home",
+			expected: "http://point11.ch/site/event/id/165",
 		},
 	}
-	event := map[string]interface{}{}
-	err = extractField(f, event, doc.Selection, "https://www.dachstock.ch/events")
-	if err != nil {
-		t.Fatalf("unexpected error while extracting the time field: %v", err)
-	}
-	if v, ok := event["url"]; !ok {
-		t.Fatal("event doesn't contain the expected url field")
-	} else {
-		expected := "https://www.dachstock.ch/events/10-03-2023-krachstock-final-story"
-		if v != expected {
-			t.Fatalf("expected '%s' for url but got '%s'", expected, v)
-		}
-	}
-}
 
-func TestExtractFieldUrlFull(t *testing.T) {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString2))
-	if err != nil {
-		t.Fatalf("unexpected error while reading html string: %v", err)
-	}
-	f := &Field{
-		Name: "url",
-		Type: "url",
-		ElementLocations: []ElementLocation{
-			{
-				Selector: "h2 > a",
-			},
-		},
-	}
-	event := map[string]interface{}{}
-	err = extractField(f, event, doc.Selection, "https://www.eventfabrik-muenchen.de/events?s=&tribe_events_cat=konzert&tribe_events_venue=&tribe_events_month=")
-	if err != nil {
-		t.Fatalf("unexpected error while extracting the time field: %v", err)
-	}
-	if v, ok := event["url"]; !ok {
-		t.Fatal("event doesn't contain the expected url field")
-	} else {
-		expected := "https://www.eventfabrik-muenchen.de/event/heinz-rudolf-kunze-verstaerkung-2/"
-		if v != expected {
-			t.Fatalf("expected '%s' for url but got '%s'", expected, v)
-		}
-	}
-}
-
-func TestExtractFieldUrlQuery(t *testing.T) {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString3))
-	if err != nil {
-		t.Fatalf("unexpected error while reading html string: %v", err)
-	}
-	f := &Field{
-		Name: "url",
-		Type: "url",
-		ElementLocations: []ElementLocation{
-			{
-				Selector: "h2 > a",
-			},
-		},
-	}
-	event := map[string]interface{}{}
-	err = extractField(f, event, doc.Selection, "https://www.eventfabrik-muenchen.de/events?s=&tribe_events_cat=konzert&tribe_events_venue=&tribe_events_month=")
-	if err != nil {
-		t.Fatalf("unexpected error while extracting the time field: %v", err)
-	}
-	if v, ok := event["url"]; !ok {
-		t.Fatal("event doesn't contain the expected url field")
-	} else {
-		expected := "https://www.eventfabrik-muenchen.de/events?bli=bla"
-		if v != expected {
-			t.Fatalf("expected '%s' for url but got '%s'", expected, v)
-		}
-	}
-}
-
-func TestExtractFieldUrlFile(t *testing.T) {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString4))
-	if err != nil {
-		t.Fatalf("unexpected error while reading html string: %v", err)
-	}
-	f := &Field{
-		Name: "url",
-		Type: "url",
-		ElementLocations: []ElementLocation{
-			{
-				Selector: "div > a",
-			},
-		},
-	}
-	event := map[string]interface{}{}
-	err = extractField(f, event, doc.Selection, "https://www.roxy.ulm.de/programm/programm.php")
-	if err != nil {
-		t.Fatalf("unexpected error while extracting the time field: %v", err)
-	}
-	if v, ok := event["url"]; !ok {
-		t.Fatal("event doesn't contain the expected url field")
-	} else {
-		expected := "https://www.roxy.ulm.de/programm/programm.php?m=4&j=2023&vid=4378"
-		if v != expected {
-			t.Fatalf("expected '%s' for url but got '%s'", expected, v)
-		}
-	}
-}
-
-func TestExtractFieldUrlParentDir(t *testing.T) {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString6))
-	if err != nil {
-		t.Fatalf("unexpected error while reading html string: %v", err)
-	}
-	f := &Field{
-		Name: "url",
-		Type: "url",
-		ElementLocations: []ElementLocation{
-			{
-				Selector: "h2 > a",
-			},
-		},
-	}
-	event := map[string]interface{}{}
-	err = extractField(f, event, doc.Selection, "http://point11.ch/site/home")
-	if err != nil {
-		t.Fatalf("unexpected error while extracting the time field: %v", err)
-	}
-	if v, ok := event["url"]; !ok {
-		t.Fatal("event doesn't contain the expected url field")
-	} else {
-		expected := "http://point11.ch/site/event/id/165"
-		if v != expected {
-			t.Fatalf("expected '%s' for url but got '%s'", expected, v)
-		}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			doc, err := goquery.NewDocumentFromReader(strings.NewReader(test.htmlString))
+			if err != nil {
+				t.Fatalf("unexpected error while reading html string: %v", err)
+			}
+			item := map[string]any{}
+			err = extractField(test.field, item, doc.Selection, test.baseUrl)
+			if err != nil {
+				if test.err == nil {
+					t.Fatalf("unexpected error while extracting the text field: %v", err)
+				}
+				if test.err.Error() != err.Error() {
+					t.Fatalf("expected error '%v' but got '%v'", test.err, err)
+				}
+				return
+			} else {
+				if test.err != nil {
+					t.Fatalf("expected error '%v' but got nil", test.err)
+				}
+			}
+			if v, ok := item[test.field.Name]; !ok {
+				t.Fatal("extracted item doesn't contain the expected title field")
+			} else {
+				if v != test.expected {
+					t.Fatalf("expected '%s' for %s but got '%s'", test.expected, test.field.Name, v)
+				}
+			}
+		})
 	}
 }
 
@@ -999,5 +980,28 @@ func TestDefaultValueDateComponentRegexExtractError(t *testing.T) {
 	}
 	if dt.Month() != 4 {
 		t.Fatalf("expected month to be %d but got %d", 4, dt.Month())
+	}
+}
+
+func TestRemoveHiddenFields(t *testing.T) {
+	s := &Scraper{
+		Fields: []Field{
+			{
+				Name: "hidden",
+				Hide: true,
+			},
+			{
+				Name: "visible",
+				Hide: false,
+			},
+		},
+	}
+	item := map[string]interface{}{"hidden": "bli", "visible": "bla"}
+	r := s.removeHiddenFields(item)
+	if _, ok := r["hidden"]; ok {
+		t.Fatal("the field 'hidden' should have been removed from the item")
+	}
+	if _, ok := r["visible"]; !ok {
+		t.Fatal("the field 'visible' should not have been removed from the item")
 	}
 }

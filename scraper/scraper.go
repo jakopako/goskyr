@@ -225,6 +225,7 @@ func (f *Filter) Initialize(fieldType string) error {
 		}
 		return nil
 	default:
+		// we won't ever get here because we set the filter type above
 		return fmt.Errorf("type '%s' does not exist for filters", f.Type)
 	}
 }

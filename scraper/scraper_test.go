@@ -99,6 +99,31 @@ const (
 			<span>20.02.</span><span>Heinz Rudolf Kunze &amp; Verstärkung
 				&#8211; ABGESAGT</span> </a>
 	</h2>`
+	htmlString8 = `
+	<div class="header">
+		<h3 class="artist">
+			<span class="name">CJ Bolland</span><span class="artist-info"> (Bonzai, BE)
+		</h3>
+		<h3 class="artist">
+			<span class="name">M.I.K.E. PUSH</span><span class="artist-info"> (Bonzai, BE)
+		</h3>
+		<h3 class="artist">
+			<span class="name">Bonzai All Stars</span><span class="artist-info"> (Bonzai, BE)
+		</h3>
+		<h3 class="artist">
+			<span class="name">Madwave</span><span class="artist-info">
+		</h3>
+	</div>`
+	htmlString9 = `
+	<script id="structured-data" type="application/ld+json" data-nscript="afterInteractive">{
+		"@context": "https://schema.org",
+		"@type": "TheaterEvent",
+		"name": "Rhys Darby: The Legend Returns",
+		"startDate": "2025-06-03T19:00:00.000Z",
+		"endDate": "2025-06-03T21:00:00.000Z",
+		"eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+		"eventStatus": "https://schema.org/EventScheduled"
+	}</script>`
 )
 
 func TestFilters(t *testing.T) {
@@ -385,6 +410,21 @@ func TestExtractFieldUrlOrText(t *testing.T) {
 			},
 			expected: "Final Story, Moment Of Madness, Irony of Fate",
 		},
+		"text entire subtree all nodes": {
+			htmlString: htmlString8,
+			field: &Field{
+				Name: "title",
+				ElementLocations: []ElementLocation{
+					{
+						Selector:      ".artist",
+						EntireSubtree: true,
+						AllNodes:      true,
+						Separator:     ", ",
+					},
+				},
+			},
+			expected: "CJ Bolland (Bonzai, BE), M.I.K.E. PUSH (Bonzai, BE), Bonzai All Stars (Bonzai, BE), Madwave",
+		},
 		"text regex": {
 			htmlString: htmlString,
 			field: &Field{
@@ -399,6 +439,19 @@ func TestExtractFieldUrlOrText(t *testing.T) {
 				},
 			},
 			expected: "20:00",
+		},
+		"text json": {
+			htmlString: htmlString9,
+			field: &Field{
+				Name: "title",
+				ElementLocations: []ElementLocation{
+					{
+						Selector:     "script[type=\"application/ld+json\"]",
+						JsonSelector: "//startDate",
+					},
+				},
+			},
+			expected: "2025-06-03T19:00:00.000Z",
 		},
 		"url needs base url": {
 			htmlString: htmlString,

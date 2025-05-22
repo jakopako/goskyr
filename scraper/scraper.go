@@ -643,7 +643,7 @@ func extractField(field *Field, event map[string]any, s *goquery.Selection, base
 
 		event[field.Name] = url
 	case "date":
-		d, err := getDate(field, s, dateDefaults{})
+		d, err := getDate(field, s)
 		if err != nil {
 			return err
 		}
@@ -708,13 +708,7 @@ type datePart struct {
 	layoutParts []string
 }
 
-// not very nice because we only need this
-// to be able to test deterministically
-type dateDefaults struct {
-	year int // format: 2006
-}
-
-func getDate(f *Field, s *goquery.Selection, dd dateDefaults) (time.Time, error) {
+func getDate(f *Field, s *goquery.Selection) (time.Time, error) {
 	// time zone
 	var t time.Time
 	loc, err := time.LoadLocation(f.DateLocation)
@@ -769,12 +763,11 @@ func getDate(f *Field, s *goquery.Selection, dd dateDefaults) (time.Time, error)
 
 	// year is special in the sense that it defaults to the current year
 	// if nothing is specified
+	currentYear := time.Now().Year()
+
 	if !combinedParts.Year {
-		if dd.year == 0 {
-			dd.year = time.Now().Year()
-		}
 		dateParts = append(dateParts, datePart{
-			stringPart:  strconv.Itoa(dd.year),
+			stringPart:  strconv.Itoa(currentYear),
 			layoutParts: []string{"2006"},
 		})
 	}
@@ -803,7 +796,7 @@ func getDate(f *Field, s *goquery.Selection, dd dateDefaults) (time.Time, error)
 			// to not confuse the user too much
 			if strings.HasSuffix(err.Error(), "day out of range") && strings.Contains(err.Error(), "29") {
 				for i := 1; i < 4; i++ {
-					dateTimeString = strings.Replace(dateTimeString, strconv.Itoa(dd.year), strconv.Itoa(dd.year+i), 1)
+					dateTimeString = strings.Replace(dateTimeString, strconv.Itoa(currentYear+i-1), strconv.Itoa(currentYear+i), 1)
 					t, err = monday.ParseInLocation(dateTimeLayout, dateTimeString, loc, monday.Locale(mLocale))
 					if err == nil {
 						return t, nil

@@ -453,6 +453,32 @@ func TestExtractFieldUrlOrText(t *testing.T) {
 			},
 			expected: "2025-06-03T19:00:00.000Z",
 		},
+		"text default": {
+			htmlString: htmlString5,
+			field: &Field{
+				Name: "title",
+				ElementLocations: []ElementLocation{
+					{
+						Selector: ".non-existent",
+						Default:  "default value",
+					},
+				},
+			},
+			expected: "default value",
+		},
+		"text no default": {
+			htmlString: htmlString4,
+			field: &Field{
+				Name: "title",
+				ElementLocations: []ElementLocation{
+					{
+						Selector: "div > a > div",
+						Default:  "default value",
+					},
+				},
+			},
+			expected: "Treffpunkt",
+		},
 		"url needs base url": {
 			htmlString: htmlString,
 			field: &Field{
@@ -558,481 +584,443 @@ func TestExtractFieldUrlOrText(t *testing.T) {
 }
 
 func TestExtractFieldDate(t *testing.T) {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString))
-	if err != nil {
-		t.Fatalf("unexpected error while reading html string: %v", err)
-	}
-	f := &Field{
-		Name: "date",
-		Type: "date",
-		Components: []DateComponent{
-			{
-				Covers: date.CoveredDateParts{
-					Day:   true,
-					Month: true,
-					Year:  true,
-					Time:  true,
-				},
-				ElementLocation: ElementLocation{
-					Selector: "a.event-date",
-				},
-				Layout: []string{
-					"Mon, 02.01.2006 - 15:04",
-				},
-			},
-		},
-		DateLocation: "Europe/Berlin",
-	}
-	event := map[string]interface{}{}
-	err = extractField(f, event, doc.Selection, "")
-	if err != nil {
-		t.Fatalf("unexpected error while extracting the date field: %v", err)
-	}
-	if v, ok := event["date"]; !ok {
-		t.Fatal("event doesn't contain the expected date field")
-	} else {
-		loc, _ := time.LoadLocation(f.DateLocation)
-		expected := time.Date(2023, 3, 10, 20, 0, 0, 0, loc)
-		vTime, ok := v.(time.Time)
-		if !ok {
-			t.Fatalf("%v is not of type time.Time", err)
-		}
-		if !vTime.Equal(expected) {
-			t.Fatalf("expected '%s' for date but got '%s'", expected, vTime)
-		}
-	}
-}
-
-func TestExtractFieldDateTransform(t *testing.T) {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString))
-	if err != nil {
-		t.Fatalf("unexpected error while reading html string: %v", err)
-	}
-	f := &Field{
-		Name: "date",
-		Type: "date",
-		Components: []DateComponent{
-			{
-				Covers: date.CoveredDateParts{
-					Day:   true,
-					Month: true,
-					Year:  true,
-					Time:  true,
-				},
-				ElementLocation: ElementLocation{
-					Selector: "a.event-date",
-				},
-				Transform: []TransformConfig{
+	tests := map[string]struct {
+		htmlString string
+		field      *Field
+		expected   time.Time
+		err        error
+	}{
+		"full date": {
+			htmlString: htmlString,
+			field: &Field{
+				Name: "date",
+				Type: "date",
+				Components: []DateComponent{
 					{
-						TransformType: "regex-replace",
-						RegexPattern:  "\\.",
-						Replacement:   "/",
+						Covers: date.CoveredDateParts{
+							Day:   true,
+							Month: true,
+							Year:  true,
+							Time:  true,
+						},
+						ElementLocation: ElementLocation{
+							Selector: "a.event-date",
+						},
+						Layout: []string{
+							"Mon, 02.01.2006 - 15:04",
+						},
 					},
 				},
-				Layout: []string{
-					"Mon, 02/01/2006 - 15:04",
-				},
+				DateLocation: "Europe/Berlin",
 			},
+			expected: time.Date(2023, 3, 10, 20, 0, 0, 0, time.FixedZone("Europe/Berlin", 60*60)),
 		},
-		DateLocation: "Europe/Berlin",
-	}
-	event := map[string]interface{}{}
-	err = extractField(f, event, doc.Selection, "")
-	if err != nil {
-		t.Fatalf("unexpected error while extracting the date field: %v", err)
-	}
-	if v, ok := event["date"]; !ok {
-		t.Fatal("event doesn't contain the expected date field")
-	} else {
-		loc, _ := time.LoadLocation(f.DateLocation)
-		expected := time.Date(2023, 3, 10, 20, 0, 0, 0, loc)
-		vTime, ok := v.(time.Time)
-		if !ok {
-			t.Fatalf("%v is not of type time.Time", err)
-		}
-		if !vTime.Equal(expected) {
-			t.Fatalf("expected '%s' for date but got '%s'", expected, vTime)
-		}
-	}
-}
-
-func TestExtractFieldDate29Feb(t *testing.T) {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString5))
-	if err != nil {
-		t.Fatalf("unexpected error while reading html string: %v", err)
-	}
-	f := &Field{
-		Name: "date",
-		Type: "date",
-		Components: []DateComponent{
-			{
-				Covers: date.CoveredDateParts{
-					Day:   true,
-					Month: true,
-				},
-				ElementLocation: ElementLocation{
-					Selector: "h2 > a > span",
-				},
-				Layout: []string{
-					"02.01.",
-				},
-			},
-			{
-				Covers: date.CoveredDateParts{
-					Time: true,
-				},
-				ElementLocation: ElementLocation{
-					Default: "19:30",
-				},
-				Layout: []string{
-					"15:04",
-				},
-			},
-		},
-		DateLocation: "Europe/Berlin",
-		GuessYear:    true,
-	}
-	dt, err := getDate(f, doc.Selection, dateDefaults{year: 2023})
-	if err != nil {
-		t.Fatalf("unexpected error while extracting the date field: %v", err)
-	}
-	if dt.Year() != 2024 {
-		t.Fatalf("expected '2024' as year of date but got '%d'", dt.Year())
-	}
-}
-
-func TestGuessYearSimple(t *testing.T) {
-	// items dates span period around change of year
-	s := &Scraper{
-		Fields: []Field{
-			{
-				Type:      "date",
-				GuessYear: true,
-				Name:      "date",
-			},
-		},
-	}
-	loc, _ := time.LoadLocation("CET")
-	items := []map[string]interface{}{
-		{
-			"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2023, 12, 24, 21, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2023, 1, 2, 20, 0, 0, 0, loc),
-		},
-	}
-	expectedItems := []map[string]interface{}{
-		{
-			"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2023, 12, 24, 21, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2024, 1, 2, 20, 0, 0, 0, loc),
-		},
-	}
-	s.guessYear(items, time.Date(2023, 11, 30, 20, 30, 0, 0, loc))
-	for i, d := range items {
-		if d["date"] != expectedItems[i]["date"] {
-			t.Fatalf("expected '%v' as year of date but got '%v'", expectedItems[i]["date"], d["date"])
-		}
-	}
-}
-
-func TestGuessYearUnordered(t *testing.T) {
-	// items dates are not perfectly ordered and span
-	// period around change of year
-	s := &Scraper{
-		Fields: []Field{
-			{
-				Type:      "date",
-				GuessYear: true,
-				Name:      "date",
-			},
-		},
-	}
-	loc, _ := time.LoadLocation("CET")
-	items := []map[string]interface{}{
-		{
-			"date": time.Date(2023, 11, 2, 20, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2023, 12, 14, 20, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2023, 12, 24, 21, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2023, 1, 2, 20, 0, 0, 0, loc),
-		},
-	}
-	expectedItems := []map[string]interface{}{
-		{
-			"date": time.Date(2023, 11, 2, 20, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2023, 12, 14, 20, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2023, 12, 24, 21, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2024, 1, 2, 20, 0, 0, 0, loc),
-		},
-	}
-	s.guessYear(items, time.Date(2023, 11, 1, 20, 30, 0, 0, loc))
-	for i, d := range items {
-		if d["date"] != expectedItems[i]["date"] {
-			t.Fatalf("expected '%v' as year of date but got '%v'", expectedItems[i]["date"], d["date"])
-		}
-	}
-}
-
-func TestGuessYear2Years(t *testing.T) {
-	// items dates span more than 2 years
-	s := &Scraper{
-		Fields: []Field{
-			{
-				Type:      "date",
-				GuessYear: true,
-				Name:      "date",
-			},
-		},
-	}
-	loc, _ := time.LoadLocation("CET")
-	items := []map[string]interface{}{
-		{
-			"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2023, 1, 14, 20, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2023, 5, 2, 20, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2023, 9, 24, 21, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2023, 2, 2, 20, 0, 0, 0, loc),
-		},
-	}
-	expectedItems := []map[string]interface{}{
-		{
-			"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2024, 1, 14, 20, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2024, 5, 2, 20, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2024, 9, 24, 21, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2025, 2, 2, 20, 0, 0, 0, loc),
-		},
-	}
-	s.guessYear(items, time.Date(2023, 11, 1, 20, 30, 0, 0, loc))
-	for i, d := range items {
-		if d["date"] != expectedItems[i]["date"] {
-			t.Fatalf("expected '%v' as year of date but got '%v'", expectedItems[i]["date"], d["date"])
-		}
-	}
-}
-
-func TestGuessYearStartBeforeReference(t *testing.T) {
-	// items date start before given reference
-	s := &Scraper{
-		Fields: []Field{
-			{
-				Type:      "date",
-				GuessYear: true,
-				Name:      "date",
-			},
-		},
-	}
-	loc, _ := time.LoadLocation("CET")
-	items := []map[string]interface{}{
-		{
-			"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2023, 12, 24, 21, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2023, 1, 2, 20, 0, 0, 0, loc),
-		},
-	}
-	expectedItems := []map[string]interface{}{
-		{
-			"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2023, 12, 24, 21, 30, 0, 0, loc),
-		},
-		{
-			"date": time.Date(2024, 1, 2, 20, 0, 0, 0, loc),
-		},
-	}
-	s.guessYear(items, time.Date(2024, 1, 30, 20, 30, 0, 0, loc))
-	for i, d := range items {
-		if d["date"] != expectedItems[i]["date"] {
-			t.Fatalf("expected '%v' as year of date but got '%v'", expectedItems[i]["date"], d["date"])
-		}
-	}
-}
-
-func TestDefaultTextValue(t *testing.T) {
-	d := "default text"
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString5))
-	if err != nil {
-		t.Fatalf("unexpected error while reading html string: %v", err)
-	}
-	l := &ElementLocation{
-		Selector: ".non-existent",
-		Default:  d,
-	}
-	v, err := getTextString(l, doc.Selection)
-	if err != nil {
-		t.Fatalf("unexpected error while extracting the element: %v", err)
-	}
-	if v != d {
-		t.Fatalf("expected '%s' but got '%s'", d, v)
-	}
-}
-
-func TestDefaultTextValueExistentValue(t *testing.T) {
-	d := "default text"
-	e := "Treffpunkt"
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString4))
-	if err != nil {
-		t.Fatalf("unexpected error while reading html string: %v", err)
-	}
-	l := &ElementLocation{
-		Selector: "div > a > div",
-		Default:  d,
-	}
-	v, err := getTextString(l, doc.Selection)
-	if err != nil {
-		t.Fatalf("unexpected error while extracting the element: %v", err)
-	}
-	if v != e {
-		t.Fatalf("expected '%s' but got '%s'", e, v)
-	}
-}
-
-func TestDefaultValueDateComponentNonExistent(t *testing.T) {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString7))
-	if err != nil {
-		t.Fatalf("unexpected error while reading html string: %v", err)
-	}
-	f := &Field{
-		Name: "date",
-		Type: "date",
-		Components: []DateComponent{
-			{
-				Covers: date.CoveredDateParts{
-					Day:   true,
-					Month: true,
-				},
-				ElementLocation: ElementLocation{
-					Selector: "h2 > a > span",
-				},
-				Layout: []string{
-					"02.01.",
-				},
-			},
-			{
-				Covers: date.CoveredDateParts{
-					Time: true,
-				},
-				ElementLocation: ElementLocation{
-					Selector: ".non-existent",
-					Default:  "19:30",
-				},
-				Layout: []string{
-					"15:04",
-				},
-			},
-		},
-		DateLocation: "Europe/Berlin",
-		GuessYear:    true,
-	}
-	dt, err := getDate(f, doc.Selection, dateDefaults{})
-	if err != nil {
-		t.Fatalf("unexpected error while extracting the date field: %v", err)
-	}
-	if dt.Hour() != 19 {
-		t.Fatalf("expected hour to be %d but got %d", 19, dt.Hour())
-	}
-	if dt.Minute() != 30 {
-		t.Fatalf("expected minute to be %d but got %d", 30, dt.Minute())
-	}
-}
-
-func TestDefaultValueDateComponentRegexExtractError(t *testing.T) {
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlString7))
-	if err != nil {
-		t.Fatalf("unexpected error while reading html string: %v", err)
-	}
-	f := &Field{
-		Name: "date",
-		Type: "date",
-		Components: []DateComponent{
-			{
-				Covers: date.CoveredDateParts{
-					Day:   true,
-					Month: true,
-				},
-				ElementLocation: ElementLocation{
-					Selector: "h2 > a > span",
-					Default:  "1. April",
-					RegexExtract: RegexConfig{
-						RegexPattern: "[A-Z]{20}", // non-matching regex
-						IgnoreErrors: true,        // will make sure the selector returns an empty string in case of an error in which case we default to the given default
+		"date transform": {
+			htmlString: htmlString,
+			field: &Field{
+				Name: "date",
+				Type: "date",
+				Components: []DateComponent{
+					{
+						Covers: date.CoveredDateParts{
+							Day:   true,
+							Month: true,
+							Year:  true,
+							Time:  true,
+						},
+						ElementLocation: ElementLocation{
+							Selector: "a.event-date",
+						},
+						Transform: []TransformConfig{
+							{
+								TransformType: "regex-replace",
+								RegexPattern:  "\\.",
+								Replacement:   "/",
+							},
+						},
+						Layout: []string{
+							"Mon, 02/01/2006 - 15:04",
+						},
 					},
 				},
-				Layout: []string{
-					"2. January",
-				},
+				DateLocation: "Europe/Berlin",
 			},
-			{
-				Covers: date.CoveredDateParts{
-					Time: true,
-				},
-				ElementLocation: ElementLocation{
-					Selector: ".non-existent",
-					Default:  "19:30",
-				},
-				Layout: []string{
-					"15:04",
-				},
-			},
+			expected: time.Date(2023, 3, 10, 20, 0, 0, 0, time.FixedZone("Europe/Berlin", 60*60)),
 		},
-		DateLocation: "Europe/Berlin",
-		GuessYear:    true,
 	}
-	dt, err := getDate(f, doc.Selection, dateDefaults{})
-	if err != nil {
-		t.Fatalf("unexpected error while extracting the date field: %v", err)
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			doc, err := goquery.NewDocumentFromReader(strings.NewReader(test.htmlString))
+			if err != nil {
+				t.Fatalf("unexpected error while reading html string: %v", err)
+			}
+			event := map[string]any{}
+			err = extractField(test.field, event, doc.Selection, "")
+			if err != nil {
+				if test.err == nil {
+					t.Fatalf("unexpected error while extracting the date field: %v", err)
+				}
+				if test.err.Error() != err.Error() {
+					t.Fatalf("expected error '%v' but got '%v'", test.err, err)
+				}
+				return
+			} else {
+				if test.err != nil {
+					t.Fatalf("expected error '%v' but got nil", test.err)
+				}
+			}
+			if v, ok := event[test.field.Name]; !ok {
+				t.Fatal("extracted item doesn't contain the expected date field")
+			} else {
+				vTime, ok := v.(time.Time)
+				if !ok {
+					t.Fatalf("%v is not of type time.Time", err)
+				}
+				if !vTime.Equal(test.expected) {
+					t.Fatalf("expected '%s' for date but got '%s'", test.expected, vTime)
+				}
+			}
+		})
 	}
-	if dt.Day() != 1 {
-		t.Fatalf("expected day to be %d but got %d", 1, dt.Day())
+}
+
+func TestGuessYear(t *testing.T) {
+	loc, _ := time.LoadLocation("CET")
+	tests := map[string]struct {
+		scraper       *Scraper
+		items         []map[string]any
+		expected      []map[string]any
+		referenceDate time.Time
+	}{
+		"guess year simple": {
+			scraper: &Scraper{
+				Fields: []Field{
+					{
+						Type:      "date",
+						GuessYear: true,
+						Name:      "date",
+					},
+				},
+			},
+			items: []map[string]any{
+				{
+					"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2023, 12, 24, 21, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2023, 1, 2, 20, 0, 0, 0, loc),
+				},
+			},
+			expected: []map[string]any{
+				{
+					"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2023, 12, 24, 21, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2024, 1, 2, 20, 0, 0, 0, loc),
+				},
+			},
+			referenceDate: time.Date(2023, 11, 30, 20, 30, 0, 0, loc),
+		},
+		"guess year unordered": {
+			scraper: &Scraper{
+				Fields: []Field{
+					{
+						Type:      "date",
+						GuessYear: true,
+						Name:      "date",
+					},
+				},
+			},
+			items: []map[string]any{
+				{
+					"date": time.Date(2023, 11, 2, 20, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2023, 12, 14, 20, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2023, 12, 24, 21, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2023, 1, 2, 20, 0, 0, 0, loc),
+				},
+			},
+			expected: []map[string]any{
+				{
+					"date": time.Date(2023, 11, 2, 20, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2023, 12, 14, 20, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2023, 12, 24, 21, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2024, 1, 2, 20, 0, 0, 0, loc),
+				},
+			},
+			referenceDate: time.Date(2023, 11, 1, 20, 30, 0, 0, loc),
+		},
+		"guess year two years span": {
+			scraper: &Scraper{
+				Fields: []Field{
+					{
+						Type:      "date",
+						GuessYear: true,
+						Name:      "date",
+					},
+				},
+			},
+			items: []map[string]any{
+				{
+					"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2023, 1, 14, 20, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2023, 5, 2, 20, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2023, 9, 24, 21, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2023, 2, 2, 20, 0, 0, 0, loc),
+				},
+			},
+			expected: []map[string]any{
+				{
+					"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2024, 1, 14, 20, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2024, 5, 2, 20, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2024, 9, 24, 21, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2025, 2, 2, 20, 0, 0, 0, loc),
+				},
+			},
+			referenceDate: time.Date(2023, 11, 1, 20, 30, 0, 0, loc),
+		},
+		"guess year start before reference": {
+			scraper: &Scraper{
+				Fields: []Field{
+					{
+						Type:      "date",
+						GuessYear: true,
+						Name:      "date",
+					},
+				},
+			},
+			items: []map[string]any{
+				{
+					"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2023, 12, 24, 21, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2023, 1, 2, 20, 0, 0, 0, loc),
+				},
+			},
+			expected: []map[string]any{
+				{
+					"date": time.Date(2023, 12, 2, 20, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2023, 12, 24, 21, 30, 0, 0, loc),
+				},
+				{
+					"date": time.Date(2024, 1, 2, 20, 0, 0, 0, loc),
+				},
+			},
+			referenceDate: time.Date(2024, 1, 30, 20, 30, 0, 0, loc),
+		},
 	}
-	if dt.Month() != 4 {
-		t.Fatalf("expected month to be %d but got %d", 4, dt.Month())
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			test.scraper.guessYear(test.items, test.referenceDate)
+			for i, d := range test.items {
+				if d["date"] != test.expected[i]["date"] {
+					t.Fatalf("expected '%v' but got '%v'", test.expected[i]["date"], d["date"])
+				}
+			}
+		})
+	}
+}
+
+func TestGetDate(t *testing.T) {
+	loc, _ := time.LoadLocation("CET")
+	currentYear := time.Now().Year()
+	nextLeapYear := currentYear
+	for nextLeapYear%4 != 0 {
+		nextLeapYear++
+	}
+
+	tests := map[string]struct {
+		htmlString string
+		field      *Field
+		expected   time.Time
+		err        error
+	}{
+		"29 feb": {
+			htmlString: htmlString5,
+			field: &Field{
+				Name: "date",
+				Type: "date",
+				Components: []DateComponent{
+					{
+						Covers: date.CoveredDateParts{
+							Day:   true,
+							Month: true,
+						},
+						ElementLocation: ElementLocation{
+							Selector: "h2 > a > span",
+						},
+						Layout: []string{
+							"02.01.",
+						},
+					},
+					{
+						Covers: date.CoveredDateParts{
+							Time: true,
+						},
+						ElementLocation: ElementLocation{
+							Default: "19:30",
+						},
+						Layout: []string{
+							"15:04",
+						},
+					},
+				},
+				DateLocation: "Europe/Berlin",
+				GuessYear:    true,
+			},
+			expected: time.Date(nextLeapYear, 2, 29, 19, 30, 0, 0, loc),
+		},
+		"default date component": {
+			htmlString: htmlString7,
+			field: &Field{
+				Name: "date",
+				Type: "date",
+				Components: []DateComponent{
+					{
+						Covers: date.CoveredDateParts{
+							Day:   true,
+							Month: true,
+						},
+						ElementLocation: ElementLocation{
+							Selector: "h2 > a > span",
+						},
+						Layout: []string{
+							"02.01.",
+						},
+					},
+					{
+						Covers: date.CoveredDateParts{
+							Time: true,
+						},
+						ElementLocation: ElementLocation{
+							Selector: ".non-existent",
+							Default:  "19:30",
+						},
+						Layout: []string{
+							"15:04",
+						},
+					},
+				},
+				DateLocation: "Europe/Berlin",
+				GuessYear:    true,
+			},
+			expected: time.Date(currentYear, 2, 20, 19, 30, 0, 0, loc),
+		},
+		"default date component regex error": {
+			htmlString: htmlString7,
+			field: &Field{
+				Name: "date",
+				Type: "date",
+				Components: []DateComponent{
+					{
+						Covers: date.CoveredDateParts{
+							Day:   true,
+							Month: true,
+						},
+						ElementLocation: ElementLocation{
+							Selector: "h2 > a > span",
+							Default:  "1. April",
+							RegexExtract: RegexConfig{
+								RegexPattern: "[A-Z]{20}", // non-matching regex
+								IgnoreErrors: true,        // will make sure the selector returns an empty string in case of an error in which case we default to the given default
+							},
+						},
+						Layout: []string{
+							"2. January",
+						},
+					},
+					{
+						Covers: date.CoveredDateParts{
+							Time: true,
+						},
+						ElementLocation: ElementLocation{
+							Selector: ".non-existent",
+							Default:  "19:30",
+						},
+						Layout: []string{
+							"15:04",
+						},
+					},
+				},
+				DateLocation: "Europe/Berlin",
+				GuessYear:    true,
+			},
+			expected: time.Date(currentYear, 4, 1, 19, 30, 0, 0, loc),
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			doc, err := goquery.NewDocumentFromReader(strings.NewReader(test.htmlString))
+			if err != nil {
+				t.Fatalf("unexpected error while reading html string: %v", err)
+			}
+
+			dt, err := getDate(test.field, doc.Selection)
+			if err != nil {
+				if test.err == nil {
+					t.Fatalf("unexpected error while extracting the date field: %v", err)
+				}
+				if test.err.Error() != err.Error() {
+					t.Fatalf("expected error '%v' but got '%v'", test.err, err)
+				}
+				return
+			} else {
+				if test.err != nil {
+					t.Fatalf("expected error '%v' but got nil", test.err)
+				}
+			}
+
+			if !dt.Equal(test.expected) {
+				t.Fatalf("expected '%s' but got '%s'", test.expected, dt)
+			}
+		})
 	}
 }
 

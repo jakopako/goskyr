@@ -997,8 +997,12 @@ func extractStringRegex(rc *RegexConfig, s string) (string, error) {
 		errMsg := ""
 		if len(matchingStrings) == 0 {
 			errMsg = fmt.Sprintf("no matching strings found for regex: %s", rc.RegexPattern)
-		} else if rc.Index == -1 {
-			extractedString = matchingStrings[len(matchingStrings)-1]
+		} else if rc.Index < 0 {
+			if len(matchingStrings)+rc.Index < 0 {
+				errMsg = fmt.Sprintf("regex index out of bounds. regex '%s' gave only %d matches", rc.RegexPattern, len(matchingStrings))
+			} else {
+				extractedString = matchingStrings[len(matchingStrings)+rc.Index]
+			}
 		} else {
 			if rc.Index >= len(matchingStrings) {
 				errMsg = fmt.Sprintf("regex index out of bounds. regex '%s' gave only %d matches", rc.RegexPattern, len(matchingStrings))

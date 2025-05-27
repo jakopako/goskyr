@@ -124,6 +124,8 @@ const (
 		"eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
 		"eventStatus": "https://schema.org/EventScheduled"
 	}</script>`
+	htmlString10 = `
+	<script id="structured-data" type="application/ld+json" data-nscript="afterInteractive">this is no json</script>`
 )
 
 func TestFilters(t *testing.T) {
@@ -440,6 +442,85 @@ func TestExtractFieldUrlOrText(t *testing.T) {
 			},
 			expected: "20:00",
 		},
+		"text regex index -1": {
+			htmlString: htmlString,
+			field: &Field{
+				Name: "time",
+				ElementLocations: []ElementLocation{
+					{
+						Selector: "a.event-date",
+						RegexExtract: RegexConfig{
+							RegexPattern: "[0-9]{2}",
+							Index:        -1,
+						},
+					},
+				},
+			},
+			expected: "00",
+		},
+		"text regex index -n": {
+			htmlString: htmlString,
+			field: &Field{
+				Name: "time",
+				ElementLocations: []ElementLocation{
+					{
+						Selector: "a.event-date",
+						RegexExtract: RegexConfig{
+							RegexPattern: "[0-9]{2}",
+							Index:        -2,
+						},
+					},
+				},
+			},
+			expected: "20",
+		},
+		"text regex positive out of bound": {
+			htmlString: htmlString,
+			field: &Field{
+				Name: "time",
+				ElementLocations: []ElementLocation{
+					{
+						Selector: "a.event-date",
+						RegexExtract: RegexConfig{
+							RegexPattern: "[0-9]{2}:[0-9]{2}",
+							Index:        1,
+						},
+					},
+				},
+			},
+			err: fmt.Errorf("regex index out of bounds. regex '[0-9]{2}:[0-9]{2}' gave only 1 matches"),
+		},
+		"text regex negative out of bound": {
+			htmlString: htmlString,
+			field: &Field{
+				Name: "time",
+				ElementLocations: []ElementLocation{
+					{
+						Selector: "a.event-date",
+						RegexExtract: RegexConfig{
+							RegexPattern: "[0-9]{2}",
+							Index:        -7,
+						},
+					},
+				},
+			},
+			err: fmt.Errorf("regex index out of bounds. regex '[0-9]{2}' gave only 6 matches"),
+		},
+		"text regex expression error": {
+			htmlString: htmlString,
+			field: &Field{
+				Name: "time",
+				ElementLocations: []ElementLocation{
+					{
+						Selector: "a.event-date",
+						RegexExtract: RegexConfig{
+							RegexPattern: ".***",
+						},
+					},
+				},
+			},
+			err: fmt.Errorf("error parsing regexp: invalid nested repetition operator: `**`"),
+		},
 		"text json": {
 			htmlString: htmlString9,
 			field: &Field{
@@ -452,6 +533,19 @@ func TestExtractFieldUrlOrText(t *testing.T) {
 				},
 			},
 			expected: "2025-06-03T19:00:00.000Z",
+		},
+		"text json error": {
+			htmlString: htmlString10,
+			field: &Field{
+				Name: "title",
+				ElementLocations: []ElementLocation{
+					{
+						Selector:     "script[type=\"application/ld+json\"]",
+						JsonSelector: "//startDate",
+					},
+				},
+			},
+			err: fmt.Errorf("JSON: invalid character 'h' in literal true (expecting 'r') : this is no json"),
 		},
 		"text default": {
 			htmlString: htmlString5,
@@ -561,7 +655,7 @@ func TestExtractFieldUrlOrText(t *testing.T) {
 			err = extractField(test.field, item, doc.Selection, test.baseUrl)
 			if err != nil {
 				if test.err == nil {
-					t.Fatalf("unexpected error while extracting the text field: %v", err)
+					t.Fatalf("unexpected error while extracting the %s field: %v", test.field.Name, err)
 				}
 				if test.err.Error() != err.Error() {
 					t.Fatalf("expected error '%v' but got '%v'", test.err, err)
@@ -573,7 +667,7 @@ func TestExtractFieldUrlOrText(t *testing.T) {
 				}
 			}
 			if v, ok := item[test.field.Name]; !ok {
-				t.Fatal("extracted item doesn't contain the expected title field")
+				t.Fatalf("extracted item doesn't contain the expected %s field", test.field.Name)
 			} else {
 				if v != test.expected {
 					t.Fatalf("expected '%s' for %s but got '%s'", test.expected, test.field.Name, v)

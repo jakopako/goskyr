@@ -16,13 +16,14 @@ require (
 
 require (
 	github.com/antchfx/jsonquery v1.3.6
-	github.com/olekukonko/tablewriter v0.0.5
+	github.com/olekukonko/tablewriter v1.0.7
 	github.com/sjwhitworth/golearn v0.0.0-20221228163002-74ae077eafb2
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
 )
 
 require (
 	github.com/antchfx/xpath v1.3.4 // indirect
+	github.com/fatih/color v1.15.0 // indirect
 	github.com/go-json-experiment/json v0.0.0-20250417205406-170dfdcf87d1 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/gonum/blas v0.0.0-20181208220705-f22b278b28ac // indirect
@@ -30,6 +31,10 @@ require (
 	github.com/gonum/matrix v0.0.0-20181209220409-c518dec07be9 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/guptarohit/asciigraph v0.7.3 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-isatty v0.0.19 // indirect
+	github.com/olekukonko/errors v0.0.0-20250405072817-4e6d85265da6 // indirect
+	github.com/olekukonko/ll v0.0.8 // indirect
 	github.com/rocketlaunchr/dataframe-go v0.0.0-20211025052708-a1030444159b // indirect
 	golang.org/x/sync v0.14.0 // indirect
 	gonum.org/v1/gonum v0.16.0 // indirect

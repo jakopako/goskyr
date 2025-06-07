@@ -1,6 +1,5 @@
+// Package types defines shared types used across the application.
 package types
-
-// shared types
 
 // Interaction represents a simple user interaction with a webpage
 type Interaction struct {

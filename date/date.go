@@ -1,8 +1,10 @@
+// Package date provides functionality to parse and format dates
 package date
 
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/jakopako/goskyr/utils"
@@ -17,6 +19,7 @@ type CoveredDateParts struct {
 	Time  bool `yaml:"time,omitempty"`
 }
 
+// CheckForDoubleDateParts checks if two CoveredDateParts structs cover the same date parts.
 func CheckForDoubleDateParts(dpOne CoveredDateParts, dpTwo CoveredDateParts) error {
 	if dpOne.Day && dpTwo.Day {
 		return errors.New("date parsing error: 'day' covered at least twice")
@@ -33,6 +36,7 @@ func CheckForDoubleDateParts(dpOne CoveredDateParts, dpTwo CoveredDateParts) err
 	return nil
 }
 
+// MergeDateParts merges two CoveredDateParts structs into one.
 func MergeDateParts(dpOne CoveredDateParts, dpTwo CoveredDateParts) CoveredDateParts {
 	return CoveredDateParts{
 		Day:   dpOne.Day || dpTwo.Day,
@@ -42,6 +46,7 @@ func MergeDateParts(dpOne CoveredDateParts, dpTwo CoveredDateParts) CoveredDateP
 	}
 }
 
+// HasAllDateParts checks if all date parts (day, month, year, time) are covered by the given CoveredDateParts struct.
 func HasAllDateParts(cdp CoveredDateParts) bool {
 	return cdp.Day && cdp.Month && cdp.Year && cdp.Time
 }
@@ -70,7 +75,7 @@ func GetDateFormat(date string, parts CoveredDateParts) (string, string) {
 	currToken := ""
 	// split date into tokens. Tokens are strings of characters, separators are single separator characters.
 	for _, c := range date {
-		if utils.RuneIsOneOf(c, separators) {
+		if slices.Contains(separators, c) {
 			if currToken != "" || len(tokens) == 0 {
 				// previous c was no separator
 				tokens = append(tokens, currToken)

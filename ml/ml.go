@@ -1,3 +1,4 @@
+// Package ml provides functions to extract features from scraped data, train a machine learning model, and label new data based on the trained model.
 package ml
 
 import (

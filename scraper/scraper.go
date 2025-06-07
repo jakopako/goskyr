@@ -1,3 +1,4 @@
+// Package scraper provides functionality to scrape data from websites
 package scraper
 
 import (
@@ -43,6 +44,9 @@ type Config struct {
 	Global   GlobalConfig        `yaml:"global,omitempty"`
 }
 
+// NewConfig reads a configuration file from the given path and returns
+// a Config struct. If the path is a directory it will read all files
+// in that directory and merge them into one Config struct.
 func NewConfig(configPath string) (*Config, error) {
 	var config Config
 	fileInfo, err := os.Stat(configPath)

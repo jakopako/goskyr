@@ -1,14 +1,17 @@
+// Package utils provides various utility functions for string manipulation, color conversion, and slice operations.
 package utils
 
 import (
 	"crypto/rand"
 	"fmt"
 	"math"
-	"sort"
+
+	"slices"
 
 	"golang.org/x/exp/constraints"
 )
 
+// ShortenString shortens a string to a given length and appends "..." if it exceeds that length.
 func ShortenString(s string, l int) string {
 	if len(s) > l && l != 0 {
 		return fmt.Sprintf("%s...", s[:l])
@@ -16,6 +19,7 @@ func ShortenString(s string, l int) string {
 	return s
 }
 
+// HSVToRGB converts HSV color values to RGB color values.
 func HSVToRGB(h, s, v float64) (int32, int32, int32) {
 	// from https://go.dev/play/p/9q5yBNDh3W
 	var r, g, b float64
@@ -57,31 +61,24 @@ func HSVToRGB(h, s, v float64) (int32, int32, int32) {
 	return int32(r), int32(g), int32(b)
 }
 
-func MostOcc[T comparable](predictions []T) T {
+// MostOcc returns the most occurring element in a slice of comparable elements.
+func MostOcc[T comparable](items []T) T {
 	count := map[T]int{}
-	for _, pred := range predictions {
-		count[pred]++
+	for _, item := range items {
+		count[item]++
 	}
-	var pred T
+	var mostOcc T
 	maxOcc := 0
-	for p, c := range count {
+	for item, c := range count {
 		if c > maxOcc {
 			maxOcc = c
-			pred = p
+			mostOcc = item
 		}
 	}
-	return pred
+	return mostOcc
 }
 
-func RuneIsOneOf(r rune, rs []rune) bool {
-	for _, ru := range rs {
-		if r == ru {
-			return true
-		}
-	}
-	return false
-}
-
+// ContainsDigits checks if a string contains any digit characters.
 func ContainsDigits(s string) bool {
 	for _, r := range s {
 		if r >= '0' && r <= '9' {
@@ -91,6 +88,7 @@ func ContainsDigits(s string) bool {
 	return false
 }
 
+// OnlyContainsDigits checks if a string contains only digit characters.
 func OnlyContainsDigits(s string) bool {
 	for _, r := range s {
 		if r < '0' || r > '9' {
@@ -100,15 +98,10 @@ func OnlyContainsDigits(s string) bool {
 	return true
 }
 
-func SortSlice[T constraints.Ordered](s []T) {
-	sort.Slice(s, func(i, j int) bool {
-		return s[i] < s[j]
-	})
-}
-
+// IntersectionSlices returns the intersection of two slices.
 func IntersectionSlices[T constraints.Ordered](a, b []T) []T {
-	SortSlice(a)
-	SortSlice(b)
+	slices.Sort(a)
+	slices.Sort(b)
 	result := []T{}
 	for j, k := 0, 0; j < len(a) && k < len(b); {
 		if a[j] == b[k] {
@@ -124,13 +117,14 @@ func IntersectionSlices[T constraints.Ordered](a, b []T) []T {
 	return result
 }
 
+// SliceEquals checks if two slices are equal, ignoring order.
 func SliceEquals[T constraints.Ordered](a, b []T) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	SortSlice(a)
-	SortSlice(b)
-	for i := 0; i < len(a); i++ {
+	slices.Sort(a)
+	slices.Sort(b)
+	for i := range a {
 		if a[i] != b[i] {
 			return false
 		}
@@ -138,12 +132,14 @@ func SliceEquals[T constraints.Ordered](a, b []T) bool {
 	return true
 }
 
+// ReverseSlice reverses a slice in place.
 func ReverseSlice[T any](s []T) {
 	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
 		s[i], s[j] = s[j], s[i]
 	}
 }
 
+// RandomString generates a random string prepended with a base string.
 func RandomString(base string) (string, error) {
 	bs := make([]byte, 8)
 	_, err := rand.Read(bs)

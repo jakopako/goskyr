@@ -1,3 +1,4 @@
+// Package fetch provides functionality to fetch web pages, both static and dynamic.
 package fetch
 
 import (

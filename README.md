@@ -523,17 +523,29 @@ The expression `exp` can be either a regular expression or a date comparison. De
 
 ### Interaction
 
-If a dynamic webpage does initially not load all the items it might be necessary to click some kind of 'load more' button. This can be configured as follows:
+If a dynamic webpage does initially not load all the items it might be necessary to click some kind of 'load more' button or scroll down the page. Multiple, consecutive interactions can be configured for one page.
+
+#### Interaction types
+
+**`click`**
 
 ```yml
 interaction:
-  - type: click # for now only click is supported.
+  - type: click
     selector: .some > div.selector
     count: 1 # number of clicks. Default is 1
-    delay: 2000 # milliseconds that the scraper waits after each click. Default is 500
+    delay: 2000 # milliseconds that the scraper waits after the click. Default is 500
 ```
 
-Note that these clicks are executed before the data is scraped. Also the interaction configuration will be ignored if `render_js` is not set to `true` because only in that case is the website actually run within a headless browser.
+**`scroll`**
+
+```yml
+interaction:
+  - type: scroll # scroll to the bottom of a page
+    delay: 2000 # milliseconds that the scraper waits after triggering the scroll. Default is 500
+```
+
+Note that interactions are executed before the data is scraped. Also the interaction configuration will be ignored if `render_js` is not set to `true` because only in that case is the website actually run within a headless browser.
 
 ### Pagination
 

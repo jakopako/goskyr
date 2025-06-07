@@ -13,6 +13,7 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/chromedp"
+	"github.com/chromedp/chromedp/kb"
 	"github.com/jakopako/goskyr/config"
 	"github.com/jakopako/goskyr/types"
 	"github.com/jakopako/goskyr/utils"
@@ -123,7 +124,7 @@ func (d *DynamicFetcher) Fetch(urlStr string, opts FetchOpts) (string, error) {
 			if ia.Count > 0 {
 				count = ia.Count
 			}
-			for i := 0; i < count; i++ {
+			for range count {
 				// we only click the button if it exists. Do we really need this check here?
 				actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
 					var nodes []*cdp.Node
@@ -139,6 +140,16 @@ func (d *DynamicFetcher) Fetch(urlStr string, opts FetchOpts) (string, error) {
 				actions = append(actions, chromedp.Sleep(delay))
 				logger.Debug(fmt.Sprintf("appended chrome actions: ActionFunc (mouse click), Sleep(%v)", delay))
 			}
+		} else if ia.Type == types.InteractionTypeScroll {
+			// scroll to the bottom of the page
+			actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
+				logger.Debug("scrolling down the page")
+				return chromedp.KeyEvent(kb.End).Do(ctx)
+			}))
+			actions = append(actions, chromedp.Sleep(delay))
+			logger.Debug(fmt.Sprintf("appended chrome actions: ActionFunc (scroll down), Sleep(%v)", delay))
+		} else {
+			logger.Warn(fmt.Sprintf("unknown interaction type %s", ia.Type))
 		}
 	}
 	actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {

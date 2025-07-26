@@ -256,9 +256,11 @@ type Scraper struct {
 }
 
 type ScrapingStats struct {
-	Name     string
-	NrItems  int
-	NrErrors int
+	Name      string
+	NrItems   int
+	NrErrors  int
+	StartTime time.Time
+	EndTime   time.Time
 }
 
 type ScrapingResult struct {
@@ -289,7 +291,8 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScrapingResul
 	result := &ScrapingResult{
 		Items: []map[string]any{},
 		Stats: &ScrapingStats{
-			Name: c.Name,
+			Name:      c.Name,
+			StartTime: time.Now().UTC(),
 		},
 	}
 
@@ -392,6 +395,8 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScrapingResul
 	}
 
 	c.guessYear(result.Items, time.Now())
+
+	result.Stats.EndTime = time.Now().UTC()
 
 	return result, nil
 }

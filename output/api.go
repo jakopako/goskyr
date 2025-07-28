@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"os"
 	"time"
+
+	"github.com/jakopako/goskyr/types"
 )
 
 // The APIWriter is meant to write to a custom API and assumes many things.
@@ -85,6 +87,10 @@ func (f *APIWriter) Write(items chan map[string]any) {
 	if !f.writerConfig.DryRun {
 		f.logger.Info(fmt.Sprintf("wrote %d items from %d sources to the api", nrItemsWritten, len(deletedSources)))
 	}
+}
+
+func (f *APIWriter) WriteStatus(scraperStatus types.ScraperStatus) {
+	// TODO: implement WriteStatus for APIWriter
 }
 
 func (f *APIWriter) writeBatch(client *http.Client, batch []map[string]any) int {

@@ -1,12 +1,18 @@
 // Package output provides the interface and configuration for writers
 package output
 
+import (
+	"github.com/jakopako/goskyr/types"
+)
+
 // Writer defines the interface for all writers that are responsible
 // for writing the scraped data to a specific output.
 type Writer interface {
-	// if a writer encounters a fatal error it should call log.Fatalf
+	// If a writer encounters a fatal error it should call log.Fatalf
 	// to prevent the crawler from uselessly continuing to run.
+	// Should Write return an error instead?
 	Write(itemsList chan map[string]any)
+	WriteStatus(scraperStatus types.ScraperStatus)
 }
 
 // .WriterConfig defines the necessary paramters to make a new writer

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+
+	"github.com/jakopako/goskyr/types"
 )
 
 type FileWriter struct {
@@ -58,4 +60,8 @@ func (fr *FileWriter) Write(items chan map[string]any) {
 	} else {
 		logger.Info(fmt.Sprintf("wrote %d items to file %s", len(allItems), fr.writerConfig.FilePath))
 	}
+}
+
+func (fr *FileWriter) WriteStatus(scraperStatus types.ScraperStatus) {
+	// TODO implement WriteStatus for FileWriter
 }

@@ -21,13 +21,14 @@ import (
 	"github.com/jakopako/goskyr/ml"
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/scraper"
+	"github.com/jakopako/goskyr/types"
 	"github.com/olekukonko/tablewriter"
 	"gopkg.in/yaml.v3"
 )
 
 var version = "dev"
 
-func worker(sc <-chan scraper.Scraper, ic chan<- map[string]any, stc chan<- scraper.ScrapingStats, gc *scraper.GlobalConfig, threadNr int) {
+func worker(sc <-chan scraper.Scraper, ic chan<- map[string]any, stc chan<- types.ScraperStatus, gc *scraper.GlobalConfig, threadNr int) {
 	workerLogger := slog.With(slog.Int("thread", threadNr))
 	for s := range sc {
 		scraperLogger := workerLogger.With(slog.String("name", s.Name))
@@ -46,22 +47,22 @@ func worker(sc <-chan scraper.Scraper, ic chan<- map[string]any, stc chan<- scra
 	workerLogger.Info("done working")
 }
 
-func collectAllStats(stc <-chan scraper.ScrapingStats) []scraper.ScrapingStats {
-	result := []scraper.ScrapingStats{}
+func collectAllStats(stc <-chan types.ScraperStatus) []types.ScraperStatus {
+	result := []types.ScraperStatus{}
 	for st := range stc {
 		result = append(result, st)
 	}
 	return result
 }
 
-func printAllStats(stats []scraper.ScrapingStats) {
+func printAllStats(stats []types.ScraperStatus) {
 	slog.Info("printing scraper summary")
 	// sort by name alphabetically
 	sort.Slice(stats, func(i, j int) bool {
 		return stats[i].Name < stats[j].Name
 	})
 
-	total := scraper.ScrapingStats{
+	total := types.ScraperStatus{
 		Name: "total",
 	}
 
@@ -222,7 +223,7 @@ func main() {
 	}
 
 	sc := make(chan scraper.Scraper)
-	stc := make(chan scraper.ScrapingStats)
+	stc := make(chan types.ScraperStatus)
 
 	// fill worker queue
 	go func() {

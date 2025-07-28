@@ -255,17 +255,9 @@ type Scraper struct {
 	fetcher      fetch.Fetcher
 }
 
-type ScrapingStats struct {
-	Name      string
-	NrItems   int
-	NrErrors  int
-	StartTime time.Time
-	EndTime   time.Time
-}
-
-type ScrapingResult struct {
+type ScraperResult struct {
 	Items []map[string]any
-	Stats *ScrapingStats
+	Stats *types.ScraperStatus
 }
 
 // Scrape fetches and returns all items from a website according to the
@@ -274,7 +266,7 @@ type ScrapingResult struct {
 // only on the location are returned (ignore regex_extract??). And only those
 // of dynamic fields, ie fields that don't have a predefined value and that are
 // present on the main page (not subpages). This is used by the ML feature generation.
-func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScrapingResult, error) {
+func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScraperResult, error) {
 
 	scrLogger := slog.With(slog.String("name", c.Name))
 	// initialize fetcher
@@ -288,9 +280,9 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScrapingResul
 		}
 	}
 
-	result := &ScrapingResult{
+	result := &ScraperResult{
 		Items: []map[string]any{},
-		Stats: &ScrapingStats{
+		Stats: &types.ScraperStatus{
 			Name:      c.Name,
 			StartTime: time.Now().UTC(),
 		},

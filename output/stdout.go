@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+
+	"github.com/jakopako/goskyr/types"
 )
 
 type StdoutWriter struct{}
@@ -36,4 +38,8 @@ func (s *StdoutWriter) Write(items chan map[string]any) {
 		}
 		fmt.Print(indentBuffer.String())
 	}
+}
+
+func (s *StdoutWriter) WriteStatus(scraperStatus types.ScraperStatus) {
+	// TODO implement WriteStatus for StdoutWriter
 }

@@ -32,16 +32,17 @@ import (
 // GlobalConfig is used for storing global configuration parameters that
 // are needed across all scrapers
 type GlobalConfig struct {
-	UserAgent string `yaml:"user-agent"`
+	UserAgent          string `yaml:"user_agent"`
+	WriteScraperStatus bool   `yaml:"write_scraper_status,omitempty"` // if true, the scraper will write the status of each scraper to the writer
 }
 
 // Config defines the overall structure of the scraper configuration.
 // Values will be taken from a config yml file or environment variables
 // or both.
 type Config struct {
-	Writer   output.WriterConfig `yaml:"writer,omitempty"`
-	Scrapers []Scraper           `yaml:"scrapers,omitempty"`
-	Global   GlobalConfig        `yaml:"global,omitempty"`
+	Writer   *output.WriterConfig `yaml:"writer,omitempty"`
+	Scrapers []Scraper            `yaml:"scrapers,omitempty"`
+	Global   *GlobalConfig        `yaml:"global,omitempty"`
 }
 
 // NewConfig reads a configuration file from the given path and returns
@@ -61,11 +62,22 @@ func NewConfig(configPath string) (*Config, error) {
 					return err
 				}
 				config.Scrapers = append(config.Scrapers, configTmp.Scrapers...)
-				if configTmp.Writer.Type != "" {
-					if config.Writer.Type == "" {
+
+				// writer
+				if configTmp.Writer != nil {
+					if config.Writer == nil {
 						config.Writer = configTmp.Writer
 					} else {
-						return fmt.Errorf("config files must only contain max. one writer")
+						return fmt.Errorf("config files must only contain max. one writer config")
+					}
+				}
+
+				// global
+				if configTmp.Global != nil {
+					if config.Global == nil {
+						config.Global = configTmp.Global
+					} else {
+						return fmt.Errorf("config files must only contain max. one global config")
 					}
 				}
 			}
@@ -79,8 +91,17 @@ func NewConfig(configPath string) (*Config, error) {
 			return nil, err
 		}
 	}
-	if config.Writer.Type == "" {
-		config.Writer.Type = output.STDOUT_WRITER_TYPE
+
+	if config.Global == nil {
+		config.Global = &GlobalConfig{
+			UserAgent: "goskyr web scraper (github.com/jakopako/goskyr)",
+		}
+	}
+
+	if config.Writer == nil {
+		config.Writer = &output.WriterConfig{
+			Type: output.STDOUT_WRITER_TYPE,
+		}
 	}
 	return &config, nil
 }
@@ -271,15 +292,20 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScraperResult
 	scrLogger := slog.With(slog.String("name", c.Name))
 
 	// initialize fetcher
+	// default fetcher type is static
+	if c.FetcherConfig.Type == "" {
+		c.FetcherConfig.Type = fetch.STATIC_FETCHER_TYPE
+	}
+
+	// To make the scraper backward compatible.
+	// At some point we'll depricate c.RenderJs (TODO)
 	if c.RenderJs {
-		// To make the scraper backward compatible.
-		// At some point we'll depricate c.RenderJs (TODO)
 		c.FetcherConfig.Type = fetch.DYNAMIC_FETCHER_TYPE
 	}
 
+	// To make the scraper backward compatible.
+	// At some point we'll depricate c.PageLoadWait (TODO)
 	if c.PageLoadWait != 0 {
-		// To make the scraper backward compatible.
-		// At some point we'll depricate c.PageLoadWait (TODO)
 		c.FetcherConfig.PageLoadWaitMS = c.PageLoadWait
 	}
 
@@ -289,10 +315,10 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScraperResult
 	}
 
 	fetcher, err := fetch.NewFetcher(&c.FetcherConfig)
-	defer fetcher.Cancel()
 	if err != nil {
 		return nil, err
 	}
+	defer fetcher.Cancel()
 
 	c.fetcher = fetcher
 

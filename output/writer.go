@@ -28,8 +28,8 @@ type WriterConfig struct {
 	Password  string     `yaml:"password" env:"WRITER_PASSWORD"`
 	FilePath  string     `yaml:"filepath" env:"WRITER_FILEPATH"`
 	DryRun    bool       `yaml:"dryrun" env:"WRITER_DRYRUN"`
-	UriDryRun string     `yaml:"uriDryRun" env:"WRITER_URI_DRYRUN"`
-	UriStatus string     `yaml:"uriStatus" env:"WRITER_URI_STATUS"`
+	UriDryRun string     `yaml:"uri_dry_run" env:"WRITER_URI_DRYRUN"`
+	UriStatus string     `yaml:"uri_status" env:"WRITER_URI_STATUS"`
 }
 
 type WriterType string

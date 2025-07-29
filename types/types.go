@@ -11,12 +11,14 @@ type Interaction struct {
 	Delay    int    `yaml:"delay,omitempty"`
 }
 
+// ScraperStatus represents the status of a scraper run.
 type ScraperStatus struct {
-	Name      string
-	NrItems   int
-	NrErrors  int
-	StartTime time.Time
-	EndTime   time.Time
+	ScraperName     string    `json:"scraperName"`
+	NrItems         int       `json:"nrItems"`
+	NrErrors        int       `json:"nrErrors"`
+	LastScrapeStart time.Time `json:"lastScrapeStart"`
+	LastScrapeEnd   time.Time `json:"lastScrapeEnd"`
+	ScraperLogs     string    `json:"scraperLogs"`
 }
 
 const (

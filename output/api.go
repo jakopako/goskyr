@@ -25,11 +25,11 @@ type APIWriter struct {
 func NewAPIWriter(wc *WriterConfig) *APIWriter {
 	return &APIWriter{
 		writerConfig: wc,
-		logger:       slog.With(slog.String("writer", API_WRITER_TYPE)),
+		logger:       slog.With(slog.String("writer", string(API_WRITER_TYPE))),
 	}
 }
 
-func (f *APIWriter) Write(items chan map[string]any) {
+func (f *APIWriter) Write(items <-chan map[string]any) {
 	client := &http.Client{
 		Timeout: time.Second * 60,
 	}
@@ -89,8 +89,43 @@ func (f *APIWriter) Write(items chan map[string]any) {
 	}
 }
 
-func (f *APIWriter) WriteStatus(scraperStatus types.ScraperStatus) {
-	// TODO: implement WriteStatus for APIWriter
+func (f *APIWriter) WriteStatus(scraperStatusC <-chan types.ScraperStatus) {
+	if f.writerConfig.DryRun {
+		f.logger.Info("dry run mode enabled, not writing scraper status")
+		return
+	}
+	client := &http.Client{
+		Timeout: time.Second * 60,
+	}
+	for status := range scraperStatusC {
+		statusJSON, err := json.Marshal(status)
+		if err != nil {
+			f.logger.Error(fmt.Sprintf("error while marshaling scraper status: %v", err))
+			continue
+		}
+		req, _ := http.NewRequest("POST", f.writerConfig.UriStatus, bytes.NewBuffer(statusJSON))
+		req.Header = map[string][]string{
+			"Content-Type": {"application/json"},
+		}
+		req.SetBasicAuth(f.writerConfig.User, f.writerConfig.Password)
+		resp, err := client.Do(req)
+		if err != nil {
+			f.logger.Error(fmt.Sprintf("error while sending post request for scraper status: %v", err))
+			continue
+		}
+		if resp.StatusCode != 200 {
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				f.logger.Error(fmt.Sprintf("error while reading post request response: %v", err))
+			} else {
+				f.logger.Error(fmt.Sprintf("error while posting scraper status. Status Code: %d Response: %s", resp.StatusCode, body))
+			}
+			resp.Body.Close()
+			continue
+		}
+		f.logger.Info(fmt.Sprintf("successfully posted scraper status for scraper %s", status.ScraperName))
+		resp.Body.Close()
+	}
 }
 
 func (f *APIWriter) writeBatch(client *http.Client, batch []map[string]any) int {

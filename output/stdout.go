@@ -11,8 +11,12 @@ import (
 
 type StdoutWriter struct{}
 
-func (s *StdoutWriter) Write(items chan map[string]any) {
-	logger := slog.With(slog.String("writer", STDOUT_WRITER_TYPE))
+func NewStdoutWriter(wc *WriterConfig) *StdoutWriter {
+	return &StdoutWriter{}
+}
+
+func (s *StdoutWriter) Write(items <-chan map[string]any) {
+	logger := slog.With(slog.String("writer", string(STDOUT_WRITER_TYPE)))
 	for item := range items {
 		// We cannot use the following line of code because it automatically replaces certain html characters
 		// with the corresponding Unicode replacement rune.
@@ -40,6 +44,6 @@ func (s *StdoutWriter) Write(items chan map[string]any) {
 	}
 }
 
-func (s *StdoutWriter) WriteStatus(scraperStatus types.ScraperStatus) {
+func (s *StdoutWriter) WriteStatus(scraperStatusC <-chan types.ScraperStatus) {
 	// TODO implement WriteStatus for StdoutWriter
 }

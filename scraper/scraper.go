@@ -243,16 +243,17 @@ type Paginator struct {
 // A Scraper contains all the necessary config parameters and structs needed
 // to extract the desired information from a website
 type Scraper struct {
-	Name         string               `yaml:"name"`
-	URL          string               `yaml:"url"`
-	Item         string               `yaml:"item"`
-	Fields       []Field              `yaml:"fields,omitempty"`
-	Filters      []*Filter            `yaml:"filters,omitempty"`
-	Paginator    Paginator            `yaml:"paginator,omitempty"`
-	RenderJs     bool                 `yaml:"render_js,omitempty"`
-	PageLoadWait int                  `yaml:"page_load_wait,omitempty"` // milliseconds. Only taken into account when render_js = true
-	Interaction  []*types.Interaction `yaml:"interaction,omitempty"`
-	fetcher      fetch.Fetcher
+	Name          string               `yaml:"name"`
+	URL           string               `yaml:"url"`
+	Item          string               `yaml:"item"`
+	Fields        []Field              `yaml:"fields,omitempty"`
+	Filters       []*Filter            `yaml:"filters,omitempty"`
+	Paginator     Paginator            `yaml:"paginator,omitempty"`
+	RenderJs      bool                 `yaml:"render_js,omitempty"`
+	PageLoadWait  int                  `yaml:"page_load_wait,omitempty"` // milliseconds. Only taken into account when render_js = true
+	Interaction   []*types.Interaction `yaml:"interaction,omitempty"`
+	FetcherConfig fetch.FetcherConfig  `yaml:"fetcher"`
+	fetcher       fetch.Fetcher
 }
 
 type ScraperResult struct {
@@ -267,24 +268,39 @@ type ScraperResult struct {
 // of dynamic fields, ie fields that don't have a predefined value and that are
 // present on the main page (not subpages). This is used by the ML feature generation.
 func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScraperResult, error) {
-
 	scrLogger := slog.With(slog.String("name", c.Name))
+
 	// initialize fetcher
 	if c.RenderJs {
-		dynFetcher := fetch.NewDynamicFetcher(globalConfig.UserAgent, c.PageLoadWait)
-		defer dynFetcher.Cancel()
-		c.fetcher = dynFetcher
-	} else {
-		c.fetcher = &fetch.StaticFetcher{
-			UserAgent: globalConfig.UserAgent,
-		}
+		// To make the scraper backward compatible.
+		// At some point we'll depricate c.RenderJs (TODO)
+		c.FetcherConfig.Type = fetch.DYNAMIC_FETCHER_TYPE
 	}
+
+	if c.PageLoadWait != 0 {
+		// To make the scraper backward compatible.
+		// At some point we'll depricate c.PageLoadWait (TODO)
+		c.FetcherConfig.PageLoadWaitMS = c.PageLoadWait
+	}
+
+	// if local UserAgent empty, set global one
+	if c.FetcherConfig.UserAgent == "" {
+		c.FetcherConfig.UserAgent = globalConfig.UserAgent
+	}
+
+	fetcher, err := fetch.NewFetcher(&c.FetcherConfig)
+	defer fetcher.Cancel()
+	if err != nil {
+		return nil, err
+	}
+
+	c.fetcher = fetcher
 
 	result := &ScraperResult{
 		Items: []map[string]any{},
 		Stats: &types.ScraperStatus{
-			Name:      c.Name,
-			StartTime: time.Now().UTC(),
+			ScraperName:     c.Name,
+			LastScrapeStart: time.Now().UTC(),
 		},
 	}
 
@@ -388,7 +404,7 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScraperResult
 
 	c.guessYear(result.Items, time.Now())
 
-	result.Stats.EndTime = time.Now().UTC()
+	result.Stats.LastScrapeEnd = time.Now().UTC()
 
 	return result, nil
 }

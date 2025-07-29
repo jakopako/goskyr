@@ -59,18 +59,18 @@ func printAllStats(stats []types.ScraperStatus) {
 	slog.Info("printing scraper summary")
 	// sort by name alphabetically
 	sort.Slice(stats, func(i, j int) bool {
-		return stats[i].Name < stats[j].Name
+		return stats[i].ScraperName < stats[j].ScraperName
 	})
 
 	total := types.ScraperStatus{
-		Name: "total",
+		ScraperName: "total",
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Name", "Items", "Errors"})
 
 	for _, s := range stats {
-		row := []string{s.Name, strconv.Itoa(s.NrItems), strconv.Itoa(s.NrErrors)}
+		row := []string{s.ScraperName, strconv.Itoa(s.NrItems), strconv.Itoa(s.NrErrors)}
 		if s.NrErrors > 0 {
 			table.Rich(row, []tablewriter.Colors{{tablewriter.Normal, tablewriter.FgRedColor}, {tablewriter.Normal, tablewriter.FgRedColor}, {tablewriter.Normal, tablewriter.FgRedColor}})
 		} else if s.NrErrors == 0 && s.NrItems == 0 {
@@ -81,7 +81,7 @@ func printAllStats(stats []types.ScraperStatus) {
 		total.NrErrors += s.NrErrors
 		total.NrItems += s.NrItems
 	}
-	table.SetFooter([]string{total.Name, strconv.Itoa(total.NrItems), strconv.Itoa(total.NrErrors)})
+	table.SetFooter([]string{total.ScraperName, strconv.Itoa(total.NrItems), strconv.Itoa(total.NrErrors)})
 	table.SetColumnAlignment([]int{tablewriter.ALIGN_LEFT, tablewriter.ALIGN_RIGHT, tablewriter.ALIGN_RIGHT})
 	table.SetBorder(false)
 	table.Render()
@@ -101,7 +101,7 @@ func main() {
 	buildModel := flag.String("t", "", "Train a ML model based on the given csv features file. This will generate 2 files, goskyr.model and goskyr.class")
 	modelPath := flag.String("model", "", "Use a pre-trained ML model to infer names of extracted fields. Works in combination with the -g flag.")
 	debugFlag := flag.Bool("debug", false, "Prints debug logs and writes scraped html's to files.")
-	summaryFlag := flag.Bool("summary", false, "Print scraper summary at the end.")
+	// summaryFlag := flag.Bool("summary", false, "Print scraper summary at the end.")
 	dryRunFlag := flag.Bool("dryrun", false, "If set to true, the writer will just do a dry run (currently only has an effect on the api writer). Useful for testing purposes.")
 
 	flag.Parse()
@@ -195,27 +195,20 @@ func main() {
 
 	var workerWg sync.WaitGroup
 	var writerWg sync.WaitGroup
-	var statsWg sync.WaitGroup
+	var statusWg sync.WaitGroup
 	ic := make(chan map[string]any)
 
-	var writer output.Writer
 	if *toStdout {
-		writer = &output.StdoutWriter{}
-	} else {
-		if *dryRunFlag {
-			config.Writer.DryRun = true
-		}
-		switch config.Writer.Type {
-		case output.STDOUT_WRITER_TYPE:
-			writer = &output.StdoutWriter{}
-		case output.API_WRITER_TYPE:
-			writer = output.NewAPIWriter(&config.Writer)
-		case output.FILE_WRITER_TYPE:
-			writer = output.NewFileWriter(&config.Writer)
-		default:
-			slog.Error(fmt.Sprintf("writer of type %s not implemented", config.Writer.Type))
-			os.Exit(1)
-		}
+		config.Writer.Type = output.STDOUT_WRITER_TYPE
+	}
+	if *dryRunFlag {
+		config.Writer.DryRun = true
+	}
+
+	writer, err := output.NewWriter(&config.Writer)
+	if err != nil {
+		slog.Error(err.Error())
+		os.Exit(1)
 	}
 
 	if config.Global.UserAgent == "" {
@@ -267,23 +260,16 @@ func main() {
 	}()
 
 	// start stats collection
-	statsWg.Add(1)
+	statusWg.Add(1)
 	slog.Debug("starting stats collection")
 	go func() {
-		defer statsWg.Done()
-		allStats := collectAllStats(stc)
-		writerWg.Wait() // only print stats in the end
-		// a bit ugly to just check here and do the collection
-		// of the stats even though they might not be needed.
-		// But this is easier for now, coding-wise.
-		if *summaryFlag {
-			printAllStats(allStats)
-		}
+		defer statusWg.Done()
+		writer.WriteStatus(stc)
 	}()
 
 	workerWg.Wait()
 	close(ic)
 	close(stc)
 	writerWg.Wait()
-	statsWg.Wait()
+	statusWg.Wait()
 }

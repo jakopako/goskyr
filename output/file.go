@@ -20,8 +20,8 @@ func NewFileWriter(wc *WriterConfig) *FileWriter {
 		writerConfig: wc,
 	}
 }
-func (fr *FileWriter) Write(items chan map[string]any) {
-	logger := slog.With(slog.String("writer", FILE_WRITER_TYPE))
+func (fr *FileWriter) Write(items <-chan map[string]any) {
+	logger := slog.With(slog.String("writer", string(FILE_WRITER_TYPE)))
 	f, err := os.Create(fr.writerConfig.FilePath)
 	if err != nil {
 		logger.Error(fmt.Sprintf("error while trying to open file: %v", err))
@@ -62,6 +62,6 @@ func (fr *FileWriter) Write(items chan map[string]any) {
 	}
 }
 
-func (fr *FileWriter) WriteStatus(scraperStatus types.ScraperStatus) {
+func (fr *FileWriter) WriteStatus(scraperStatusC <-chan types.ScraperStatus) {
 	// TODO implement WriteStatus for FileWriter
 }

@@ -245,19 +245,25 @@ func main() {
 
 	// fill worker queue
 	go func() {
-		queuedScrapers := 0
-		for _, s := range config.Scrapers {
-			if *singleScraper == "" || *singleScraper == s.Name {
-				// s.Debug = *debugFlag
+		if *singleScraper == "" {
+			slog.Info(fmt.Sprintf("queueing %d scrapers", len(config.Scrapers)))
+			for _, s := range config.Scrapers {
 				sc <- s
-				queuedScrapers++
+			}
+		} else {
+			foundSingleScraper := false
+			for _, s := range config.Scrapers {
+				if *singleScraper == s.Name {
+					sc <- s
+					foundSingleScraper = true
+					break
+				}
+			}
+			if !foundSingleScraper {
+				slog.Error(fmt.Sprintf("no scrapers found for name %s", *singleScraper))
+				os.Exit(1)
 			}
 		}
-		if queuedScrapers == 0 {
-			slog.Error(fmt.Sprintf("no scrapers found for name %s", *singleScraper))
-			os.Exit(1)
-		}
-		slog.Info(fmt.Sprintf("queued %d scrapers", queuedScrapers))
 		close(sc)
 	}()
 

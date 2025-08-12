@@ -32,8 +32,8 @@ import (
 // GlobalConfig is used for storing global configuration parameters that
 // are needed across all scrapers
 type GlobalConfig struct {
-	UserAgent          string `yaml:"user_agent"`
-	WriteScraperStatus bool   `yaml:"write_scraper_status,omitempty"` // if true, the scraper will write the status of each scraper to the writer
+	UserAgent string `yaml:"user_agent"`
+	// WriteScraperStatus bool   `yaml:"write_scraper_status,omitempty"` // if true, the scraper will write the status of each scraper to the writer. TODO: move to writer config?
 }
 
 // Config defines the overall structure of the scraper configuration.

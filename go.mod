@@ -4,8 +4,8 @@ go 1.24
 
 require (
 	github.com/PuerkitoBio/goquery v1.10.3
-	github.com/chromedp/cdproto v0.0.0-20250429231605-6ed5b53462d4
-	github.com/chromedp/chromedp v0.13.7
+	github.com/chromedp/cdproto v0.0.0-20250724212937-08a3db8b4327
+	github.com/chromedp/chromedp v0.14.1
 	github.com/gdamore/tcell/v2 v2.8.1
 	github.com/goodsign/monday v1.0.2
 	github.com/ilyakaznacheev/cleanenv v1.5.0
@@ -23,7 +23,7 @@ require (
 
 require (
 	github.com/antchfx/xpath v1.3.4 // indirect
-	github.com/go-json-experiment/json v0.0.0-20250417205406-170dfdcf87d1 // indirect
+	github.com/go-json-experiment/json v0.0.0-20250725192818-e39067aee2d2 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/gonum/blas v0.0.0-20181208220705-f22b278b28ac // indirect
 	github.com/gonum/lapack v0.0.0-20181123203213-e4cdc5a0bff9 // indirect

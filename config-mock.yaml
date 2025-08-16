@@ -10,6 +10,7 @@
 writer:
   type: file
   filedir: mock-items
+  write_status: true
 
 scrapers:
   - name: mock

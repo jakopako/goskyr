@@ -15,8 +15,8 @@ import (
 	"github.com/jakopako/goskyr/types"
 )
 
-// The APIWriter is meant to write to a custom API and assumes many things.
-// So currently, it is better not to use this APIWriter.
+// APIWriter represents a writer that writes to a custom API.
+// The corresponding API can be found here: https://github.com/jakopako/event-api
 type APIWriter struct {
 	*WriterConfig
 	logger *slog.Logger

@@ -12,6 +12,7 @@ import (
 	"github.com/jakopako/goskyr/types"
 )
 
+// FileWriter represents a writer that writes to a file
 type FileWriter struct {
 	*WriterConfig
 	logger *slog.Logger
@@ -69,7 +70,7 @@ func (w *FileWriter) Write(itemChan <-chan map[string]any) {
 		return
 	}
 	if _, err = f.Write(indentBuffer.Bytes()); err != nil {
-		w.logger.Error(fmt.Sprintf("error while writing json to file: %v", err))
+		w.logger.Error(fmt.Sprintf("error while writing items json to file: %v", err))
 	} else {
 		w.logger.Info(fmt.Sprintf("wrote %d items to file %s", len(allItems), filepath))
 	}
@@ -88,5 +89,15 @@ func (w *FileWriter) WriteStatus(statusChan <-chan types.ScraperStatus) {
 	for status := range statusChan {
 		allStatus = append(allStatus, status)
 	}
-	// WIP
+
+	statusJson, err := json.MarshalIndent(allStatus, "", "  ")
+	if err != nil {
+		w.logger.Error(fmt.Sprintf("error while marshalling status json: %v", err))
+	}
+
+	if _, err = f.Write(statusJson); err != nil {
+		w.logger.Error(fmt.Sprintf("error while writing status json to file: %v", err))
+	} else {
+		w.logger.Info(fmt.Sprintf("wrote status to file %s", filepath))
+	}
 }

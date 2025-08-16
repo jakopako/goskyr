@@ -1,4 +1,4 @@
-// Package output provides the interface and configuration for writers
+// Package output provides the interface and configuration and implementation for writers
 package output
 
 import (
@@ -33,6 +33,8 @@ type WriterConfig struct {
 	WriteStatus bool       `yaml:"write_status" env:"WRITER_WRITE_STATUS"`
 }
 
+// WriterType encapsulates the type of a writer
+// See below constants for possible types
 type WriterType string
 
 const (
@@ -41,6 +43,7 @@ const (
 	API_WRITER_TYPE    WriterType = "api"
 )
 
+// NewWriter returns a new writer depending on the writer type
 func NewWriter(wc *WriterConfig) (Writer, error) {
 	switch wc.Type {
 	case STDOUT_WRITER_TYPE:

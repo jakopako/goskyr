@@ -18,7 +18,7 @@ type ScraperStatus struct {
 	NrErrors        int       `json:"nrErrors"`
 	LastScrapeStart time.Time `json:"lastScrapeStart"`
 	LastScrapeEnd   time.Time `json:"lastScrapeEnd"`
-	ScraperLogs     string    `json:"scraperLogs"`
+	ScraperLogs     string    `json:"scraperLogs"` // not yet used
 }
 
 const (

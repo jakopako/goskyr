@@ -12,6 +12,11 @@ import (
 	"github.com/jakopako/goskyr/types"
 )
 
+const (
+	itemsFilename  = "items.json"
+	statusFilename = "status.json"
+)
+
 // FileWriter represents a writer that writes to a file
 type FileWriter struct {
 	*WriterConfig
@@ -33,9 +38,9 @@ func NewFileWriter(wc *WriterConfig) (*FileWriter, error) {
 		logger:       slog.With(slog.String("writer", string(FILE_WRITER_TYPE))),
 	}, nil
 }
+
 func (w *FileWriter) Write(itemChan <-chan map[string]any) {
-	filename := "items.json"
-	filepath := path.Join(w.FileDir, filename)
+	filepath := path.Join(w.FileDir, itemsFilename)
 	f, err := os.Create(filepath)
 	if err != nil {
 		w.logger.Error(fmt.Sprintf("error while trying to open file: %v", err))
@@ -77,8 +82,7 @@ func (w *FileWriter) Write(itemChan <-chan map[string]any) {
 }
 
 func (w *FileWriter) WriteStatus(statusChan <-chan types.ScraperStatus) {
-	filename := "status.json"
-	filepath := path.Join(w.FileDir, filename)
+	filepath := path.Join(w.FileDir, statusFilename)
 	f, err := os.Create(filepath)
 	if err != nil {
 		w.logger.Error(fmt.Sprintf("error while trying to open file: %v", err))

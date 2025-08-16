@@ -12,7 +12,7 @@
 1. [Manual Configuration & Usage](#manual-configuration--usage)
    1. [Static fields](#static-fields)
    1. [Dynamic fields](#dynamic-fields)
-   1. [JS rendering](#js-rendering)
+   1. [Fetcher](#fetcher)
    1. [Filters](#filters)
    1. [Interaction](#interaction)
    1. [Pagination](#pagination)
@@ -222,7 +222,7 @@ fields:
 
 ### Dynamic fields
 
-Dynamic fields are a little more complex as their values are extracted from the webpage and can have different types. In the most trivial case it suffices to define a field name and a selector so the scraper knows where to look for the corresponding value. The quotes scraper is a good example for that:
+Dynamic fields are a little more complex as their values are extracted from the web page and can have different types. In the most trivial case it suffices to define a field name and a selector so the scraper knows where to look for the corresponding value. The quotes scraper is a good example for that:
 
 ```yml
 fields:
@@ -427,7 +427,7 @@ To get an even better feeling for the location configuration check out the numer
 
 _Subkey: `json_selector`_
 
-If the string extracted from the webpage is a json string, then you can extract data from that json based on the give `json_selector`.
+If the string extracted from the web page is a json string, then you can extract data from that json based on the give `json_selector`.
 
 _Subkey: `default`_
 
@@ -484,9 +484,9 @@ Note, that the `transform` can also be used for date components, eg.
 
 This is the type of the field. As mentioned above its value can be `text`, `url` or `date`.
 
-For a field of type `text` the value that is being extracted from the webpage based on the defined location will simply be assigned to the value of the corresponding field in the output.
+For a field of type `text` the value that is being extracted from the web page based on the defined location will simply be assigned to the value of the corresponding field in the output.
 
-If a field has type `url`, the resulting value in the output will allways be a full, valid url, meaning that it will contain protocol, hostname, path and query parameters. If the webpage does not provide this, goskyr will 'autocomplete' the url like a browser would. E.g. if a webpage, `https://event-venue.com`, contains `<a href="/events/10-03-2023-krachstock-final-story" >` and we would have a field of type `url` that extracts this url from the href attribute the resulting value would be `https://event-venue.com/events/10-03-2023-krachstock-final-story`. Also, the `location.attr` field is implicetly set to `"href"` if not defined by the user.
+If a field has type `url`, the resulting value in the output will allways be a full, valid url, meaning that it will contain protocol, hostname, path and query parameters. If the web page does not provide this, goskyr will 'autocomplete' the url like a browser would. E.g. if a web page, `https://event-venue.com`, contains `<a href="/events/10-03-2023-krachstock-final-story" >` and we would have a field of type `url` that extracts this url from the href attribute the resulting value would be `https://event-venue.com/events/10-03-2023-krachstock-final-story`. Also, the `location.attr` field is implicetly set to `"href"` if not defined by the user.
 
 A `date` field is different from a text field in that the result is a complete, valid date. Internally, this is a `time.Time` object but in the json output it is represented by a string in RFC3339 format. In order to be able to handle a lot of different cases where date information might be spread across different locations, might be formatted in different ways using different languages a date field has a list of components and some other optional settings, see table above.
 
@@ -494,11 +494,57 @@ As can be seen, a component has to define which part of the date it covers (at l
 
 The `date_language` key needs to correspond to the language on the website. Currently, the default is `de_DE`. Note, that this doesn't matter for dates that only contain numbers. `date_location` sets the time zone of the respective date.
 
-### JS rendering
+### Fetcher
 
-Since version 0.3.0 js rendering is supported. For this to work the `google-chrome` binary needs to be installed. In the configuration snippet of a scraper just add `render_js: true` and everything will be taken care of. With `page_load_wait: <milliseconds>` the default waiting time of 2000 ms can be adapted accordingly.
+Different ways of fetching a web page are supported. The two supported types are `static` and `dynamic`. By default a scraper uses a static fetcher, i.e. does not render any javascript. You can configure a static fetcher explicitly if you like.
 
-User interactions with the page (eg scrolling) might be implemented in the future. Clicking has been implemented, see below section [Interaction](#interaction).
+```yml
+fetcher:
+  type: static
+```
+
+To render javascript before extracting any data from a web page, you need to use the dynamic fetcher. For this to work the `google-chrome` binary needs to be installed.
+
+```yml
+fetcher:
+  type: dynamic
+  page_load_wait_ms: 1000 # optional. Defaults to 2000 ms
+```
+
+If using the dynamic fetcher there are ways of interacting with the page, see below section [Interaction](#interaction).
+
+For both types of fetcher, there is an option to customize the user agent.
+
+```yml
+fetcher:
+  user_agent: "Mozilla"
+```
+
+### Interaction
+
+If a dynamic web page does initially not load all the items it might be necessary to click some kind of 'load more' button or scroll down the page. Multiple, consecutive interactions can be configured for one page.
+
+#### Interaction types
+
+**`click`**
+
+```yml
+interaction:
+  - type: click
+    selector: .some > div.selector
+    count: 1 # number of clicks. Default is 1
+    delay: 2000 # milliseconds that the scraper waits after the click. Default is 500
+```
+
+**`scroll`**
+
+```yml
+interaction:
+  - type: scroll # scroll to the bottom of a page
+    delay: 2000 # milliseconds that the scraper waits after triggering the scroll. Default is 500
+```
+
+Note that interactions are executed before the data is scraped. Also the interaction configuration will only be respected if the dynamic fetcher is used because only in that case is the website actually run within a headless browser.
 
 ### Filters
 
@@ -521,32 +567,6 @@ The `field` key determines to which field the expression will be applied. `exp` 
 
 The expression `exp` can be either a regular expression or a date comparison. Depending on the type of the respective `field` in the `fields` section of the configuration it has to be either one or the other. If the corresponding field is of type `date` the expression has to be a date comparison. For every other field type it has to be a regular expression.
 
-### Interaction
-
-If a dynamic webpage does initially not load all the items it might be necessary to click some kind of 'load more' button or scroll down the page. Multiple, consecutive interactions can be configured for one page.
-
-#### Interaction types
-
-**`click`**
-
-```yml
-interaction:
-  - type: click
-    selector: .some > div.selector
-    count: 1 # number of clicks. Default is 1
-    delay: 2000 # milliseconds that the scraper waits after the click. Default is 500
-```
-
-**`scroll`**
-
-```yml
-interaction:
-  - type: scroll # scroll to the bottom of a page
-    delay: 2000 # milliseconds that the scraper waits after triggering the scroll. Default is 500
-```
-
-Note that interactions are executed before the data is scraped. Also the interaction configuration will be ignored if `render_js` is not set to `true` because only in that case is the website actually run within a headless browser.
-
 ### Pagination
 
 If the list of items on a web page spans multiple pages pagination can be configured as follows:
@@ -557,7 +577,7 @@ paginator:
     selector: ".pagination .selector"
 ```
 
-In case `render_js` is set to `false` by default the value of the `href` key is taken as url for the next page. However, you can change this and other parameters in the paginator configuration.
+If the static fetcher is used by default the value of the `href` key is taken as url for the next page. However, you can change this and other parameters in the paginator configuration.
 
 ```yml
 paginator:
@@ -567,7 +587,7 @@ paginator:
   max_pages: <number>
 ```
 
-If `render_js` is set to `true` the scraper will simulate a mouse click on the given selector to loop over the pages.
+If the dynamic fetcher is used the scraper will simulate a mouse click on the given selector to loop over the pages.
 
 ### Output
 

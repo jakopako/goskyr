@@ -320,6 +320,7 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScraperResult
 	}
 	defer fetcher.Cancel()
 
+	scrLogger.Info(fmt.Sprintf("using %s fetcher", c.FetcherConfig.Type))
 	c.fetcher = fetcher
 
 	result := &ScraperResult{

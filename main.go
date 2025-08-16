@@ -239,12 +239,12 @@ func main() {
 	workerWg := sync.WaitGroup{}
 	workerWg.Add(nrWorkers)
 
-	ic := make(chan map[string]any)
+	itemChan := make(chan map[string]any)
 	slog.Debug("starting workers")
 	for i := range nrWorkers {
 		go func(j int) {
 			defer workerWg.Done()
-			worker(scraperChan, ic, statusChan, config.Global, j)
+			worker(scraperChan, itemChan, statusChan, config.Global, j)
 		}(i)
 	}
 
@@ -254,12 +254,12 @@ func main() {
 	go func() {
 		defer collectorWg.Done()
 		slog.Debug("starting collector")
-		collector(ic, statusChan, writer)
+		collector(itemChan, statusChan, writer)
 	}()
 
 	workerWg.Wait()
 	slog.Debug("all workers finished, closing item channel")
-	close(ic)
+	close(itemChan)
 	if statusChan != nil {
 		slog.Debug("all workers finished, closing scraper status channel")
 		close(statusChan)

@@ -578,6 +578,25 @@ func TestExtractFieldUrlOrText(t *testing.T) {
 			},
 			expected: "Treffpunkt",
 		},
+		"text transform": {
+			htmlString: htmlString4,
+			field: &Field{
+				Name: "title",
+				ElementLocations: []ElementLocation{
+					{
+						Selector: "div > a > div",
+					},
+				},
+				Transform: []TransformConfig{
+					{
+						TransformType: "regex-replace",
+						RegexPattern:  "p[a-z]+n",
+						Replacement:   "xxx",
+					},
+				},
+			},
+			expected: "Treffxxxkt",
+		},
 		"url needs base url": {
 			htmlString: htmlString,
 			field: &Field{

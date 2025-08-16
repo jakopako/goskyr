@@ -15,9 +15,9 @@ func NewStdoutWriter(wc *WriterConfig) *StdoutWriter {
 	return &StdoutWriter{}
 }
 
-func (s *StdoutWriter) Write(items <-chan map[string]any) {
+func (w *StdoutWriter) Write(itemChan <-chan map[string]any) {
 	logger := slog.With(slog.String("writer", string(STDOUT_WRITER_TYPE)))
-	for item := range items {
+	for item := range itemChan {
 		// We cannot use the following line of code because it automatically replaces certain html characters
 		// with the corresponding Unicode replacement rune.
 		// itemsJson, err := json.MarshalIndent(items, "", "  ")
@@ -44,6 +44,6 @@ func (s *StdoutWriter) Write(items <-chan map[string]any) {
 	}
 }
 
-func (s *StdoutWriter) WriteStatus(scraperStatusC <-chan types.ScraperStatus) {
+func (w *StdoutWriter) WriteStatus(statusChan <-chan types.ScraperStatus) {
 	// TODO implement WriteStatus for StdoutWriter
 }

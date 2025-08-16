@@ -542,3 +542,190 @@ func TestGetDateFormat18(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckForDoubleDateParts(t *testing.T) {
+	tests := []struct {
+		name    string
+		dpOne   CoveredDateParts
+		dpTwo   CoveredDateParts
+		wantErr string
+	}{
+		{
+			name:    "No overlap",
+			dpOne:   CoveredDateParts{Day: true},
+			dpTwo:   CoveredDateParts{Month: true},
+			wantErr: "",
+		},
+		{
+			name:    "Day overlap",
+			dpOne:   CoveredDateParts{Day: true},
+			dpTwo:   CoveredDateParts{Day: true},
+			wantErr: "date parsing error: 'day' covered at least twice",
+		},
+		{
+			name:    "Month overlap",
+			dpOne:   CoveredDateParts{Month: true},
+			dpTwo:   CoveredDateParts{Month: true},
+			wantErr: "date parsing error: 'month' covered at least twice",
+		},
+		{
+			name:    "Year overlap",
+			dpOne:   CoveredDateParts{Year: true},
+			dpTwo:   CoveredDateParts{Year: true},
+			wantErr: "date parsing error: 'year' covered at least twice",
+		},
+		{
+			name:    "Time overlap",
+			dpOne:   CoveredDateParts{Time: true},
+			dpTwo:   CoveredDateParts{Time: true},
+			wantErr: "date parsing error: 'time' covered at least twice",
+		},
+		{
+			name:    "Multiple overlaps, only first detected",
+			dpOne:   CoveredDateParts{Day: true, Month: true},
+			dpTwo:   CoveredDateParts{Day: true, Month: true},
+			wantErr: "date parsing error: 'day' covered at least twice",
+		},
+		{
+			name:    "No overlap, all different",
+			dpOne:   CoveredDateParts{Day: true, Month: true},
+			dpTwo:   CoveredDateParts{Year: true, Time: true},
+			wantErr: "",
+		},
+		{
+			name:    "All overlap, only first detected",
+			dpOne:   CoveredDateParts{Day: true, Month: true, Year: true, Time: true},
+			dpTwo:   CoveredDateParts{Day: true, Month: true, Year: true, Time: true},
+			wantErr: "date parsing error: 'day' covered at least twice",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := CheckForDoubleDateParts(tt.dpOne, tt.dpTwo)
+			if tt.wantErr == "" && err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Errorf("expected error %q, got nil", tt.wantErr)
+				} else if err.Error() != tt.wantErr {
+					t.Errorf("expected error %q, got %q", tt.wantErr, err.Error())
+				}
+			}
+		})
+	}
+}
+func TestMergeDateParts(t *testing.T) {
+	tests := []struct {
+		name     string
+		dpOne    CoveredDateParts
+		dpTwo    CoveredDateParts
+		expected CoveredDateParts
+	}{
+		{
+			name:     "No overlap, all false",
+			dpOne:    CoveredDateParts{},
+			dpTwo:    CoveredDateParts{},
+			expected: CoveredDateParts{},
+		},
+		{
+			name:     "No overlap, different parts",
+			dpOne:    CoveredDateParts{Day: true},
+			dpTwo:    CoveredDateParts{Month: true},
+			expected: CoveredDateParts{Day: true, Month: true},
+		},
+		{
+			name:     "Overlap, both true for Day",
+			dpOne:    CoveredDateParts{Day: true},
+			dpTwo:    CoveredDateParts{Day: true},
+			expected: CoveredDateParts{Day: true},
+		},
+		{
+			name:     "All true in one, all false in other",
+			dpOne:    CoveredDateParts{Day: true, Month: true, Year: true, Time: true},
+			dpTwo:    CoveredDateParts{},
+			expected: CoveredDateParts{Day: true, Month: true, Year: true, Time: true},
+		},
+		{
+			name:     "All true in both",
+			dpOne:    CoveredDateParts{Day: true, Month: true, Year: true, Time: true},
+			dpTwo:    CoveredDateParts{Day: true, Month: true, Year: true, Time: true},
+			expected: CoveredDateParts{Day: true, Month: true, Year: true, Time: true},
+		},
+		{
+			name:     "Mixed overlap",
+			dpOne:    CoveredDateParts{Day: true, Year: true},
+			dpTwo:    CoveredDateParts{Month: true, Time: true},
+			expected: CoveredDateParts{Day: true, Month: true, Year: true, Time: true},
+		},
+		{
+			name:     "Partial overlap",
+			dpOne:    CoveredDateParts{Day: true, Month: true},
+			dpTwo:    CoveredDateParts{Month: true, Year: true},
+			expected: CoveredDateParts{Day: true, Month: true, Year: true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := MergeDateParts(tt.dpOne, tt.dpTwo)
+			if result != tt.expected {
+				t.Errorf("expected %+v, got %+v", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestHasAllDateParts(t *testing.T) {
+	tests := []struct {
+		name     string
+		cdp      CoveredDateParts
+		expected bool
+	}{
+		{
+			name:     "All parts true",
+			cdp:      CoveredDateParts{Day: true, Month: true, Year: true, Time: true},
+			expected: true,
+		},
+		{
+			name:     "Day missing",
+			cdp:      CoveredDateParts{Day: false, Month: true, Year: true, Time: true},
+			expected: false,
+		},
+		{
+			name:     "Month missing",
+			cdp:      CoveredDateParts{Day: true, Month: false, Year: true, Time: true},
+			expected: false,
+		},
+		{
+			name:     "Year missing",
+			cdp:      CoveredDateParts{Day: true, Month: true, Year: false, Time: true},
+			expected: false,
+		},
+		{
+			name:     "Time missing",
+			cdp:      CoveredDateParts{Day: true, Month: true, Year: true, Time: false},
+			expected: false,
+		},
+		{
+			name:     "All parts false",
+			cdp:      CoveredDateParts{Day: false, Month: false, Year: false, Time: false},
+			expected: false,
+		},
+		{
+			name:     "Only one part true",
+			cdp:      CoveredDateParts{Day: true},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := HasAllDateParts(tt.cdp)
+			if result != tt.expected {
+				t.Errorf("HasAllDateParts(%+v) = %v; want %v", tt.cdp, result, tt.expected)
+			}
+		})
+	}
+}

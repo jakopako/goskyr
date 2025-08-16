@@ -48,23 +48,23 @@ func worker(sc <-chan scraper.Scraper, ic chan<- map[string]any, stc chan<- type
 	workerLogger.Info("done working")
 }
 
-func collector(ic <-chan map[string]any, stc <-chan types.ScraperStatus, writer output.Writer) {
+func collector(itemChan <-chan map[string]any, statusChan <-chan types.ScraperStatus, writer output.Writer) {
 	collectorLogger := slog.With(slog.String("collector", "main"))
 	writerWg := sync.WaitGroup{}
 	writerWg.Add(1)
 	go func() {
 		defer writerWg.Done()
 		collectorLogger.Debug("starting writing items")
-		writer.Write(ic)
+		writer.Write(itemChan)
 	}()
 
-	if stc != nil {
+	if statusChan != nil {
 		statusWg := sync.WaitGroup{}
 		statusWg.Add(1)
 		go func() {
 			defer statusWg.Done()
 			collectorLogger.Debug("starting writing scraper status")
-			writer.WriteStatus(stc)
+			writer.WriteStatus(statusChan)
 		}()
 		statusWg.Wait()
 		collectorLogger.Debug("done writing scraper status")
@@ -236,11 +236,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	sc := make(chan scraper.Scraper)
-	var stc chan types.ScraperStatus = nil
-	if config.Global.WriteScraperStatus {
+	scraperChan := make(chan scraper.Scraper)
+	var statusChan chan types.ScraperStatus = nil
+	if config.Writer.WriteStatus && !config.Writer.DryRun {
 		slog.Info("scraper status collection enabled")
-		stc = make(chan types.ScraperStatus)
+		statusChan = make(chan types.ScraperStatus)
+	} else {
+		slog.Info("scraper status collection disabled")
 	}
 
 	// fill worker queue
@@ -248,13 +250,13 @@ func main() {
 		if *singleScraper == "" {
 			slog.Info(fmt.Sprintf("queueing %d scrapers", len(config.Scrapers)))
 			for _, s := range config.Scrapers {
-				sc <- s
+				scraperChan <- s
 			}
 		} else {
 			foundSingleScraper := false
 			for _, s := range config.Scrapers {
 				if *singleScraper == s.Name {
-					sc <- s
+					scraperChan <- s
 					foundSingleScraper = true
 					break
 				}
@@ -264,7 +266,7 @@ func main() {
 				os.Exit(1)
 			}
 		}
-		close(sc)
+		close(scraperChan)
 	}()
 
 	// start workers
@@ -282,7 +284,7 @@ func main() {
 	for i := range nrWorkers {
 		go func(j int) {
 			defer workerWg.Done()
-			worker(sc, ic, stc, config.Global, j)
+			worker(scraperChan, ic, statusChan, config.Global, j)
 		}(i)
 	}
 
@@ -292,15 +294,15 @@ func main() {
 	go func() {
 		defer collectorWg.Done()
 		slog.Debug("starting collector")
-		collector(ic, stc, writer)
+		collector(ic, statusChan, writer)
 	}()
 
 	workerWg.Wait()
 	slog.Debug("all workers finished, closing item channel")
 	close(ic)
-	if stc != nil {
+	if statusChan != nil {
 		slog.Debug("all workers finished, closing scraper status channel")
-		close(stc)
+		close(statusChan)
 	}
 	collectorWg.Wait()
 }

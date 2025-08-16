@@ -12,10 +12,10 @@ type FetcherType string
 const (
 	STATIC_FETCHER_TYPE  FetcherType = "static"
 	DYNAMIC_FETCHER_TYPE FetcherType = "dynamic"
-	DUMMY_FETCHER_TYPE   FetcherType = "dummy"
+	MOCK_FETCHER_TYPE    FetcherType = "mock"
 )
 
-type DummyPage struct {
+type MockPage struct {
 	Url     string `yaml:"url"`
 	Content string `yaml:"content"`
 }
@@ -24,7 +24,7 @@ type FetcherConfig struct {
 	Type           FetcherType `yaml:"type"`
 	UserAgent      string      `yaml:"user_agent"`
 	PageLoadWaitMS int         `yaml:"page_load_wait_ms"`
-	DummyPages     []DummyPage `yaml:"dummy_pages"`
+	MockPages      []MockPage  `yaml:"mock_pages"`
 }
 
 type FetchOpts struct {
@@ -43,7 +43,7 @@ func NewFetcher(fc *FetcherConfig) (Fetcher, error) {
 		return NewStaticFetcher(fc), nil
 	case DYNAMIC_FETCHER_TYPE:
 		return NewDynamicFetcher(fc), nil
-	case DUMMY_FETCHER_TYPE:
+	case MOCK_FETCHER_TYPE:
 		return NewDummyFetcher(fc), nil
 	default:
 		return nil, fmt.Errorf("fetcher of type %s not implemented", fc.Type)

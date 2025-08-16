@@ -13,23 +13,24 @@ type Writer interface {
 	// If a writer encounters a fatal error it should call log.Fatalf
 	// to prevent the crawler from uselessly continuing to run.
 	// Should Write return an error instead?
-	Write(itemsList <-chan map[string]any)
+	Write(itemChan <-chan map[string]any)
 	// WriteStatus writes the status to an output
-	WriteStatus(scraperStatusC <-chan types.ScraperStatus)
+	WriteStatus(statusChan <-chan types.ScraperStatus)
 }
 
 // WriterConfig defines the necessary paramters to make a new writer
 // which is responsible for writing the scraped data to a specific output
 // eg. stdout.
 type WriterConfig struct {
-	Type      WriterType `yaml:"type" env:"WRITER_TYPE"`
-	Uri       string     `yaml:"uri" env:"WRITER_URI"`
-	User      string     `yaml:"user" env:"WRITER_USER"`
-	Password  string     `yaml:"password" env:"WRITER_PASSWORD"`
-	FilePath  string     `yaml:"filepath" env:"WRITER_FILEPATH"`
-	DryRun    bool       `yaml:"dryrun" env:"WRITER_DRYRUN"`
-	UriDryRun string     `yaml:"uri_dry_run" env:"WRITER_URI_DRYRUN"`
-	UriStatus string     `yaml:"uri_status" env:"WRITER_URI_STATUS"`
+	Type        WriterType `yaml:"type" env:"WRITER_TYPE"`
+	Uri         string     `yaml:"uri" env:"WRITER_URI"`
+	User        string     `yaml:"user" env:"WRITER_USER"`
+	Password    string     `yaml:"password" env:"WRITER_PASSWORD"`
+	FileDir     string     `yaml:"filedir" env:"WRITER_FILEDIR"`
+	DryRun      bool       `yaml:"dryrun" env:"WRITER_DRYRUN"`
+	UriDryRun   string     `yaml:"uri_dryrun" env:"WRITER_URI_DRYRUN"`
+	UriStatus   string     `yaml:"uri_status" env:"WRITER_URI_STATUS"`
+	WriteStatus bool       `yaml:"write_status" env:"WRITER_WRITE_STATUS"`
 }
 
 type WriterType string
@@ -45,9 +46,9 @@ func NewWriter(wc *WriterConfig) (Writer, error) {
 	case STDOUT_WRITER_TYPE:
 		return NewStdoutWriter(wc), nil
 	case FILE_WRITER_TYPE:
-		return NewFileWriter(wc), nil
+		return NewFileWriter(wc)
 	case API_WRITER_TYPE:
-		return NewAPIWriter(wc), nil
+		return NewAPIWriter(wc)
 	default:
 		return nil, fmt.Errorf("writer of type %s not implemented", wc.Type)
 	}

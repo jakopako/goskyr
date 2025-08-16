@@ -22,9 +22,9 @@ type MockPage struct {
 
 type FetcherConfig struct {
 	Type           FetcherType `yaml:"type"`
-	UserAgent      string      `yaml:"user_agent"`
-	PageLoadWaitMS int         `yaml:"page_load_wait_ms"`
-	MockPages      []MockPage  `yaml:"mock_pages"`
+	UserAgent      string      `yaml:"user_agent,omitempty"`
+	PageLoadWaitMS int         `yaml:"page_load_wait_ms,omitempty"`
+	MockPages      []MockPage  `yaml:"mock_pages,omitempty"`
 }
 
 type FetchOpts struct {
@@ -44,7 +44,7 @@ func NewFetcher(fc *FetcherConfig) (Fetcher, error) {
 	case DYNAMIC_FETCHER_TYPE:
 		return NewDynamicFetcher(fc), nil
 	case MOCK_FETCHER_TYPE:
-		return NewDummyFetcher(fc), nil
+		return NewMockFetcher(fc), nil
 	default:
 		return nil, fmt.Errorf("fetcher of type %s not implemented", fc.Type)
 	}

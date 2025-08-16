@@ -73,46 +73,6 @@ func collector(itemChan <-chan map[string]any, statusChan <-chan types.ScraperSt
 	collectorLogger.Debug("done writing items")
 }
 
-// func collectAllStats(stc <-chan types.ScraperStatus) []types.ScraperStatus {
-// 	result := []types.ScraperStatus{}
-// 	for st := range stc {
-// 		result = append(result, st)
-// 	}
-// 	return result
-// }
-
-// func printAllStats(stats []types.ScraperStatus) {
-// 	slog.Info("printing scraper summary")
-// 	// sort by name alphabetically
-// 	sort.Slice(stats, func(i, j int) bool {
-// 		return stats[i].ScraperName < stats[j].ScraperName
-// 	})
-
-// 	total := types.ScraperStatus{
-// 		ScraperName: "total",
-// 	}
-
-// 	table := tablewriter.NewWriter(os.Stdout)
-// 	table.SetHeader([]string{"Name", "Items", "Errors"})
-
-// 	for _, s := range stats {
-// 		row := []string{s.ScraperName, strconv.Itoa(s.NrItems), strconv.Itoa(s.NrErrors)}
-// 		if s.NrErrors > 0 {
-// 			table.Rich(row, []tablewriter.Colors{{tablewriter.Normal, tablewriter.FgRedColor}, {tablewriter.Normal, tablewriter.FgRedColor}, {tablewriter.Normal, tablewriter.FgRedColor}})
-// 		} else if s.NrErrors == 0 && s.NrItems == 0 {
-// 			table.Rich(row, []tablewriter.Colors{{tablewriter.Normal, tablewriter.FgYellowColor}, {tablewriter.Normal, tablewriter.FgYellowColor}, {tablewriter.Normal, tablewriter.FgYellowColor}})
-// 		} else {
-// 			table.Append(row)
-// 		}
-// 		total.NrErrors += s.NrErrors
-// 		total.NrItems += s.NrItems
-// 	}
-// 	table.SetFooter([]string{total.ScraperName, strconv.Itoa(total.NrItems), strconv.Itoa(total.NrErrors)})
-// 	table.SetColumnAlignment([]int{tablewriter.ALIGN_LEFT, tablewriter.ALIGN_RIGHT, tablewriter.ALIGN_RIGHT})
-// 	table.SetBorder(false)
-// 	table.Render()
-// }
-
 func main() {
 	singleScraper := flag.String("s", "", "The name of the scraper to be run.")
 	toStdout := flag.Bool("stdout", false, "If set to true the scraped data will be written to stdout despite any other existing writer configurations. In combination with the -generate flag the newly generated config will be written to stdout instead of to a file.")

@@ -9,7 +9,7 @@ type MockFetcher struct {
 	pagesMap map[string]string
 }
 
-func NewDummyFetcher(fc *FetcherConfig) *MockFetcher {
+func NewMockFetcher(fc *FetcherConfig) *MockFetcher {
 	df := &MockFetcher{
 		FetcherConfig: fc,
 		pagesMap:      map[string]string{},

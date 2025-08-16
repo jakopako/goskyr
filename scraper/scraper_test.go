@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -126,6 +127,10 @@ const (
 	}</script>`
 	htmlString10 = `
 	<script id="structured-data" type="application/ld+json" data-nscript="afterInteractive">this is no json</script>`
+	htmlString11 = `
+	<h3 class="date">
+		<span>12.12.2024 14:30</span>
+	</h3>`
 )
 
 func TestFilters(t *testing.T) {
@@ -572,6 +577,25 @@ func TestExtractFieldUrlOrText(t *testing.T) {
 				},
 			},
 			expected: "Treffpunkt",
+		},
+		"text transform": {
+			htmlString: htmlString4,
+			field: &Field{
+				Name: "title",
+				ElementLocations: []ElementLocation{
+					{
+						Selector: "div > a > div",
+					},
+				},
+				Transform: []TransformConfig{
+					{
+						TransformType: "regex-replace",
+						RegexPattern:  "p[a-z]+n",
+						Replacement:   "xxx",
+					},
+				},
+			},
+			expected: "Treffxxxkt",
 		},
 		"url needs base url": {
 			htmlString: htmlString,
@@ -1087,6 +1111,15 @@ func TestGetDate(t *testing.T) {
 			},
 			expected: time.Date(currentYear, 4, 1, 19, 30, 0, 0, loc),
 		},
+		"erroneous date location": {
+			htmlString: "",
+			field: &Field{
+				Name:         "date",
+				Type:         "date",
+				DateLocation: "Does/Not/Exist",
+			},
+			err: fmt.Errorf("unknown time zone Does/Not/Exist"),
+		},
 	}
 
 	for name, test := range tests {
@@ -1131,12 +1164,72 @@ func TestRemoveHiddenFields(t *testing.T) {
 			},
 		},
 	}
-	item := map[string]interface{}{"hidden": "bli", "visible": "bla"}
+	item := map[string]any{"hidden": "bli", "visible": "bla"}
 	r := s.removeHiddenFields(item)
 	if _, ok := r["hidden"]; ok {
 		t.Fatal("the field 'hidden' should have been removed from the item")
 	}
 	if _, ok := r["visible"]; !ok {
 		t.Fatal("the field 'visible' should not have been removed from the item")
+	}
+}
+
+func TestGetRawDateComponents(t *testing.T) {
+	tests := map[string]struct {
+		field      *Field
+		htmlString string
+		err        error
+		expected   map[string]string
+	}{
+		"all components": {
+			field: &Field{
+				Components: []DateComponent{
+					{
+						Covers: date.CoveredDateParts{
+							Day:   true,
+							Month: true,
+							Year:  true,
+							Time:  true,
+						},
+						ElementLocation: ElementLocation{
+							Selector: "h3.date > span",
+						},
+					},
+				},
+			},
+			htmlString: htmlString11,
+			expected: map[string]string{
+				"date-component-day-month-year-time": "12.12.2024 14:30",
+			},
+			err: nil,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			doc, err := goquery.NewDocumentFromReader(strings.NewReader(test.htmlString))
+			if err != nil {
+				t.Fatalf("unexpected error while reading html string: %v", err)
+			}
+
+			d, err := getRawDateComponents(test.field, doc.Selection)
+			if err != nil {
+				if test.err == nil {
+					t.Fatalf("unexpected error while getting the raw date components: %v", err)
+				}
+				if test.err.Error() != err.Error() {
+					t.Fatalf("expected error '%v' but got '%v'", test.err, err)
+				}
+				return
+			} else {
+				if test.err != nil {
+					t.Fatalf("expected error '%v' but got nil", test.err)
+				}
+			}
+
+			if !reflect.DeepEqual(test.expected, d) {
+				t.Fatalf("expected '%v' but got '%v'", test.expected, d)
+			}
+		})
 	}
 }

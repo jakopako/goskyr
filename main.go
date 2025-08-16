@@ -12,22 +12,21 @@ import (
 	"math"
 	"os"
 	"runtime/debug"
-	"sort"
-	"strconv"
 	"sync"
 
 	"github.com/jakopako/goskyr/autoconfig"
 	"github.com/jakopako/goskyr/config"
+	"github.com/jakopako/goskyr/fetch"
 	"github.com/jakopako/goskyr/ml"
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/scraper"
-	"github.com/olekukonko/tablewriter"
+	"github.com/jakopako/goskyr/types"
 	"gopkg.in/yaml.v3"
 )
 
 var version = "dev"
 
-func worker(sc <-chan scraper.Scraper, ic chan<- map[string]any, stc chan<- scraper.ScrapingStats, gc *scraper.GlobalConfig, threadNr int) {
+func worker(sc <-chan scraper.Scraper, ic chan<- map[string]any, stc chan<- types.ScraperStatus, gc *scraper.GlobalConfig, threadNr int) {
 	workerLogger := slog.With(slog.Int("thread", threadNr))
 	for s := range sc {
 		scraperLogger := workerLogger.With(slog.String("name", s.Name))
@@ -41,49 +40,37 @@ func worker(sc <-chan scraper.Scraper, ic chan<- map[string]any, stc chan<- scra
 		for _, item := range result.Items {
 			ic <- item
 		}
-		stc <- *result.Stats
+		// if the scraper status channel is not nil, it means that we are collecting stats
+		if stc != nil {
+			stc <- *result.Stats
+		}
 	}
 	workerLogger.Info("done working")
 }
 
-func collectAllStats(stc <-chan scraper.ScrapingStats) []scraper.ScrapingStats {
-	result := []scraper.ScrapingStats{}
-	for st := range stc {
-		result = append(result, st)
+func collector(itemChan <-chan map[string]any, statusChan <-chan types.ScraperStatus, writer output.Writer) {
+	collectorLogger := slog.With(slog.String("collector", "main"))
+	writerWg := sync.WaitGroup{}
+	writerWg.Add(1)
+	go func() {
+		defer writerWg.Done()
+		collectorLogger.Debug("starting writing items")
+		writer.Write(itemChan)
+	}()
+
+	if statusChan != nil {
+		statusWg := sync.WaitGroup{}
+		statusWg.Add(1)
+		go func() {
+			defer statusWg.Done()
+			collectorLogger.Debug("starting writing scraper status")
+			writer.WriteStatus(statusChan)
+		}()
+		statusWg.Wait()
+		collectorLogger.Debug("done writing scraper status")
 	}
-	return result
-}
-
-func printAllStats(stats []scraper.ScrapingStats) {
-	slog.Info("printing scraper summary")
-	// sort by name alphabetically
-	sort.Slice(stats, func(i, j int) bool {
-		return stats[i].Name < stats[j].Name
-	})
-
-	total := scraper.ScrapingStats{
-		Name: "total",
-	}
-
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Name", "Items", "Errors"})
-
-	for _, s := range stats {
-		row := []string{s.Name, strconv.Itoa(s.NrItems), strconv.Itoa(s.NrErrors)}
-		if s.NrErrors > 0 {
-			table.Rich(row, []tablewriter.Colors{{tablewriter.Normal, tablewriter.FgRedColor}, {tablewriter.Normal, tablewriter.FgRedColor}, {tablewriter.Normal, tablewriter.FgRedColor}})
-		} else if s.NrErrors == 0 && s.NrItems == 0 {
-			table.Rich(row, []tablewriter.Colors{{tablewriter.Normal, tablewriter.FgYellowColor}, {tablewriter.Normal, tablewriter.FgYellowColor}, {tablewriter.Normal, tablewriter.FgYellowColor}})
-		} else {
-			table.Append(row)
-		}
-		total.NrErrors += s.NrErrors
-		total.NrItems += s.NrItems
-	}
-	table.SetFooter([]string{total.Name, strconv.Itoa(total.NrItems), strconv.Itoa(total.NrErrors)})
-	table.SetColumnAlignment([]int{tablewriter.ALIGN_LEFT, tablewriter.ALIGN_RIGHT, tablewriter.ALIGN_RIGHT})
-	table.SetBorder(false)
-	table.Render()
+	writerWg.Wait()
+	collectorLogger.Debug("done writing items")
 }
 
 func main() {
@@ -100,7 +87,6 @@ func main() {
 	buildModel := flag.String("t", "", "Train a ML model based on the given csv features file. This will generate 2 files, goskyr.model and goskyr.class")
 	modelPath := flag.String("model", "", "Use a pre-trained ML model to infer names of extracted fields. Works in combination with the -g flag.")
 	debugFlag := flag.Bool("debug", false, "Prints debug logs and writes scraped html's to files.")
-	summaryFlag := flag.Bool("summary", false, "Print scraper summary at the end.")
 	dryRunFlag := flag.Bool("dryrun", false, "If set to true, the writer will just do a dry run (currently only has an effect on the api writer). Useful for testing purposes.")
 
 	flag.Parse()
@@ -130,9 +116,14 @@ func main() {
 
 	if *generateConfig != "" {
 		slog.Debug("starting to generate config")
-		s := &scraper.Scraper{URL: *generateConfig}
+		s := &scraper.Scraper{
+			URL: *generateConfig,
+			FetcherConfig: fetch.FetcherConfig{
+				Type: fetch.STATIC_FETCHER_TYPE, // default to static fetcher
+			},
+		}
 		if *renderJs {
-			s.RenderJs = true
+			s.FetcherConfig.Type = fetch.DYNAMIC_FETCHER_TYPE
 		}
 		slog.Debug(fmt.Sprintf("analyzing url %s", s.URL))
 		err := autoconfig.GetDynamicFieldsConfig(s, *m, *f, *modelPath, *wordsDir)
@@ -192,54 +183,50 @@ func main() {
 		return
 	}
 
-	var workerWg sync.WaitGroup
-	var writerWg sync.WaitGroup
-	var statsWg sync.WaitGroup
-	ic := make(chan map[string]any)
-
-	var writer output.Writer
 	if *toStdout {
-		writer = &output.StdoutWriter{}
+		config.Writer.Type = output.STDOUT_WRITER_TYPE
+	}
+	if *dryRunFlag {
+		config.Writer.DryRun = true
+	}
+
+	writer, err := output.NewWriter(config.Writer)
+	if err != nil {
+		slog.Error(err.Error())
+		os.Exit(1)
+	}
+
+	scraperChan := make(chan scraper.Scraper)
+	var statusChan chan types.ScraperStatus = nil
+	if config.Writer.WriteStatus && !config.Writer.DryRun {
+		slog.Info("scraper status collection enabled")
+		statusChan = make(chan types.ScraperStatus)
 	} else {
-		if *dryRunFlag {
-			config.Writer.DryRun = true
-		}
-		switch config.Writer.Type {
-		case output.STDOUT_WRITER_TYPE:
-			writer = &output.StdoutWriter{}
-		case output.API_WRITER_TYPE:
-			writer = output.NewAPIWriter(&config.Writer)
-		case output.FILE_WRITER_TYPE:
-			writer = output.NewFileWriter(&config.Writer)
-		default:
-			slog.Error(fmt.Sprintf("writer of type %s not implemented", config.Writer.Type))
-			os.Exit(1)
-		}
+		slog.Info("scraper status collection disabled")
 	}
-
-	if config.Global.UserAgent == "" {
-		config.Global.UserAgent = "goskyr web scraper (github.com/jakopako/goskyr)"
-	}
-
-	sc := make(chan scraper.Scraper)
-	stc := make(chan scraper.ScrapingStats)
 
 	// fill worker queue
 	go func() {
-		queuedScrapers := 0
-		for _, s := range config.Scrapers {
-			if *singleScraper == "" || *singleScraper == s.Name {
-				// s.Debug = *debugFlag
-				sc <- s
-				queuedScrapers++
+		if *singleScraper == "" {
+			slog.Info(fmt.Sprintf("queueing %d scrapers", len(config.Scrapers)))
+			for _, s := range config.Scrapers {
+				scraperChan <- s
+			}
+		} else {
+			foundSingleScraper := false
+			for _, s := range config.Scrapers {
+				if *singleScraper == s.Name {
+					scraperChan <- s
+					foundSingleScraper = true
+					break
+				}
+			}
+			if !foundSingleScraper {
+				slog.Error(fmt.Sprintf("no scrapers found for name %s", *singleScraper))
+				os.Exit(1)
 			}
 		}
-		if queuedScrapers == 0 {
-			slog.Error(fmt.Sprintf("no scrapers found for name %s", *singleScraper))
-			os.Exit(1)
-		}
-		slog.Info(fmt.Sprintf("queued %d scrapers", queuedScrapers))
-		close(sc)
+		close(scraperChan)
 	}()
 
 	// start workers
@@ -248,41 +235,34 @@ func main() {
 		nrWorkers = int(math.Min(20, float64(len(config.Scrapers))))
 	}
 	slog.Info(fmt.Sprintf("running with %d threads", nrWorkers))
+
+	workerWg := sync.WaitGroup{}
 	workerWg.Add(nrWorkers)
+
+	itemChan := make(chan map[string]any)
 	slog.Debug("starting workers")
 	for i := range nrWorkers {
 		go func(j int) {
 			defer workerWg.Done()
-			worker(sc, ic, stc, &config.Global, j)
+			worker(scraperChan, itemChan, statusChan, config.Global, j)
 		}(i)
 	}
 
-	// start writer
-	writerWg.Add(1)
-	slog.Debug("starting writer")
+	// start collector (collecting items and possibly scraper status)
+	collectorWg := sync.WaitGroup{}
+	collectorWg.Add(1)
 	go func() {
-		defer writerWg.Done()
-		writer.Write(ic)
-	}()
-
-	// start stats collection
-	statsWg.Add(1)
-	slog.Debug("starting stats collection")
-	go func() {
-		defer statsWg.Done()
-		allStats := collectAllStats(stc)
-		writerWg.Wait() // only print stats in the end
-		// a bit ugly to just check here and do the collection
-		// of the stats even though they might not be needed.
-		// But this is easier for now, coding-wise.
-		if *summaryFlag {
-			printAllStats(allStats)
-		}
+		defer collectorWg.Done()
+		slog.Debug("starting collector")
+		collector(itemChan, statusChan, writer)
 	}()
 
 	workerWg.Wait()
-	close(ic)
-	close(stc)
-	writerWg.Wait()
-	statsWg.Wait()
+	slog.Debug("all workers finished, closing item channel")
+	close(itemChan)
+	if statusChan != nil {
+		slog.Debug("all workers finished, closing scraper status channel")
+		close(statusChan)
+	}
+	collectorWg.Wait()
 }

@@ -475,12 +475,11 @@ func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields b
 	}
 	s.Name = s.URL
 
-	var fetcher fetch.Fetcher
-	if s.RenderJs {
-		fetcher = fetch.NewDynamicFetcher("", 0)
-	} else {
-		fetcher = &fetch.StaticFetcher{}
+	fetcher, err := fetch.NewFetcher(&s.FetcherConfig)
+	if err != nil {
+		return fmt.Errorf("error creating fetcher: %v", err)
 	}
+
 	res, err := fetcher.Fetch(s.URL, fetch.FetchOpts{})
 	if err != nil {
 		return err

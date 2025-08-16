@@ -32,16 +32,17 @@ import (
 // GlobalConfig is used for storing global configuration parameters that
 // are needed across all scrapers
 type GlobalConfig struct {
-	UserAgent string `yaml:"user-agent"`
+	UserAgent string `yaml:"user_agent"`
+	// WriteScraperStatus bool   `yaml:"write_scraper_status,omitempty"` // if true, the scraper will write the status of each scraper to the writer. TODO: move to writer config?
 }
 
 // Config defines the overall structure of the scraper configuration.
 // Values will be taken from a config yml file or environment variables
 // or both.
 type Config struct {
-	Writer   output.WriterConfig `yaml:"writer,omitempty"`
-	Scrapers []Scraper           `yaml:"scrapers,omitempty"`
-	Global   GlobalConfig        `yaml:"global,omitempty"`
+	Writer   *output.WriterConfig `yaml:"writer,omitempty"`
+	Scrapers []Scraper            `yaml:"scrapers,omitempty"`
+	Global   *GlobalConfig        `yaml:"global,omitempty"`
 }
 
 // NewConfig reads a configuration file from the given path and returns
@@ -61,11 +62,22 @@ func NewConfig(configPath string) (*Config, error) {
 					return err
 				}
 				config.Scrapers = append(config.Scrapers, configTmp.Scrapers...)
-				if configTmp.Writer.Type != "" {
-					if config.Writer.Type == "" {
+
+				// writer
+				if configTmp.Writer != nil {
+					if config.Writer == nil {
 						config.Writer = configTmp.Writer
 					} else {
-						return fmt.Errorf("config files must only contain max. one writer")
+						return fmt.Errorf("config files must only contain max. one writer config")
+					}
+				}
+
+				// global
+				if configTmp.Global != nil {
+					if config.Global == nil {
+						config.Global = configTmp.Global
+					} else {
+						return fmt.Errorf("config files must only contain max. one global config")
 					}
 				}
 			}
@@ -79,8 +91,17 @@ func NewConfig(configPath string) (*Config, error) {
 			return nil, err
 		}
 	}
-	if config.Writer.Type == "" {
-		config.Writer.Type = output.STDOUT_WRITER_TYPE
+
+	if config.Global == nil {
+		config.Global = &GlobalConfig{
+			UserAgent: "goskyr web scraper (github.com/jakopako/goskyr)",
+		}
+	}
+
+	if config.Writer == nil {
+		config.Writer = &output.WriterConfig{
+			Type: output.STDOUT_WRITER_TYPE,
+		}
 	}
 	return &config, nil
 }
@@ -243,29 +264,22 @@ type Paginator struct {
 // A Scraper contains all the necessary config parameters and structs needed
 // to extract the desired information from a website
 type Scraper struct {
-	Name         string               `yaml:"name"`
-	URL          string               `yaml:"url"`
-	Item         string               `yaml:"item"`
-	Fields       []Field              `yaml:"fields,omitempty"`
-	Filters      []*Filter            `yaml:"filters,omitempty"`
-	Paginator    Paginator            `yaml:"paginator,omitempty"`
-	RenderJs     bool                 `yaml:"render_js,omitempty"`
-	PageLoadWait int                  `yaml:"page_load_wait,omitempty"` // milliseconds. Only taken into account when render_js = true
-	Interaction  []*types.Interaction `yaml:"interaction,omitempty"`
-	fetcher      fetch.Fetcher
+	Name          string               `yaml:"name"`
+	URL           string               `yaml:"url"`
+	Item          string               `yaml:"item"`
+	Fields        []Field              `yaml:"fields,omitempty"`
+	Filters       []*Filter            `yaml:"filters,omitempty"`
+	Paginator     Paginator            `yaml:"paginator,omitempty"`
+	RenderJs      bool                 `yaml:"render_js,omitempty"`
+	PageLoadWait  int                  `yaml:"page_load_wait,omitempty"` // milliseconds. Only taken into account when render_js = true
+	Interaction   []*types.Interaction `yaml:"interaction,omitempty"`
+	FetcherConfig fetch.FetcherConfig  `yaml:"fetcher"`
+	fetcher       fetch.Fetcher
 }
 
-type ScrapingStats struct {
-	Name      string
-	NrItems   int
-	NrErrors  int
-	StartTime time.Time
-	EndTime   time.Time
-}
-
-type ScrapingResult struct {
+type ScraperResult struct {
 	Items []map[string]any
-	Stats *ScrapingStats
+	Stats *types.ScraperStatus
 }
 
 // Scrape fetches and returns all items from a website according to the
@@ -274,25 +288,46 @@ type ScrapingResult struct {
 // only on the location are returned (ignore regex_extract??). And only those
 // of dynamic fields, ie fields that don't have a predefined value and that are
 // present on the main page (not subpages). This is used by the ML feature generation.
-func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScrapingResult, error) {
-
+func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScraperResult, error) {
 	scrLogger := slog.With(slog.String("name", c.Name))
+
 	// initialize fetcher
-	if c.RenderJs {
-		dynFetcher := fetch.NewDynamicFetcher(globalConfig.UserAgent, c.PageLoadWait)
-		defer dynFetcher.Cancel()
-		c.fetcher = dynFetcher
-	} else {
-		c.fetcher = &fetch.StaticFetcher{
-			UserAgent: globalConfig.UserAgent,
-		}
+	// default fetcher type is static
+	if c.FetcherConfig.Type == "" {
+		c.FetcherConfig.Type = fetch.STATIC_FETCHER_TYPE
 	}
 
-	result := &ScrapingResult{
+	// To make the scraper backward compatible.
+	// At some point we'll depricate c.RenderJs (TODO)
+	if c.RenderJs {
+		c.FetcherConfig.Type = fetch.DYNAMIC_FETCHER_TYPE
+	}
+
+	// To make the scraper backward compatible.
+	// At some point we'll depricate c.PageLoadWait (TODO)
+	if c.PageLoadWait != 0 {
+		c.FetcherConfig.PageLoadWaitMS = c.PageLoadWait
+	}
+
+	// if local UserAgent empty, set global one
+	if c.FetcherConfig.UserAgent == "" {
+		c.FetcherConfig.UserAgent = globalConfig.UserAgent
+	}
+
+	fetcher, err := fetch.NewFetcher(&c.FetcherConfig)
+	if err != nil {
+		return nil, err
+	}
+	defer fetcher.Cancel()
+
+	scrLogger.Info(fmt.Sprintf("using %s fetcher", c.FetcherConfig.Type))
+	c.fetcher = fetcher
+
+	result := &ScraperResult{
 		Items: []map[string]any{},
-		Stats: &ScrapingStats{
-			Name:      c.Name,
-			StartTime: time.Now().UTC(),
+		Stats: &types.ScraperStatus{
+			ScraperName:     c.Name,
+			LastScrapeStart: time.Now().UTC(),
 		},
 	}
 
@@ -396,7 +431,7 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScrapingResul
 
 	c.guessYear(result.Items, time.Now())
 
-	result.Stats.EndTime = time.Now().UTC()
+	result.Stats.LastScrapeEnd = time.Now().UTC()
 
 	return result, nil
 }

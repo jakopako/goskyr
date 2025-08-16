@@ -1,0 +1,79 @@
+# writer:
+#   type: api
+#   uri: "http://localhost:5001/api/events"
+#   uri_dryrun: "http://localhost:5001/api/events/validate"
+#   uri_status: "http://localhost:5001/api/status"
+#   write_status: true
+#   user: croncert
+#   password: croncert
+
+writer:
+  type: file
+  filedir: mock-items
+  write_status: true
+
+scrapers:
+  - name: mock
+    url: "https://mock.url"
+    fetcher:
+      type: mock
+      mock_pages:
+        - url: "https://mock.url"
+          content: |
+            <div class="artist-list"><!--[-->
+                <h3 class="size-xxl"><!--[-->
+                    <div class="artist-teaser">
+                        <div class="artist-name">Final Story</div>
+                        <div class="artist-info">Aargau</div>
+                    </div><!----><!--]-->
+                    <div class="date">
+                        20.8.2025 20:00
+                    </div>
+                </h3>
+                <h3 class="size-xxl"><!--[-->
+                    <div class="artist-teaser">
+                        <div class="artist-name">Moment Of Madness</div>
+                        <div class="artist-info">Basel</div>
+                    </div><!----><!--]-->
+                    <div class="date">
+                        21.8.2025 21:00
+                    </div>
+                </h3>
+                <h3 class="size-xxl"><!--[-->
+                    <div class="artist-teaser">
+                        <div class="artist-name">Irony of Fate</div>
+                        <div class="artist-info">Bern</div>
+                    </div><!----><!--]-->
+                    <div class="date">
+                        22.8.2025 20:30
+                    </div>
+                </h3><!--]--><!---->
+            </div><!---->
+    item: div > h3.size-xxl
+    fields:
+      - name: sourceUrl
+        value: "https://mock.url"
+      - name: location
+        value: MockVenue
+      - name: city
+        value: Zurich
+      - name: country
+        value: Switzerland
+      - name: type
+        value: concert
+      - name: url
+        value: "https://mock.url"
+      - name: title
+        location:
+          selector: div.artist-name
+      - name: date
+        type: date
+        components:
+          - covers:
+              day: true
+              month: true
+              year: true
+              time: true
+            location:
+              selector: div.date
+            layout: ["2.1.2006 15:04"]

@@ -64,7 +64,7 @@ func ExtractFeatures(config *scraper.Config, featureFile, wordsDir string) error
 	go writeFeaturesToFile(featureFile, featuresChan, &writerWg)
 	for _, s := range config.Scrapers {
 		calcWg.Add(1)
-		go calculateScraperFeatures(s, featuresChan, wordMap, &config.Global, &calcWg)
+		go calculateScraperFeatures(s, featuresChan, wordMap, config.Global, &calcWg)
 	}
 	calcWg.Wait()
 	close(featuresChan)

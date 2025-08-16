@@ -8,3 +8,4 @@ goskyr.model
 .release-env
 .local-env
 config-test-dir
+mock-items

@@ -103,6 +103,24 @@ func NewConfig(configPath string) (*Config, error) {
 			Type: output.STDOUT_WRITER_TYPE,
 		}
 	}
+
+	// log warnings for depricated fields
+	hasLogged := map[string]bool{}
+	for _, s := range config.Scrapers {
+		if s.RenderJs {
+			if !hasLogged["render_js"] {
+				slog.Warn("'render_js' is deprecated. Please use 'fetcher.type' instead")
+				hasLogged["render_js"] = true
+			}
+		}
+		if s.PageLoadWait > 0 {
+			if !hasLogged["page_load_wait"] {
+				slog.Warn("'page_load_wait' is deprecated. Please use 'fetcher.page_load_wait_ms' instead")
+				hasLogged["page_load_wait"] = true
+			}
+		}
+	}
+
 	return &config, nil
 }
 
@@ -270,11 +288,15 @@ type Scraper struct {
 	Fields        []Field              `yaml:"fields,omitempty"`
 	Filters       []*Filter            `yaml:"filters,omitempty"`
 	Paginator     Paginator            `yaml:"paginator,omitempty"`
+	RenderJs      bool                 `yaml:"render_js,omitempty"`      // DEPRECATED
+	PageLoadWait  int                  `yaml:"page_load_wait,omitempty"` // DEPRECATED (milliseconds. Only taken into account when render_js = true)
 	Interaction   []*types.Interaction `yaml:"interaction,omitempty"`
 	FetcherConfig fetch.FetcherConfig  `yaml:"fetcher"`
 	fetcher       fetch.Fetcher
 }
 
+// ScraperResult contains the results of a scrape. It consists of the scraped items
+// and the scraper status
 type ScraperResult struct {
 	Items []map[string]any
 	Stats *types.ScraperStatus

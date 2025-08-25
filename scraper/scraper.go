@@ -270,8 +270,6 @@ type Scraper struct {
 	Fields        []Field              `yaml:"fields,omitempty"`
 	Filters       []*Filter            `yaml:"filters,omitempty"`
 	Paginator     Paginator            `yaml:"paginator,omitempty"`
-	RenderJs      bool                 `yaml:"render_js,omitempty"`
-	PageLoadWait  int                  `yaml:"page_load_wait,omitempty"` // milliseconds. Only taken into account when render_js = true
 	Interaction   []*types.Interaction `yaml:"interaction,omitempty"`
 	FetcherConfig fetch.FetcherConfig  `yaml:"fetcher"`
 	fetcher       fetch.Fetcher
@@ -295,18 +293,6 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScraperResult
 	// default fetcher type is static
 	if c.FetcherConfig.Type == "" {
 		c.FetcherConfig.Type = fetch.STATIC_FETCHER_TYPE
-	}
-
-	// To make the scraper backward compatible.
-	// At some point we'll depricate c.RenderJs (TODO)
-	if c.RenderJs {
-		c.FetcherConfig.Type = fetch.DYNAMIC_FETCHER_TYPE
-	}
-
-	// To make the scraper backward compatible.
-	// At some point we'll depricate c.PageLoadWait (TODO)
-	if c.PageLoadWait != 0 {
-		c.FetcherConfig.PageLoadWaitMS = c.PageLoadWait
 	}
 
 	// if local UserAgent empty, set global one
@@ -558,7 +544,7 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 		return true, currentPageUrl, newDoc, nil
 	} else {
 		if c.Paginator.Location.Selector != "" {
-			if c.RenderJs {
+			if c.FetcherConfig.Type == fetch.DYNAMIC_FETCHER_TYPE {
 				// check if node c.Paginator.Location.Selector is present in doc
 				pagSelector := doc.Find(c.Paginator.Location.Selector)
 				if len(pagSelector.Nodes) > 0 {

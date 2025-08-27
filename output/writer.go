@@ -22,15 +22,15 @@ type Writer interface {
 // which is responsible for writing the scraped data to a specific output
 // eg. stdout.
 type WriterConfig struct {
-	Type        WriterType `yaml:"type" env:"WRITER_TYPE"`
-	Uri         string     `yaml:"uri" env:"WRITER_URI"`
-	User        string     `yaml:"user" env:"WRITER_USER"`
-	Password    string     `yaml:"password" env:"WRITER_PASSWORD"`
-	FileDir     string     `yaml:"filedir" env:"WRITER_FILEDIR"`
-	DryRun      bool       `yaml:"dryrun" env:"WRITER_DRYRUN"`
-	UriDryRun   string     `yaml:"uri_dryrun" env:"WRITER_URI_DRYRUN"`
-	UriStatus   string     `yaml:"uri_status" env:"WRITER_URI_STATUS"`
-	WriteStatus bool       `yaml:"write_status" env:"WRITER_WRITE_STATUS"`
+	Type        WriterType `yaml:"type"`
+	Uri         string     `yaml:"uri"`
+	User        string     `yaml:"user" env:"WRITER_USER"`         // we want to be able to pass credentials via env vars
+	Password    string     `yaml:"password" env:"WRITER_PASSWORD"` // we want to be able to pass credentials via env vars
+	FileDir     string     `yaml:"filedir"`
+	DryRun      bool       `yaml:"dryrun"`
+	UriDryRun   string     `yaml:"uri_dryrun"`
+	UriStatus   string     `yaml:"uri_status"`
+	WriteStatus bool       `yaml:"write_status"`
 }
 
 // WriterType encapsulates the type of a writer
@@ -53,6 +53,6 @@ func NewWriter(wc *WriterConfig) (Writer, error) {
 	case API_WRITER_TYPE:
 		return NewAPIWriter(wc)
 	default:
-		return nil, fmt.Errorf("writer of type %s not implemented", wc.Type)
+		return nil, fmt.Errorf("writer of type '%s' not implemented", wc.Type)
 	}
 }

@@ -40,9 +40,13 @@ type GlobalConfig struct {
 // Values will be taken from a config yml file or environment variables
 // or both.
 type Config struct {
-	Writer   *output.WriterConfig `yaml:"writer,omitempty"`
-	Scrapers []Scraper            `yaml:"scrapers,omitempty"`
-	Global   *GlobalConfig        `yaml:"global,omitempty"`
+	// We cannot use a pointer for Writer otherwise reading from
+	// env vars for the Writer output.WriterConfig fields does
+	// not work with cleanenv.ReadConfig because it does not supported
+	// nested structs with pointers
+	Writer   output.WriterConfig `yaml:"writer,omitempty"`
+	Scrapers []Scraper           `yaml:"scrapers,omitempty"`
+	Global   *GlobalConfig       `yaml:"global,omitempty"`
 }
 
 // NewConfig reads a configuration file from the given path and returns
@@ -64,8 +68,8 @@ func NewConfig(configPath string) (*Config, error) {
 				config.Scrapers = append(config.Scrapers, configTmp.Scrapers...)
 
 				// writer
-				if configTmp.Writer != nil {
-					if config.Writer == nil {
+				if configTmp.Writer.Type != "" {
+					if config.Writer.Type == "" {
 						config.Writer = configTmp.Writer
 					} else {
 						return fmt.Errorf("config files must only contain max. one writer config")
@@ -98,10 +102,9 @@ func NewConfig(configPath string) (*Config, error) {
 		}
 	}
 
-	if config.Writer == nil {
-		config.Writer = &output.WriterConfig{
-			Type: output.STDOUT_WRITER_TYPE,
-		}
+	// default to stdout writer
+	if config.Writer.Type == "" {
+		config.Writer.Type = output.STDOUT_WRITER_TYPE
 	}
 
 	// log warnings for depricated fields

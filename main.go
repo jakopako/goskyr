@@ -190,7 +190,7 @@ func main() {
 		config.Writer.DryRun = true
 	}
 
-	writer, err := output.NewWriter(config.Writer)
+	writer, err := output.NewWriter(&config.Writer)
 	if err != nil {
 		slog.Error(err.Error())
 		os.Exit(1)

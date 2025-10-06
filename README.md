@@ -30,14 +30,10 @@ Next to [manually configuring](#manual-configuration--usage) the scraper there i
 
 ## Quick Start
 
-<https://user-images.githubusercontent.com/26999089/210244250-09a11b64-0981-40d1-8f81-9fbb00e17164.mp4>
-
-To reproduce what happens above [install goskyr](#installation) and then run the following steps:
-
-Start the configuration generation. The configuration file is written to the default location `config.yml`. Navigation in the interactive terminal window is done with the arrow keys, the return key and the tab key.
+First, [install goskyr](#installation) and then run the following steps to generate a configuration file for the scraper. The configuration file is written to the default location `config.yml`. Navigation in the interactive terminal window is done with the arrow keys, the return key and the tab key.
 
 ```bash
-goskyr -g https://www.imdb.com/chart/top/ -f
+goskyr generate -u https://www.imdb.com/chart/top/ -D
 ```
 
 Note, that different colors are used to show how 'close' certain fields are to each other in the html tree. This should help when there are multiple list-like structures on a web page and you need to figure out which fields belong together.
@@ -45,13 +41,13 @@ Note, that different colors are used to show how 'close' certain fields are to e
 Next, start the scraping process. The configuration file is read from the default location `config.yml`.
 
 ```bash
-goskyr
+goskyr scrape
 ```
 
 Optionally, modify the configuration file according to your needs. For more information check out the section on [manually configuring](#manual-configuration--usage) the scraper. For a better understanding of the command line flags run
 
 ```bash
-goskyr -help
+goskyr -h
 ```
 
 Note that the feature to (semi-)automatically generate a configuration file is currently in an experimental stage and might not properly work in a lot of cases.
@@ -82,22 +78,42 @@ Or clone the repository and then run with `go run main.go ...` or build it yours
 
 As shown under [Quick Start](#quick-start) goskyr can be used to automatically extract a configuration for a given url. A number of different options are available.
 
-- `-g`: Pass the url you want to extract data from to this flag.
-- `-f`: Only show fields that have varying values across the list of items.
-- `-m`: The minimum number of items on a page. This is needed to filter out noise. The default is 20.
-- `-r`: Render JS before starting to extract the configuration.
-- `--model`: This option is new since `v0.4.0`. You can pass a reference to a ML model that suggests names for the extracted fields. Note that the model currently consists of two files that have to be named exactly the same except for the ending. The string that you have to pass to the `--model` flag has to be the filename without the ending. Check out the section on [building a ML model](#build-ml-model-for-improved-auto-config).
-- `-w`: Works in combination with `--model`. This flag is used to pass a the name of a directory that contains a bunch of text files with dictionary words. This is needed for feature extraction for the ML stuff. This repository contains an example of such a directory, `word-lists`, although the lists are pretty limited. Default is `word-lists`.
+```
+$ goskyr generate -h
+Usage: goskyr generate --url=STRING [flags]
+
+Generate a scraper configuration file for the given URL
+
+Flags:
+  -h, --help                       Show context-sensitive help.
+  -v, --version                    Print the version and exit.
+  -d, --debug                      Set log level to 'debug' and store additional helpful debugging data.
+
+  -u, --url=STRING                 The URL for which to generate the scraper configuration file.
+  -m, --min-occurrence=20          The minimum number of occurrences of a certain field on an html page to be included in the suggested fields. This is needed to filter out noise.
+  -D, --distinct                   If set to true only fields with distinct values will be included in the suggested fields.
+  -r, --render-js                  Render javascript before analyzing the html page.
+  -w, --word-lists="word-lists"    The directory that contains a number of files containing words of different languages, needed for extracting ML features.
+  -M, --model-name=STRING          The name to a pre-trained ML model to infer names of extracted fields.
+  -o, --stdout                     If set to true the the generated configuration will be written to stdout.
+  -c, --config="./config.yml"      The file that the generated configuration will be written to.
+```
+
+A few more details on the ML part.
+
+With the `-M` / `--model-name` flag, you can pass a reference to a ML model that suggests names for the extracted fields. Note that the model currently consists of two files that have to be named exactly the same except for the ending. The string that you have to pass to the `--model` flag has to be the filename without the ending. Check out the section on [building a ML model](#build-ml-model-for-improved-auto-config).
+
+The flag `-w` / `--word-lists` is used to pass a the name of a directory that contains a bunch of text files with dictionary words. This is needed for feature extraction for the ML stuff. This repository contains an example of such a directory, `word-lists`, although the lists are pretty limited. Default is `word-lists`.
 
 Note that when using machine learning & a properly trained model, the auto configuration is capable of determining what fields could be a date and what date components they contain. With that information another algorithm then tries to derive the format of the date that is needed for proper parsing. So in the best case you have to do nothing more than rename some of the fields to get the desired configuration.
 
-Note that the machine learning feature is rather new and might not always work well, especially since it only takes into account a fields value and not its position in the DOM. A basic model is contained in the `ml-models` directory. It uses the labels `text`, `url` and `date-component-*`. You could for instance run `goskyr -g  https://www.schuur.ch/programm/ --model ml-models/knn-types-v0.4.4` which would suggest the following fields to you.
+Note that the machine learning feature is rather limited and might not always work well, especially since it only takes into account a fields value and not its position in the DOM. A basic model is contained in the `ml-models` directory. It uses the labels `text`, `url` and `date-component-*`. You could for instance run `goskyr generate -u https://www.schuur.ch/programm/ --model-name ml-models/knn-types-v0.4.4` which would suggest the following fields to you.
 
 ![screenshot field extraction](schuur-extract.png)
 
 ## Manual Configuration & Usage
 
-Despite the option to automatically generate a configuration file for goskyr there are a lot more options that can be configured manually. Note that while writing and testing a new configuration it might make sense to use the `-debug` flag when running goskyr, to enable more detailed logging and have the scraped html's written to files.
+Despite the option to automatically generate a configuration file for goskyr there are a lot more options that can be configured manually. Note that while writing and testing a new configuration it might make sense to use the `--debug` flag when running goskyr, to enable more detailed logging and have the scraped html's written to files.
 
 A very simple configuration would look something like this:
 
@@ -604,13 +620,13 @@ writer:
 In order for the auto configuration feature to find suitable names for the extracted fields, since `v0.4.0` machine learning can be used. Goskyr allows you to extract a fixed set of features based on an existing goskyr configuration. Basically, goskyr scrapes all the websites you configured, extracts the raw text values based on the configured fields per site and then calculates the features for each extracted value, labeling the resulting vector with the field name you defined in the configuration. Currently, all features are based on the extracted text only, i.e. not on the location within the website. Checkout the `Features` struct in the `ml/ml.go` file if you want to know what exactly those features are. Extraction command:
 
 ```bash
-goskyr -e features.csv -w word-lists -c some-goskyr-config.yml
+goskyr extract -o features.csv -w word-lists -c some-goskyr-config.yml
 ```
 
 Note that `-w` and `-c` are optional. The respective defaults are `word-lists` and `config.yml`. The resulting csv file can optionally be edited (eg if you want to remove or replace some labels) and consequently be used to build a ML model, like so:
 
 ```bash
-goskyr -t features.csv
+goskyr train -f features.csv
 ```
 
 Currently, a KNN classifier is used. The output of the above command shows the result of the training. Additionally, two files are generated, `goskyr.model` and `goskyr.class`. Both together define the model that can be used for labeling fields during auto configuration, see [Semi-Automatic Configuration](#semi-automatic-configuration).

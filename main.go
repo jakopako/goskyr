@@ -1,12 +1,6 @@
-/*
-goskyr is a command line web scraper written in Go.
-
-Have a look at the README.md for more information.
-*/
 package main
 
 import (
-	"flag"
 	"fmt"
 	"log/slog"
 	"math"
@@ -14,6 +8,7 @@ import (
 	"runtime/debug"
 	"sync"
 
+	"github.com/alecthomas/kong"
 	"github.com/jakopako/goskyr/autoconfig"
 	"github.com/jakopako/goskyr/config"
 	"github.com/jakopako/goskyr/fetch"
@@ -25,6 +20,120 @@ import (
 )
 
 var version = "dev"
+
+var cli struct {
+	Globals
+
+	Scrape   ScrapeCmd   `cmd:"" help:"Scrape data"`
+	Generate GenerateCmd `cmd:"" help:"Generate a scraper configuration file for the given URL"`
+	Extract  ExtractCmd  `cmd:"" help:"Extract ML features based on the given configuration file"`
+	Train    TrainCmd    `cmd:"" help:"Train ML model based on the given features file. This will generate 2 files, goskyr.model and goskyr.class"`
+}
+
+type Globals struct {
+	Version bool `short:"v" long:"version" help:"Print the version and exit."`
+	Debug   bool `short:"d" long:"debug" help:"Set log level to 'debug' and store additional helpful debugging data."`
+}
+
+type ScrapeCmd struct {
+	Config string `short:"c" default:"./config.yml" help:"The location of the configuration. Can be a directory containing config files or a single config file."`
+	Name   string `short:"n" help:"The name of the scraper to be run, if only one of the configured ones should be run."`
+	Stdout bool   `short:"o" help:"If set to true the scraped data will be written to stdout despite any other existing writer configurations."`
+	DryRun bool   `short:"D" help:"If set to true the scraper will not persist any scraped data (currently only has an effect on the APIWriter)."`
+}
+
+func (scc *ScrapeCmd) Run() error {
+	config, err := scraper.NewConfig(scc.Config)
+	if err != nil {
+		slog.Error(fmt.Sprintf("%v", err))
+		return err
+	}
+
+	if scc.Stdout {
+		config.Writer.Type = output.STDOUT_WRITER_TYPE
+	}
+
+	if scc.DryRun {
+		config.Writer.DryRun = true
+	}
+
+	writer, err := output.NewWriter(&config.Writer)
+	if err != nil {
+		slog.Error(err.Error())
+		return err
+	}
+
+	scraperChan := make(chan scraper.Scraper)
+	var statusChan chan types.ScraperStatus = nil
+	if config.Writer.WriteStatus && !config.Writer.DryRun {
+		slog.Info("scraper status collection enabled")
+		statusChan = make(chan types.ScraperStatus)
+	} else {
+		slog.Info("scraper status collection disabled")
+	}
+
+	// fill worker queue
+	go func() {
+		if scc.Name == "" {
+			slog.Info(fmt.Sprintf("queueing %d scrapers", len(config.Scrapers)))
+			for _, s := range config.Scrapers {
+				scraperChan <- s
+			}
+		} else {
+			foundSingleScraper := false
+			for _, s := range config.Scrapers {
+				if scc.Name == s.Name {
+					scraperChan <- s
+					foundSingleScraper = true
+					break
+				}
+			}
+			if !foundSingleScraper {
+				slog.Error(fmt.Sprintf("no scrapers found for name %s", scc.Name))
+				os.Exit(1)
+			}
+		}
+		close(scraperChan)
+	}()
+
+	// start workers
+	nrWorkers := 1
+	if scc.Name == "" {
+		nrWorkers = int(math.Min(20, float64(len(config.Scrapers))))
+	}
+	slog.Info(fmt.Sprintf("running with %d threads", nrWorkers))
+
+	workerWg := sync.WaitGroup{}
+	workerWg.Add(nrWorkers)
+
+	itemChan := make(chan map[string]any)
+	slog.Debug("starting workers")
+	for i := range nrWorkers {
+		go func(j int) {
+			defer workerWg.Done()
+			worker(scraperChan, itemChan, statusChan, config.Global, j)
+		}(i)
+	}
+
+	// start collector (collecting items and possibly scraper status)
+	collectorWg := sync.WaitGroup{}
+	collectorWg.Add(1)
+	go func() {
+		defer collectorWg.Done()
+		slog.Debug("starting collector")
+		collector(itemChan, statusChan, writer)
+	}()
+
+	workerWg.Wait()
+	slog.Debug("all workers finished, closing item channel")
+	close(itemChan)
+	if statusChan != nil {
+		slog.Debug("all workers finished, closing scraper status channel")
+		close(statusChan)
+	}
+	collectorWg.Wait()
+	return nil
+}
 
 func worker(sc <-chan scraper.Scraper, ic chan<- map[string]any, stc chan<- types.ScraperStatus, gc *scraper.GlobalConfig, threadNr int) {
 	workerLogger := slog.With(slog.Int("thread", threadNr))
@@ -73,39 +182,119 @@ func collector(itemChan <-chan map[string]any, statusChan <-chan types.ScraperSt
 	collectorLogger.Debug("done writing items")
 }
 
-func main() {
-	singleScraper := flag.String("s", "", "The name of the scraper to be run.")
-	toStdout := flag.Bool("stdout", false, "If set to true the scraped data will be written to stdout despite any other existing writer configurations. In combination with the -generate flag the newly generated config will be written to stdout instead of to a file.")
-	configLoc := flag.String("c", "./config.yml", "The location of the configuration. Can be a directory containing config files or a single config file.")
-	printVersion := flag.Bool("v", false, "The version of goskyr.")
-	generateConfig := flag.String("g", "", "Automatically generate a config file for the given url.")
-	m := flag.Int("m", 20, "The minimum number of items on a page. This is needed to filter out noise. Works in combination with the -g flag.")
-	f := flag.Bool("f", false, "Only show fields that have varying values across the list of items. Works in combination with the -g flag.")
-	renderJs := flag.Bool("r", false, "Render JS before generating a configuration file. Works in combination with the -g flag.")
-	extractFeatures := flag.String("e", "", "Extract ML features based on the given configuration file (-c) and write them to the given file in csv format.")
-	wordsDir := flag.String("w", "word-lists", "The directory that contains a number of files containing words of different languages. This is needed for the ML part (use with -e or -b).")
-	buildModel := flag.String("t", "", "Train a ML model based on the given csv features file. This will generate 2 files, goskyr.model and goskyr.class")
-	modelPath := flag.String("model", "", "Use a pre-trained ML model to infer names of extracted fields. Works in combination with the -g flag.")
-	debugFlag := flag.Bool("debug", false, "Prints debug logs and writes scraped html's to files.")
-	dryRunFlag := flag.Bool("dryrun", false, "If set to true, the writer will just do a dry run (currently only has an effect on the api writer). Useful for testing purposes.")
+type GenerateCmd struct {
+	URL           string `short:"u" long:"url" help:"The URL for which to generate the scraper configuration file." required:""`
+	MinOccurrence int    `short:"m" default:"20" help:"The minimum number of occurrences of a certain field on an html page to be included in the suggested fields. This is needed to filter out noise."`
+	Distinct      bool   `short:"D" help:"If set to true only fields with distinct values will be included in the suggested fields."`
+	RenderJS      bool   `short:"r" help:"Render javascript before analyzing the html page."`
+	WordLists     string `short:"w" default:"word-lists" help:"The directory that contains a number of files containing words of different languages, needed for extracting ML features."`
+	ModelName     string `short:"M" help:"The name to a pre-trained ML model to infer names of extracted fields."`
+	Stdout        bool   `short:"o" long:"stdout" help:"If set to true the the generated configuration will be written to stdout."`
+	Config        string `short:"c" long:"config" default:"./config.yml" help:"The file that the generated configuration will be written to."`
+}
 
-	flag.Parse()
-
-	if *printVersion {
-		buildInfo, ok := debug.ReadBuildInfo()
-		if ok {
-			if buildInfo.Main.Version != "" && buildInfo.Main.Version != "(devel)" {
-				fmt.Println(buildInfo.Main.Version)
-				return
-			}
-		}
-		fmt.Println(version)
-		return
+func (g *GenerateCmd) Run() error {
+	slog.Debug("starting to generate config")
+	s := &scraper.Scraper{
+		URL: g.URL,
+		FetcherConfig: fetch.FetcherConfig{
+			Type: fetch.STATIC_FETCHER_TYPE, // default to static fetcher
+		},
 	}
 
-	config.Debug = *debugFlag
+	if g.RenderJS {
+		s.FetcherConfig.Type = fetch.DYNAMIC_FETCHER_TYPE
+	}
+
+	slog.Debug(fmt.Sprintf("analyzing url %s", s.URL))
+	err := autoconfig.GetDynamicFieldsConfig(s, g.MinOccurrence, g.Distinct, g.ModelName, g.WordLists)
+	if err != nil {
+		slog.Error(fmt.Sprintf("%v", err))
+		return err
+	}
+
+	c := scraper.Config{
+		Scrapers: []scraper.Scraper{
+			*s,
+		},
+	}
+	yamlData, err := yaml.Marshal(&c)
+	if err != nil {
+		slog.Error(fmt.Sprintf("error while marshalling. %v", err))
+		return err
+	}
+
+	if g.Stdout {
+		fmt.Println(string(yamlData))
+	} else {
+		f, err := os.Create(g.Config)
+		if err != nil {
+			slog.Error(fmt.Sprintf("error opening file: %v", err))
+			return err
+		}
+		defer f.Close()
+
+		_, err = f.Write(yamlData)
+		if err != nil {
+			slog.Error(fmt.Sprintf("error writing to file: %v", err))
+			return err
+		}
+		slog.Info(fmt.Sprintf("successfully wrote config to file %s", g.Config))
+	}
+
+	return nil
+}
+
+type ExtractCmd struct {
+	Config    string `short:"c" default:"./config.yml" help:"The location of the configuration file."`
+	OutFile   string `short:"o" help:"The file to which the extracted features will be written in csv format." required:""`
+	WordLists string `short:"w" default:"word-lists" help:"The directory that contains a number of files containing words of different languages, needed for extracting ML features."`
+}
+
+func (e *ExtractCmd) Run() error {
+	config, err := scraper.NewConfig(e.Config)
+	if err != nil {
+		slog.Error(fmt.Sprintf("%v", err))
+		return err
+	}
+
+	if err := ml.ExtractFeatures(config, e.OutFile, e.WordLists); err != nil {
+		slog.Error(fmt.Sprintf("%v", err))
+		return err
+	}
+
+	return nil
+}
+
+type TrainCmd struct {
+	FeatureFile string `short:"f" help:"The csv file containing the extracted features." required:""`
+}
+
+func (t *TrainCmd) Run() error {
+	if err := ml.TrainModel(t.FeatureFile); err != nil {
+		slog.Error(fmt.Sprintf("%v", err))
+		return err
+	}
+
+	slog.Info("successfully trained model")
+	return nil
+}
+
+func printVersion() {
+	buildInfo, ok := debug.ReadBuildInfo()
+	if ok {
+		if buildInfo.Main.Version != "" && buildInfo.Main.Version != "(devel)" {
+			fmt.Println(buildInfo.Main.Version)
+			return
+		}
+	}
+	fmt.Println(version)
+	return
+}
+
+func initializeLogging(debug bool) {
 	var logLevel slog.Level
-	if *debugFlag {
+	if debug {
 		logLevel = slog.LevelDebug
 	} else {
 		logLevel = slog.LevelInfo
@@ -113,156 +302,19 @@ func main() {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 	slog.SetDefault(logger)
+}
 
-	if *generateConfig != "" {
-		slog.Debug("starting to generate config")
-		s := &scraper.Scraper{
-			URL: *generateConfig,
-			FetcherConfig: fetch.FetcherConfig{
-				Type: fetch.STATIC_FETCHER_TYPE, // default to static fetcher
-			},
-		}
-		if *renderJs {
-			s.FetcherConfig.Type = fetch.DYNAMIC_FETCHER_TYPE
-		}
-		slog.Debug(fmt.Sprintf("analyzing url %s", s.URL))
-		err := autoconfig.GetDynamicFieldsConfig(s, *m, *f, *modelPath, *wordsDir)
-		if err != nil {
-			slog.Error(fmt.Sprintf("%v", err))
-			os.Exit(1)
-		}
-		c := scraper.Config{
-			Scrapers: []scraper.Scraper{
-				*s,
-			},
-		}
-		yamlData, err := yaml.Marshal(&c)
-		if err != nil {
-			slog.Error(fmt.Sprintf("error while marshaling. %v", err))
-			os.Exit(1)
-		}
+func main() {
+	ctx := kong.Parse(&cli)
 
-		if *toStdout {
-			fmt.Println(string(yamlData))
-		} else {
-			f, err := os.Create(*configLoc)
-			if err != nil {
-				slog.Error(fmt.Sprintf("error opening file: %v", err))
-				os.Exit(1)
-			}
-			defer f.Close()
-			_, err = f.Write(yamlData)
-			if err != nil {
-				slog.Error(fmt.Sprintf("error writing to file: %v", err))
-				os.Exit(1)
-			}
-			slog.Info(fmt.Sprintf("successfully wrote config to file %s", *configLoc))
-		}
+	if cli.Globals.Version {
+		printVersion()
 		return
 	}
 
-	if *buildModel != "" {
-		if err := ml.TrainModel(*buildModel); err != nil {
-			slog.Error(fmt.Sprintf("%v", err))
-			os.Exit(1)
-		}
-		return
-	}
+	initializeLogging(cli.Globals.Debug)
+	config.Debug = cli.Globals.Debug
 
-	config, err := scraper.NewConfig(*configLoc)
-	if err != nil {
-		slog.Error(fmt.Sprintf("%v", err))
-		os.Exit(1)
-	}
-
-	if *extractFeatures != "" {
-		if err := ml.ExtractFeatures(config, *extractFeatures, *wordsDir); err != nil {
-			slog.Error(fmt.Sprintf("%v", err))
-			os.Exit(1)
-		}
-		return
-	}
-
-	if *toStdout {
-		config.Writer.Type = output.STDOUT_WRITER_TYPE
-	}
-	if *dryRunFlag {
-		config.Writer.DryRun = true
-	}
-
-	writer, err := output.NewWriter(&config.Writer)
-	if err != nil {
-		slog.Error(err.Error())
-		os.Exit(1)
-	}
-
-	scraperChan := make(chan scraper.Scraper)
-	var statusChan chan types.ScraperStatus = nil
-	if config.Writer.WriteStatus && !config.Writer.DryRun {
-		slog.Info("scraper status collection enabled")
-		statusChan = make(chan types.ScraperStatus)
-	} else {
-		slog.Info("scraper status collection disabled")
-	}
-
-	// fill worker queue
-	go func() {
-		if *singleScraper == "" {
-			slog.Info(fmt.Sprintf("queueing %d scrapers", len(config.Scrapers)))
-			for _, s := range config.Scrapers {
-				scraperChan <- s
-			}
-		} else {
-			foundSingleScraper := false
-			for _, s := range config.Scrapers {
-				if *singleScraper == s.Name {
-					scraperChan <- s
-					foundSingleScraper = true
-					break
-				}
-			}
-			if !foundSingleScraper {
-				slog.Error(fmt.Sprintf("no scrapers found for name %s", *singleScraper))
-				os.Exit(1)
-			}
-		}
-		close(scraperChan)
-	}()
-
-	// start workers
-	nrWorkers := 1
-	if *singleScraper == "" {
-		nrWorkers = int(math.Min(20, float64(len(config.Scrapers))))
-	}
-	slog.Info(fmt.Sprintf("running with %d threads", nrWorkers))
-
-	workerWg := sync.WaitGroup{}
-	workerWg.Add(nrWorkers)
-
-	itemChan := make(chan map[string]any)
-	slog.Debug("starting workers")
-	for i := range nrWorkers {
-		go func(j int) {
-			defer workerWg.Done()
-			worker(scraperChan, itemChan, statusChan, config.Global, j)
-		}(i)
-	}
-
-	// start collector (collecting items and possibly scraper status)
-	collectorWg := sync.WaitGroup{}
-	collectorWg.Add(1)
-	go func() {
-		defer collectorWg.Done()
-		slog.Debug("starting collector")
-		collector(itemChan, statusChan, writer)
-	}()
-
-	workerWg.Wait()
-	slog.Debug("all workers finished, closing item channel")
-	close(itemChan)
-	if statusChan != nil {
-		slog.Debug("all workers finished, closing scraper status channel")
-		close(statusChan)
-	}
-	collectorWg.Wait()
+	err := ctx.Run()
+	ctx.FatalIfErrorf(err)
 }

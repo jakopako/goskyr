@@ -1,3 +1,8 @@
+/*
+goskyr is a command line web scraper written in Go.
+
+Have a look at the README.md for more information.
+*/
 package main
 
 import (

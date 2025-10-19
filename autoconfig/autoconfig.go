@@ -6,10 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/agnivade/levenshtein"
 	"github.com/gdamore/tcell/v2"
 	"github.com/jakopako/goskyr/date"
 	"github.com/jakopako/goskyr/fetch"
@@ -17,85 +15,9 @@ import (
 	"github.com/jakopako/goskyr/scraper"
 	"github.com/jakopako/goskyr/utils"
 	"github.com/rivo/tview"
-	"golang.org/x/net/html"
 )
 
-// A node is our representation of a node in an html tree
-type node struct {
-	tagName       string
-	classes       []string
-	pseudoClasses []string
-}
-
-func (n node) string() string {
-	nodeString := n.tagName
-	for _, cl := range n.classes {
-		// escape special characters
-		// https://www.itsupportguides.com/knowledge-base/website-tips/css-colon-in-id/
-		cl = strings.ReplaceAll(cl, ":", "\\:")
-		cl = strings.ReplaceAll(cl, ">", "\\>")
-		cl = strings.ReplaceAll(cl, "[", "\\[")
-		cl = strings.ReplaceAll(cl, "]", "\\]")
-		cl = strings.ReplaceAll(cl, "/", "\\/")
-		cl = strings.ReplaceAll(cl, "!", "\\!")
-		cl = strings.ReplaceAll(cl, "%", "\\%")
-		// https://stackoverflow.com/questions/45293534/css-class-starting-with-number-is-not-getting-applied
-		if unicode.IsDigit(rune(cl[0])) {
-			cl = fmt.Sprintf(`\3%s `, string(cl[1:]))
-		}
-		nodeString += fmt.Sprintf(".%s", cl)
-	}
-	if len(n.pseudoClasses) > 0 {
-		nodeString += fmt.Sprintf(":%s", strings.Join(n.pseudoClasses, ":"))
-	}
-	return nodeString
-}
-
-func (n node) equals(n2 node) bool {
-	if n.tagName == n2.tagName {
-		if utils.SliceEquals(n.classes, n2.classes) {
-			if utils.SliceEquals(n.pseudoClasses, n2.pseudoClasses) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// A path is a list of nodes starting from the root node and going down
-// the html tree to a specific node
-type path []node
-
-func (p path) string() string {
-	nodeStrings := []string{}
-	for _, n := range p {
-		nodeStrings = append(nodeStrings, n.string())
-	}
-	return strings.Join(nodeStrings, " > ")
-}
-
-// distance calculates the levenshtein distance between the string represention
-// of two paths
-func (p path) distance(p2 path) float64 {
-	return float64(levenshtein.ComputeDistance(p.string(), p2.string()))
-}
-
-type locationProps struct {
-	path      path
-	attr      string
-	textIndex int // this will translate into child index within scraper.ElementLocation
-	count     int
-	examples  []string
-	selected  bool
-	color     tcell.Color
-	distance  float64
-	name      string
-	iStrip    int // this is needed for the squashLocationManager function
-}
-
-type locationManager []*locationProps
-
-func (l locationManager) setColors() {
+func (l fieldManager) setColors() {
 	if len(l) == 0 {
 		return
 	}
@@ -115,7 +37,7 @@ func (l locationManager) setColors() {
 	}
 }
 
-func (l locationManager) findFieldNames(modelName, wordsDir string) error {
+func (l fieldManager) findFieldNames(modelName, wordsDir string) error {
 	if modelName != "" {
 		ll, err := ml.LoadLabler(modelName, wordsDir)
 		if err != nil {
@@ -136,7 +58,7 @@ func (l locationManager) findFieldNames(modelName, wordsDir string) error {
 	return nil
 }
 
-func (l locationManager) selectFieldsTable() {
+func (l fieldManager) selectFieldsTable() {
 	app := tview.NewApplication()
 	table := tview.NewTable().SetBorders(true)
 	cols, rows := 5, len(l)+1
@@ -218,8 +140,8 @@ func (l locationManager) selectFieldsTable() {
 	}
 }
 
-func (l locationManager) elementsToConfig(s *scraper.Scraper) error {
-	var locPropsSel []*locationProps
+func (l fieldManager) elementsToConfig(s *scraper.Scraper) error {
+	var locPropsSel []*fieldProps
 	for _, lm := range l {
 		if lm.selected {
 			locPropsSel = append(locPropsSel, lm)
@@ -316,11 +238,11 @@ func shortenRootSelector(p path) path {
 	return p
 }
 
-// squashLocationManager merges different locationProps into one
+// squashFieldManager merges different locationProps into one
 // based on their similarity. The tricky question is 'when are two
 // locationProps close enough to be merged into one?'
-func squashLocationManager(l locationManager, minOcc int) locationManager {
-	squashed := locationManager{}
+func squashFieldManager(l fieldManager, minOcc int) fieldManager {
+	squashed := fieldManager{}
 	for i := len(l) - 1; i >= 0; i-- {
 		lp := l[i]
 		updated := false
@@ -344,7 +266,7 @@ func squashLocationManager(l locationManager, minOcc int) locationManager {
 // different paths but if all paths' base paths look differently (because their
 // nodes have different nth-child pseudo classes) there won't be a common
 // base path.
-func stripNthChild(lp *locationProps, minOcc int) {
+func stripNthChild(lp *fieldProps, minOcc int) {
 	iStrip := 0
 	// every node in lp.path with index < than iStrip needs no be stripped
 	// of its pseudo classes. iStrip changes during the execution of
@@ -376,7 +298,7 @@ func stripNthChild(lp *locationProps, minOcc int) {
 	}
 }
 
-func checkAndUpdateLocProps(old, new *locationProps) bool {
+func checkAndUpdateLocProps(old, new *fieldProps) bool {
 	// returns true if the paths overlap and the rest of the
 	// element location is identical. If true is returned
 	// the Selector of old will be updated if necessary.
@@ -439,7 +361,7 @@ func checkAndUpdateLocProps(old, new *locationProps) bool {
 	return false
 }
 
-func filter(l locationManager, minCount int, removeStaticFields bool) locationManager {
+func filter(l fieldManager, minCount int, removeStaticFields bool) fieldManager {
 	// remove if count is smaller than minCount
 	// or if the examples are all the same (if removeStaticFields is true)
 	i := 0
@@ -498,128 +420,8 @@ func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields b
 		return err
 	}
 
-	// start analyzing the html
-	z := html.NewTokenizer(strings.NewReader(htmlStr))
-	locMan := locationManager{}
-	nrChildren := map[string]int{}    // the nr of children a node (represented by a path) has, including non-html-tag nodes (ie text)
-	childNodes := map[string][]node{} // the children of the node at the specified nodePath; used for :nth-child() logic
-	nodePath := path{}
-	depth := 0
-	inBody := false
-parse:
-	for {
-		tt := z.Next()
-		switch tt {
-		case html.ErrorToken:
-			break parse
-		case html.TextToken:
-			if inBody {
-				text := string(z.Text())
-				p := nodePath.string()
-				textTrimmed := strings.TrimSpace(text)
-				if len(textTrimmed) > 0 {
-					ti := nrChildren[p]
-					lp := locationProps{
-						path:      make([]node, len(nodePath)),
-						examples:  []string{textTrimmed},
-						textIndex: ti,
-						count:     1,
-					}
-					copy(lp.path, nodePath)
-					locMan = append(locMan, &lp)
-				}
-				nrChildren[p] += 1
-			}
-		case html.StartTagToken, html.EndTagToken:
-			tn, _ := z.TagName()
-			tagNameStr := string(tn)
-			if tagNameStr == "body" {
-				inBody = !inBody
-			}
-			if inBody {
-				// br can also be self closing tag, see later case statement
-				if tagNameStr == "br" || tagNameStr == "input" {
-					nrChildren[nodePath.string()] += 1
-					childNodes[nodePath.string()] = append(childNodes[nodePath.string()], node{tagName: tagNameStr})
-					continue
-				}
-				if tt == html.StartTagToken {
-					attrs, cls, pCls := getTagMetadata(tagNameStr, z, childNodes[nodePath.string()])
-					nrChildren[nodePath.string()] += 1
-					childNodes[nodePath.string()] = append(childNodes[nodePath.string()], node{tagName: tagNameStr, classes: cls})
-
-					newNode := node{
-						tagName:       tagNameStr,
-						classes:       cls,
-						pseudoClasses: pCls,
-					}
-					nodePath = append(nodePath, newNode)
-					depth++
-					childNodes[nodePath.string()] = []node{}
-
-					for attrKey, attrValue := range attrs {
-						lp := locationProps{
-							path:     make([]node, len(nodePath)),
-							examples: []string{attrValue},
-							attr:     attrKey,
-							count:    1,
-						}
-						copy(lp.path, nodePath)
-						locMan = append(locMan, &lp)
-					}
-				} else {
-					n := true
-					for n && depth > 0 {
-						if nodePath[len(nodePath)-1].tagName == tagNameStr {
-							if tagNameStr == "body" {
-								break parse
-							}
-							n = false
-						}
-						delete(nrChildren, nodePath.string())
-						delete(childNodes, nodePath.string())
-						nodePath = nodePath[:len(nodePath)-1]
-						depth--
-					}
-				}
-			}
-		case html.SelfClosingTagToken:
-			if inBody {
-				tn, _ := z.TagName()
-				tagNameStr := string(tn)
-				if tagNameStr == "br" || tagNameStr == "input" || tagNameStr == "img" || tagNameStr == "link" {
-					attrs, cls, pCls := getTagMetadata(tagNameStr, z, childNodes[nodePath.string()])
-					nrChildren[nodePath.string()] += 1
-					childNodes[nodePath.string()] = append(childNodes[nodePath.string()], node{tagName: tagNameStr, classes: cls})
-
-					if len(attrs) > 0 {
-						tmpNodePath := make([]node, len(nodePath))
-						copy(tmpNodePath, nodePath)
-						newNode := node{
-							tagName:       tagNameStr,
-							classes:       cls,
-							pseudoClasses: pCls,
-						}
-						tmpNodePath = append(tmpNodePath, newNode)
-
-						for attrKey, attrValue := range attrs {
-							lp := locationProps{
-								path:     make([]node, len(tmpNodePath)),
-								examples: []string{attrValue},
-								attr:     attrKey,
-								count:    1,
-							}
-							copy(lp.path, tmpNodePath)
-							locMan = append(locMan, &lp)
-						}
-					}
-					continue
-				}
-			}
-		}
-	}
-
-	locMan = squashLocationManager(locMan, minOcc)
+	locMan := newFieldManagerFromHtml(htmlStr)
+	locMan = squashFieldManager(locMan, minOcc)
 	locMan = filter(locMan, minOcc, removeStaticFields)
 	locMan.setColors()
 	if err := locMan.findFieldNames(modelName, wordsDir); err != nil {
@@ -631,55 +433,4 @@ parse:
 		return locMan.elementsToConfig(s)
 	}
 	return fmt.Errorf("no fields found")
-}
-
-// getTagMetadata, for a given node returns a map of key value pairs (only for the attriutes we're interested in) and
-// a list of this node's classes and a list of this node's pseudo classes (currently only nth-child).
-func getTagMetadata(tagName string, z *html.Tokenizer, siblingNodes []node) (map[string]string, []string, []string) {
-	allowedAttrs := map[string]map[string]bool{
-		"a":   {"href": true},
-		"img": {"src": true},
-	}
-	moreAttr := true
-	attrs := make(map[string]string)
-	var cls []string       // classes
-	if tagName != "body" { // we don't care about classes for the body tag
-		for moreAttr {
-			k, v, m := z.TagAttr()
-			vString := strings.TrimSpace(string(v))
-			kString := string(k)
-			if kString == "class" && vString != "" {
-				cls = strings.Split(vString, " ")
-				j := 0
-				for _, cl := range cls {
-					// for now we ignore classes that contain dots
-					if cl != "" && !strings.Contains(cl, ".") {
-						cls[j] = cl
-						j++
-					}
-				}
-				cls = cls[:j]
-			}
-			if _, found := allowedAttrs[tagName]; found {
-				if _, found := allowedAttrs[tagName][kString]; found {
-					attrs[kString] = vString
-				}
-			}
-			moreAttr = m
-		}
-	}
-	var pCls []string // pseudo classes
-	// only add nth-child if there has been another node before at the same
-	// level (sibling node) with same tag and the same classes
-	for i := 0; i < len(siblingNodes); i++ {
-		childNode := siblingNodes[i]
-		if childNode.tagName == tagName {
-			if utils.SliceEquals(childNode.classes, cls) {
-				pCls = []string{fmt.Sprintf("nth-child(%d)", len(siblingNodes)+1)}
-				break
-			}
-		}
-
-	}
-	return attrs, cls, pCls
 }

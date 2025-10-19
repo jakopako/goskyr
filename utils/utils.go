@@ -2,13 +2,12 @@
 package utils
 
 import (
+	"cmp"
 	"crypto/rand"
 	"fmt"
 	"math"
 
 	"slices"
-
-	"golang.org/x/exp/constraints"
 )
 
 // ShortenString shortens a string to a given length and appends "..." if it exceeds that length.
@@ -29,27 +28,28 @@ func HSVToRGB(h, s, v float64) (int32, int32, int32) {
 	v2 := v * (1 - s*(h-i))
 	v3 := v * (1 - s*(1-(h-i)))
 
-	if i == 0 {
+	switch i {
+	case 0:
 		r = v
 		g = v3
 		b = v1
-	} else if i == 1 {
+	case 1:
 		r = v2
 		g = v
 		b = v1
-	} else if i == 2 {
+	case 2:
 		r = v1
 		g = v
 		b = v3
-	} else if i == 3 {
+	case 3:
 		r = v1
 		g = v2
 		b = v
-	} else if i == 4 {
+	case 4:
 		r = v3
 		g = v1
 		b = v
-	} else {
+	default:
 		r = v
 		g = v1
 		b = v2
@@ -99,7 +99,7 @@ func OnlyContainsDigits(s string) bool {
 }
 
 // IntersectionSlices returns the intersection of two slices.
-func IntersectionSlices[T constraints.Ordered](a, b []T) []T {
+func IntersectionSlices[T cmp.Ordered](a, b []T) []T {
 	slices.Sort(a)
 	slices.Sort(b)
 	result := []T{}
@@ -118,7 +118,7 @@ func IntersectionSlices[T constraints.Ordered](a, b []T) []T {
 }
 
 // SliceEquals checks if two slices are equal, ignoring order.
-func SliceEquals[T constraints.Ordered](a, b []T) bool {
+func SliceEquals[T cmp.Ordered](a, b []T) bool {
 	if len(a) != len(b) {
 		return false
 	}

@@ -3,7 +3,6 @@ package autoconfig
 import (
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -62,8 +61,8 @@ func (l fieldManager) selectFieldsTable() {
 	app := tview.NewApplication()
 	table := tview.NewTable().SetBorders(true)
 	cols, rows := 5, len(l)+1
-	for r := 0; r < rows; r++ {
-		for c := 0; c < cols; c++ {
+	for r := range rows {
+		for c := range cols {
 			color := tcell.ColorWhite
 			if c < 1 || r < 1 {
 				if c < 1 && r > 0 {
@@ -238,134 +237,11 @@ func shortenRootSelector(p path) path {
 	return p
 }
 
-// squashFieldManager merges different locationProps into one
-// based on their similarity. The tricky question is 'when are two
-// locationProps close enough to be merged into one?'
-func squashFieldManager(l fieldManager, minOcc int) fieldManager {
-	squashed := fieldManager{}
-	for i := len(l) - 1; i >= 0; i-- {
-		lp := l[i]
-		updated := false
-		for _, sp := range squashed {
-			updated = checkAndUpdateLocProps(sp, lp)
-			if updated {
-				break
-			}
-		}
-		if !updated {
-			stripNthChild(lp, minOcc)
-			squashed = append(squashed, lp)
-		}
-	}
-	return squashed
-}
-
-// stripNthChild tries to find the index in a locationProps path under which
-// we need to strip the nth-child pseudo class. We need to strip that pseudo
-// class because at a later point we want to find a common base path between
-// different paths but if all paths' base paths look differently (because their
-// nodes have different nth-child pseudo classes) there won't be a common
-// base path.
-func stripNthChild(lp *fieldProps, minOcc int) {
-	iStrip := 0
-	// every node in lp.path with index < than iStrip needs no be stripped
-	// of its pseudo classes. iStrip changes during the execution of
-	// this function.
-	// A bit arbitrary (and probably not always correct) but
-	// for now we assume that iStrip cannot be len(lp.path)-1
-	// not correct for https://huxleysneuewelt.com/shows
-	// but needed for http://www.bar-laparenthese.ch/
-	// Therefore by default we substract 1 but in a certain case
-	// we substract 2
-	sub := 1
-	// when minOcc is too small we'd risk stripping the wrong nth-child pseudo classes
-	if minOcc < 6 {
-		sub = 2
-	}
-	for i := len(lp.path) - sub; i >= 0; i-- {
-		if i < iStrip {
-			lp.path[i].pseudoClasses = []string{}
-		} else if len(lp.path[i].pseudoClasses) > 0 {
-			// nth-child(x)
-			ncIndex, _ := strconv.Atoi(strings.Replace(strings.Split(lp.path[i].pseudoClasses[0], "(")[1], ")", "", 1))
-			if ncIndex >= minOcc {
-				lp.path[i].pseudoClasses = []string{}
-				iStrip = i
-				// we need to pass iStrip to the locationProps too to be used by checkAndUpdateLocProps
-				lp.iStrip = iStrip
-			}
-		}
-	}
-}
-
-func checkAndUpdateLocProps(old, new *fieldProps) bool {
-	// returns true if the paths overlap and the rest of the
-	// element location is identical. If true is returned
-	// the Selector of old will be updated if necessary.
-	if old.textIndex == new.textIndex && old.attr == new.attr {
-		if len(old.path) != len(new.path) {
-			return false
-		}
-		newPath := path{}
-		for i, on := range old.path {
-			if on.tagName == new.path[i].tagName {
-				pseudoClassesTmp := []string{}
-				if i > old.iStrip {
-					pseudoClassesTmp = new.path[i].pseudoClasses
-				}
-				// the following checks are not complete yet but suffice for now
-				// with nth-child being our only pseudo class
-				if len(on.pseudoClasses) == len(pseudoClassesTmp) {
-					if len(on.pseudoClasses) == 1 {
-						if on.pseudoClasses[0] != pseudoClassesTmp[0] {
-							return false
-						}
-					}
-					newNode := node{
-						tagName:       on.tagName,
-						pseudoClasses: on.pseudoClasses,
-					}
-					if len(on.classes) == 0 && len(new.path[i].classes) == 0 {
-						newPath = append(newPath, newNode)
-						continue
-					}
-					ovClasses := utils.IntersectionSlices(on.classes, new.path[i].classes)
-					if len(ovClasses) > 0 {
-						if i > old.iStrip {
-							// if we're past iStrip we only consider nodes equal if they have the same classes
-							if len(ovClasses) == len(on.classes) {
-								newNode.classes = on.classes
-								newPath = append(newPath, newNode)
-								continue
-							}
-						} else {
-							// if nodes have more than 0 classes and we're not past iStrip there has to be at least 1 overlapping class
-							newNode.classes = ovClasses
-							newPath = append(newPath, newNode)
-							continue
-						}
-					}
-					// }
-				}
-			}
-			return false
-
-		}
-		// if we get until here there is an overlapping path
-		old.path = newPath
-		old.count++
-		old.examples = append(old.examples, new.examples...)
-		return true
-
-	}
-	return false
-}
-
-func filter(l fieldManager, minCount int, removeStaticFields bool) fieldManager {
+func filter(l *fieldManager, minCount int, removeStaticFields bool) fieldManager {
 	// remove if count is smaller than minCount
 	// or if the examples are all the same (if removeStaticFields is true)
 	i := 0
-	for _, p := range l {
+	for _, p := range *l {
 		if p.count >= minCount {
 			// first reverse the examples list and only take the first x
 			utils.ReverseSlice(p.examples)
@@ -379,16 +255,16 @@ func filter(l fieldManager, minCount int, removeStaticFields bool) fieldManager 
 					}
 				}
 				if !eqEx {
-					l[i] = p
+					(*l)[i] = p
 					i++
 				}
 			} else {
-				l[i] = p
+				(*l)[i] = p
 				i++
 			}
 		}
 	}
-	return l[:i]
+	return (*l)[:i]
 }
 
 func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool, modelName, wordsDir string) error {
@@ -421,16 +297,16 @@ func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields b
 	}
 
 	locMan := newFieldManagerFromHtml(htmlStr)
-	locMan = squashFieldManager(locMan, minOcc)
-	locMan = filter(locMan, minOcc, removeStaticFields)
-	locMan.setColors()
-	if err := locMan.findFieldNames(modelName, wordsDir); err != nil {
+	locMan.squash(minOcc)
+	locMan2 := filter(locMan, minOcc, removeStaticFields)
+	locMan2.setColors()
+	if err := locMan2.findFieldNames(modelName, wordsDir); err != nil {
 		return err
 	}
 
-	if len(locMan) > 0 {
-		locMan.selectFieldsTable()
-		return locMan.elementsToConfig(s)
+	if len(locMan2) > 0 {
+		locMan2.selectFieldsTable()
+		return locMan2.elementsToConfig(s)
 	}
 	return fmt.Errorf("no fields found")
 }

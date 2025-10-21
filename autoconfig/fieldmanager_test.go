@@ -1,6 +1,7 @@
 package autoconfig
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/jakopako/goskyr/utils"
@@ -596,5 +597,110 @@ func TestSquash_MergeOverlappingClassesBeforeIStrip(t *testing.T) {
 
 	if !fm.equals(&expected) {
 		t.Fatalf("squash did not merge overlapping classes before iStrip.\nGot: \n%s\nWant: \n%s", fm.string(), expected.string())
+	}
+}
+
+func TestFilter_MinCountAndTruncation(t *testing.T) {
+	fm := &fieldManager{
+		&fieldProps{
+			path:     nil,
+			attr:     "",
+			count:    1,
+			examples: []string{"a", "b"},
+		},
+		&fieldProps{
+			path:     nil,
+			attr:     "",
+			count:    2,
+			examples: []string{"one", "two", "three"},
+		},
+		&fieldProps{
+			path:     nil,
+			attr:     "",
+			count:    3,
+			examples: []string{"same", "same", "same"},
+		},
+	}
+
+	fm.filter(2, false)
+
+	if len(*fm) != 2 {
+		t.Fatalf("expected 2 entries after filter, got %d", len(*fm))
+	}
+
+	// first surviving entry should be the original second element
+	fp0 := (*fm)[0]
+	if fp0.count != 2 {
+		t.Fatalf("fp0.count = %d, want %d", fp0.count, 2)
+	}
+	if !slices.Equal(fp0.examples, []string{"three", "two"}) {
+		t.Fatalf("fp0.examples = %v, want %v", fp0.examples, []string{"three", "two"})
+	}
+
+	// second surviving entry should be the original third element
+	fp1 := (*fm)[1]
+	if fp1.count != 3 {
+		t.Fatalf("fp1.count = %d, want %d", fp1.count, 3)
+	}
+	if !slices.Equal(fp1.examples, []string{"same", "same"}) {
+		t.Fatalf("fp1.examples = %v, want %v", fp1.examples, []string{"same", "same"})
+	}
+}
+
+func TestFilter_RemoveStaticFieldsTrue(t *testing.T) {
+	fm := &fieldManager{
+		&fieldProps{
+			path:     nil,
+			attr:     "",
+			count:    2,
+			examples: []string{"x", "x"},
+		},
+		&fieldProps{
+			path:     nil,
+			attr:     "",
+			count:    2,
+			examples: []string{"y", "z"},
+		},
+		&fieldProps{
+			path:     nil,
+			attr:     "",
+			count:    1,
+			examples: []string{"ignored"},
+		},
+	}
+
+	fm.filter(2, true)
+
+	if len(*fm) != 1 {
+		t.Fatalf("expected 1 entry after filter, got %d", len(*fm))
+	}
+
+	fp := (*fm)[0]
+	if fp.count != 2 {
+		t.Fatalf("fp.count = %d, want %d", fp.count, 2)
+	}
+	// examples reversed and truncated to minCount=2 => ["z","y"]
+	if !slices.Equal(fp.examples, []string{"z", "y"}) {
+		t.Fatalf("fp.examples = %v, want %v", fp.examples, []string{"z", "y"})
+	}
+}
+
+func TestFilter_ExamplesTruncationOrder(t *testing.T) {
+	fp := &fieldProps{
+		path:     nil,
+		attr:     "",
+		count:    3,
+		examples: []string{"first", "second", "third"},
+	}
+	fm := &fieldManager{fp}
+
+	fm.filter(2, false)
+
+	if len(*fm) != 1 {
+		t.Fatalf("expected 1 entry after filter, got %d", len(*fm))
+	}
+	got := (*fm)[0].examples
+	if !slices.Equal(got, []string{"third", "second"}) {
+		t.Fatalf("examples = %v, want %v", got, []string{"third", "second"})
 	}
 }

@@ -10,7 +10,12 @@ import (
 	"github.com/jakopako/goskyr/scraper"
 )
 
-func GetDynamicFieldsConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool, modelName, wordsDir string) error {
+// GenerateConfig generates a scraper configuration for the given scraper s's URL
+// by analyzing the HTML structure and allowing the user to select fields interactively.
+// minOcc specifies the minimum occurrences a field must have to be included.
+// If removeStaticFields is true, fields that have static values will be removed from the configuration.
+// modelName and wordsDir are used for text analysis to predict field names.
+func GenerateConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool, modelName, wordsDir string) error {
 	if s.URL == "" {
 		return errors.New("URL field cannot be empty")
 	}

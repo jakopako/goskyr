@@ -212,7 +212,7 @@ func (g *GenerateCmd) Run() error {
 	}
 
 	slog.Debug(fmt.Sprintf("analyzing url %s", s.URL))
-	err := autoconfig.GetDynamicFieldsConfig(s, g.MinOccurrence, g.Distinct, g.ModelName, g.WordLists)
+	err := autoconfig.GenerateConfig(s, g.MinOccurrence, g.Distinct, g.ModelName, g.WordLists)
 	if err != nil {
 		slog.Error(fmt.Sprintf("%v", err))
 		return err

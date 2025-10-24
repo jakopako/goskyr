@@ -26,18 +26,24 @@ import (
 
 var version = "dev"
 
-var cli struct {
-	Globals
+type VersionFlag string
+
+func (v VersionFlag) Decode(_ *kong.DecodeContext) error { return nil }
+func (v VersionFlag) IsBool() bool                       { return true }
+func (v VersionFlag) BeforeApply(app *kong.Kong, vars kong.Vars) error {
+	fmt.Println(vars["version"])
+	app.Exit(0)
+	return nil
+}
+
+type cli struct {
+	Version VersionFlag `short:"v" long:"version" help:"Print the version and exit."`
+	Debug   bool        `short:"d" long:"debug" help:"Set log level to 'debug' and store additional helpful debugging data."`
 
 	Scrape   ScrapeCmd   `cmd:"" help:"Scrape data"`
 	Generate GenerateCmd `cmd:"" help:"Generate a scraper configuration file for the given URL"`
 	Extract  ExtractCmd  `cmd:"" help:"Extract ML features based on the given configuration file"`
 	Train    TrainCmd    `cmd:"" help:"Train ML model based on the given features file. This will generate 2 files, goskyr.model and goskyr.class"`
-}
-
-type Globals struct {
-	Version bool `short:"v" long:"version" help:"Print the version and exit."`
-	Debug   bool `short:"d" long:"debug" help:"Set log level to 'debug' and store additional helpful debugging data."`
 }
 
 type ScrapeCmd struct {
@@ -285,16 +291,16 @@ func (t *TrainCmd) Run() error {
 	return nil
 }
 
-func printVersion() {
+func getVersion() string {
 	buildInfo, ok := debug.ReadBuildInfo()
 	if ok {
 		if buildInfo.Main.Version != "" && buildInfo.Main.Version != "(devel)" {
-			fmt.Println(buildInfo.Main.Version)
-			return
+			// fmt.Println(buildInfo.Main.Version)
+			return buildInfo.Main.Version
 		}
 	}
-	fmt.Println(version)
-	return
+	// fmt.Println(version)
+	return version
 }
 
 func initializeLogging(debug bool) {
@@ -310,15 +316,16 @@ func initializeLogging(debug bool) {
 }
 
 func main() {
-	ctx := kong.Parse(&cli)
-
-	if cli.Globals.Version {
-		printVersion()
-		return
+	cli := cli{
+		Version: VersionFlag(getVersion()),
 	}
+	ctx := kong.Parse(&cli,
+		kong.Vars{
+			"version": string(cli.Version),
+		})
 
-	initializeLogging(cli.Globals.Debug)
-	config.Debug = cli.Globals.Debug
+	initializeLogging(cli.Debug)
+	config.Debug = cli.Debug
 
 	err := ctx.Run()
 	ctx.FatalIfErrorf(err)

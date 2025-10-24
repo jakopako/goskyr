@@ -142,6 +142,28 @@ func TestNewElementManagerFromHtml(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "siblings with overlapping classes -> nth-child",
+			html: `<html><body><div class="box highlight">Box 1</div><div class="box">Box 2</div></body></html>`,
+			expected: []*fieldProps{
+				{
+					path: []node{
+						{tagName: "body"},
+						{tagName: "div", classes: []string{"box", "highlight"}},
+					},
+					count:    1,
+					examples: []string{"Box 1"},
+				},
+				{
+					path: []node{
+						{tagName: "body"},
+						{tagName: "div", classes: []string{"box"}, pseudoClasses: []string{"nth-child(2)"}},
+					},
+					count:    1,
+					examples: []string{"Box 2"},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -382,7 +404,7 @@ func TestCheckOverlapAndUpdate(t *testing.T) {
 			wantExamples: []string{"a"},
 		},
 		{
-			name: "overlapping classes after iStrip full match -> accept and keep original classes",
+			name: "overlapping classes after iStrip but no full match -> reject",
 			fp: makeFP(path{
 				makeNode("body", nil, nil),
 				makeNode("div", []string{"a", "b"}, nil),
@@ -391,10 +413,10 @@ func TestCheckOverlapAndUpdate(t *testing.T) {
 				makeNode("body", nil, nil),
 				makeNode("div", []string{"a", "b", "c"}, nil),
 			}, "", 0, []string{"b"}, 1, 0),
-			wantUpdated:   true,
-			wantPathAfter: path{makeNode("body", nil, nil), makeNode("div", []string{"a", "b"}, nil)},
-			wantCount:     2,
-			wantExamples:  []string{"a", "b"},
+			wantUpdated: false,
+			// wantPathAfter: path{makeNode("body", nil, nil), makeNode("div", []string{"a", "b"}, nil)},
+			wantCount:    1,
+			wantExamples: []string{"a"},
 		},
 	}
 

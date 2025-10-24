@@ -78,8 +78,9 @@ func (fp *fieldProps) checkOverlapAndUpdate(other *fieldProps) bool {
 					intersectionCls := utils.IntersectionSlices(fpNode.classes, other.path[i].classes)
 					if len(intersectionCls) > 0 {
 						if i > fp.iStrip {
-							// if we're past iStrip we only consider nodes equal if they have the same classes
-							if len(intersectionCls) == len(fpNode.classes) {
+							// if we're past iStrip we only consider nodes equal if they have the exact same classes
+							// if len(other.path[i].classes) == len(fpNode.classes) && len(intersectionCls) == len(fpNode.classes) {
+							if utils.SliceEquals(other.path[i].classes, fpNode.classes) {
 								newNode.classes = fpNode.classes
 								newPath = append(newPath, newNode)
 								continue
@@ -427,13 +428,17 @@ func (fm fieldManager) showInteractiveTable() error {
 
 // elementsToConfig converts the selected fieldProps into scraper config
 func (fm fieldManager) elementsToConfig(s *scraper.Scraper) error {
-	var locPropsSel []*fieldProps
-	for _, lm := range fm {
-		if lm.selected {
-			locPropsSel = append(locPropsSel, lm)
+	// remove unselected fieldProps
+	j := 0
+	for i, fp := range fm {
+		if fp.selected {
+			fm[j] = fm[i]
+			j++
 		}
 	}
-	if len(locPropsSel) == 0 {
+
+	fm = fm[:j]
+	if len(fm) == 0 {
 		return fmt.Errorf("no fields selected")
 	}
 
@@ -442,7 +447,7 @@ func (fm fieldManager) elementsToConfig(s *scraper.Scraper) error {
 outer:
 	for i := 0; ; i++ {
 		var n node
-		for j, e := range locPropsSel {
+		for j, e := range fm {
 			if i >= len(e.path) {
 				rootSelector = e.path[:i]
 				break outer
@@ -457,7 +462,8 @@ outer:
 			}
 		}
 	}
-	s.Item = shortenRootSelector(rootSelector).string()
+	s.Item = rootSelector.trimPrefix(3).string()
+
 	// for now we assume that there will only be one date field
 	t := time.Now()
 	zone, _ := t.Zone()
@@ -467,7 +473,7 @@ outer:
 		Type:         "date",
 		DateLocation: zone,
 	}
-	for _, e := range locPropsSel {
+	for _, e := range fm {
 		loc := scraper.ElementLocation{
 			Selector:   e.path[len(rootSelector):].string(),
 			ChildIndex: e.textIndex,
@@ -650,32 +656,16 @@ func getTagMetadata(tagName string, z *html.Tokenizer, siblingNodes []node) (map
 	}
 	var pCls []string // pseudo classes
 	// only add nth-child if there has been another node before at the same
-	// level (sibling node) with same tag and the same classes
+	// level (sibling node) with same tag --and the same classes--
 	for i := range siblingNodes {
 		childNode := siblingNodes[i]
 		if childNode.tagName == tagName {
-			if utils.SliceEquals(childNode.classes, cls) {
-				pCls = []string{fmt.Sprintf("nth-child(%d)", len(siblingNodes)+1)}
-				break
-			}
+			// if utils.SliceEquals(childNode.classes, cls) {
+			pCls = []string{fmt.Sprintf("nth-child(%d)", len(siblingNodes)+1)}
+			break
+			// }
 		}
 
 	}
 	return attrs, cls, pCls
-}
-
-// shortenRootSelector shortens the root selector path by removing
-// leading nodes until a certain threshold of classes is reached
-func shortenRootSelector(p path) path {
-	// the following algorithm is a bit arbitrary. Let's
-	// see if it works.
-	nrTotalClasses := 0
-	thresholdTotalClasses := 3
-	for i := len(p) - 1; i >= 0; i-- {
-		nrTotalClasses += len(p[i].classes)
-		if nrTotalClasses >= thresholdTotalClasses {
-			return p[i:]
-		}
-	}
-	return p
 }

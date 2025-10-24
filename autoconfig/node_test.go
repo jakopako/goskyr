@@ -174,3 +174,87 @@ func TestPathString(t *testing.T) {
 		})
 	}
 }
+
+func TestPathTrimPrefix(t *testing.T) {
+	tests := []struct {
+		name     string
+		p        path
+		min      int
+		expected string
+	}{
+		{
+			name: "trim to last node when minClasses=1",
+			p: path{
+				node{tagName: "a", classes: []string{"x"}},
+				node{tagName: "b", classes: []string{"y", "z"}},
+				node{tagName: "c", classes: []string{"w"}},
+			},
+			min:      1,
+			expected: "c.w",
+		},
+		{
+			name: "trim to last two nodes when minClasses=2",
+			p: path{
+				node{tagName: "a", classes: []string{"x"}},
+				node{tagName: "b", classes: []string{"y", "z"}},
+				node{tagName: "c", classes: []string{"w"}},
+			},
+			min:      2,
+			expected: "b.y.z > c.w",
+		},
+		{
+			name: "minClasses exactly total across last two nodes (3) returns last two",
+			p: path{
+				node{tagName: "a", classes: []string{"x"}},
+				node{tagName: "b", classes: []string{"y", "z"}},
+				node{tagName: "c", classes: []string{"w"}},
+			},
+			min:      3,
+			expected: "b.y.z > c.w",
+		},
+		{
+			name: "minClasses equals total (4) returns full path",
+			p: path{
+				node{tagName: "a", classes: []string{"x"}},
+				node{tagName: "b", classes: []string{"y", "z"}},
+				node{tagName: "c", classes: []string{"w"}},
+			},
+			min:      4,
+			expected: "a.x > b.y.z > c.w",
+		},
+		{
+			name: "minClasses greater than total returns original path",
+			p: path{
+				node{tagName: "a", classes: []string{"x"}},
+				node{tagName: "b", classes: []string{"y", "z"}},
+				node{tagName: "c", classes: []string{"w"}},
+			},
+			min:      5,
+			expected: "a.x > b.y.z > c.w",
+		},
+		{
+			name: "nodes with no classes - cannot reach min, return original",
+			p: path{
+				node{tagName: "div"},
+				node{tagName: "span"},
+			},
+			min:      1,
+			expected: "div > span",
+		},
+		{
+			name:     "empty path stays empty",
+			p:        path{},
+			min:      1,
+			expected: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.p.trimPrefix(tc.min).string()
+			if got != tc.expected {
+				t.Fatalf("trimPrefix(%d) returned %q; want %q for path=%+v", tc.min, got, tc.expected, tc.p)
+			}
+		})
+	}
+}

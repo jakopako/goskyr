@@ -71,3 +71,16 @@ func (p path) string() string {
 func (p path) distance(p2 path) float64 {
 	return float64(levenshtein.ComputeDistance(p.string(), p2.string()))
 }
+
+// trimPrefix shortens the path by removing leading nodes
+// while keeping at least minClasses total classes in the path
+func (p path) trimPrefix(minClasses int) path {
+	nrTotalClasses := 0
+	for i := len(p) - 1; i >= 0; i-- {
+		nrTotalClasses += len(p[i].classes)
+		if nrTotalClasses >= minClasses {
+			return p[i:]
+		}
+	}
+	return p
+}

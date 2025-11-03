@@ -390,6 +390,112 @@ func TestCheckOverlapAndUpdate(t *testing.T) {
 			wantExamples:  []string{"a", "b"},
 		},
 		{
+			name: "overlapping classes before iStrip -> accept intersection, real case",
+			fp: makeFP(path{
+				makeNode("div", []string{"whats-on"}, nil),
+				makeNode("div", []string{"grid", "loading"}, nil),
+				makeNode("div", []string{"classical", "grid-item"}, nil),
+				makeNode("div", []string{"grid-item__inner", "lev"}, nil),
+				makeNode("div", []string{"classical", "text"}, []string{"nth-child(3)"}),
+				makeNode("h2", []string{"grid-item__title"}, nil),
+			}, "", 0, []string{"a"}, 1, 2),
+			other: makeFP(path{
+				makeNode("div", []string{"whats-on"}, nil),
+				makeNode("div", []string{"grid", "loading"}, nil),
+				makeNode("div", []string{"grid-item"}, nil),
+				makeNode("div", []string{"grid-item__inner", "lev"}, nil),
+				makeNode("div", []string{"classical", "text"}, []string{"nth-child(3)"}),
+				makeNode("h2", []string{"grid-item__title"}, nil),
+			}, "", 0, []string{"b"}, 1, 0),
+			wantUpdated: true,
+			wantPathAfter: path{
+				makeNode("div", []string{"whats-on"}, nil),
+				makeNode("div", []string{"grid", "loading"}, nil),
+				makeNode("div", []string{"grid-item"}, nil),
+				makeNode("div", []string{"grid-item__inner", "lev"}, nil),
+				makeNode("div", []string{"classical", "text"}, []string{"nth-child(3)"}),
+				makeNode("h2", []string{"grid-item__title"}, nil),
+			},
+			wantCount:    2,
+			wantExamples: []string{"a", "b"},
+		},
+		{
+			name: "overlapping classes before iStrip -> accept intersection, real case reverse",
+			fp: makeFP(path{
+				makeNode("div", []string{"whats-on"}, nil),
+				makeNode("div", []string{"grid", "loading"}, nil),
+				makeNode("div", []string{"grid-item"}, nil),
+				makeNode("div", []string{"grid-item__inner", "lev"}, nil),
+				makeNode("div", []string{"classical", "text"}, []string{"nth-child(3)"}),
+				makeNode("h2", []string{"grid-item__title"}, nil),
+			}, "", 0, []string{"b"}, 1, 2),
+			other: makeFP(path{
+				makeNode("div", []string{"whats-on"}, nil),
+				makeNode("div", []string{"grid", "loading"}, nil),
+				makeNode("div", []string{"classical", "grid-item"}, nil),
+				makeNode("div", []string{"grid-item__inner", "lev"}, nil),
+				makeNode("div", []string{"classical", "text"}, []string{"nth-child(3)"}),
+				makeNode("h2", []string{"grid-item__title"}, nil),
+			}, "", 0, []string{"a"}, 1, 0),
+			wantUpdated: true,
+			wantPathAfter: path{
+				makeNode("div", []string{"whats-on"}, nil),
+				makeNode("div", []string{"grid", "loading"}, nil),
+				makeNode("div", []string{"grid-item"}, nil),
+				makeNode("div", []string{"grid-item__inner", "lev"}, nil),
+				makeNode("div", []string{"classical", "text"}, []string{"nth-child(3)"}),
+				makeNode("h2", []string{"grid-item__title"}, nil),
+			},
+			wantCount:    2,
+			wantExamples: []string{"b", "a"},
+		},
+		{
+			name: "overlapping classes before iStrip, overlapping classes after iStrip, distinct nth-child -> reject",
+			fp: makeFP(
+				path{
+					makeNode("body", nil, nil),
+					makeNode("div", []string{"a", "b"}, nil),
+					makeNode("div", nil, nil),
+					makeNode("div", []string{"c", "d"}, []string{"nth-child(1)"}),
+				}, "", 0, []string{"a"}, 1, 1),
+			other: makeFP(
+				path{
+					makeNode("body", nil, nil),
+					makeNode("div", []string{"b", "e"}, nil),
+					makeNode("div", nil, nil),
+					makeNode("div", []string{"d", "f"}, []string{"nth-child(2)"}),
+				}, "", 0, []string{"b"}, 1, 0),
+			wantUpdated:  false,
+			wantCount:    1,
+			wantExamples: []string{"a"},
+		},
+		{
+			name: "overlapping classes before iStrip, overlapping classes after iStrip, same nth-child -> accept",
+			fp: makeFP(
+				path{
+					makeNode("body", nil, nil),
+					makeNode("div", []string{"a", "b"}, nil),
+					makeNode("div", nil, nil),
+					makeNode("div", []string{"c", "d"}, []string{"nth-child(2)"}),
+				}, "", 0, []string{"a"}, 1, 1),
+			other: makeFP(
+				path{
+					makeNode("body", nil, nil),
+					makeNode("div", []string{"b", "e"}, nil),
+					makeNode("div", nil, nil),
+					makeNode("div", []string{"d", "f"}, []string{"nth-child(2)"}),
+				}, "", 0, []string{"b"}, 1, 0),
+			wantUpdated: true,
+			wantPathAfter: path{
+				makeNode("body", nil, nil),
+				makeNode("div", []string{"b"}, nil),
+				makeNode("div", nil, nil),
+				makeNode("div", []string{"d"}, []string{"nth-child(2)"}),
+			},
+			wantCount:    2,
+			wantExamples: []string{"a", "b"},
+		},
+		{
 			name: "overlapping classes after iStrip requires full match -> reject if partial",
 			fp: makeFP(path{
 				makeNode("body", nil, nil),

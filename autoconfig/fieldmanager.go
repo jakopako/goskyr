@@ -79,7 +79,6 @@ func (fp *fieldProps) checkOverlapAndUpdate(other *fieldProps) bool {
 					if len(intersectionCls) > 0 {
 						if i > fp.iStrip {
 							// if we're past iStrip we only consider nodes equal if they have the exact same classes
-							// if len(other.path[i].classes) == len(fpNode.classes) && len(intersectionCls) == len(fpNode.classes) {
 							if utils.SliceEquals(other.path[i].classes, fpNode.classes) {
 								newNode.classes = fpNode.classes
 								newPath = append(newPath, newNode)

@@ -147,8 +147,6 @@ func (fm fieldManager) string() string {
 // compareFieldProps compares two fieldProps and returns an int indicating their order
 func compareFieldProps(fm1, fm2 *fieldProps) int {
 	// for now we ignore 'selected', 'color' & 'distance' in comparison
-	// slices.Sort(fm1.examples)
-	// slices.Sort(fm2.examples)
 	return cmp.Or(
 		cmp.Compare(fm1.path.string(), fm2.path.string()),
 		cmp.Compare(fm1.attr, fm2.attr),

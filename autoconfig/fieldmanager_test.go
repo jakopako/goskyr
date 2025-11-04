@@ -520,35 +520,6 @@ func TestCheckOverlapAndUpdate(t *testing.T) {
 			wantCount:    2,
 			wantExamples: []string{"a", "b"},
 		},
-		// {
-		// 	name: "overlapping classes after iStrip requires full match -> reject if partial",
-		// 	fp: makeFP(path{
-		// 		makeNode("body", nil, nil),
-		// 		makeNode("div", []string{"a", "b"}, nil),
-		// 	}, "", 0, []string{"a"}, 1, 0), // iStrip=0 so at i=1 we are > iStrip and require full match
-		// 	other: makeFP(path{
-		// 		makeNode("body", nil, nil),
-		// 		makeNode("div", []string{"b", "c"}, nil),
-		// 	}, "", 0, []string{"b"}, 1, 0),
-		// 	wantUpdated:  false,
-		// 	wantCount:    1,
-		// 	wantExamples: []string{"a"},
-		// },
-		// {
-		// 	name: "overlapping classes after iStrip but no full match -> reject",
-		// 	fp: makeFP(path{
-		// 		makeNode("body", nil, nil),
-		// 		makeNode("div", []string{"a", "b"}, nil),
-		// 	}, "", 0, []string{"a"}, 1, 0), // iStrip=0 so at i=1 we are > iStrip
-		// 	other: makeFP(path{
-		// 		makeNode("body", nil, nil),
-		// 		makeNode("div", []string{"a", "b", "c"}, nil),
-		// 	}, "", 0, []string{"b"}, 1, 0),
-		// 	wantUpdated: false,
-		// 	// wantPathAfter: path{makeNode("body", nil, nil), makeNode("div", []string{"a", "b"}, nil)},
-		// 	wantCount:    1,
-		// 	wantExamples: []string{"a"},
-		// },
 	}
 
 	for _, tt := range tests {

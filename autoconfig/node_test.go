@@ -22,11 +22,11 @@ func TestNodeString(t *testing.T) {
 			name: "escape special characters in class",
 			n: node{
 				tagName: "div",
-				classes: []string{"a:b>[c]/d!%"},
+				classes: []string{"a:b>[c]/d!%'"},
 			},
 			// ":" -> "\:", ">" -> "\>", "[" -> "\[", "]" -> "\]",
 			// "/" -> "\/", "!" -> "\!", "%" -> "\%"
-			expected: `div.a\:b\>\[c\]\/d\!\%`,
+			expected: `div.a\:b\>\[c\]\/d\!\%\'`,
 		},
 		{
 			name: "class starting with digit gets special escape (includes trailing space)",

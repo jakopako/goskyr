@@ -701,7 +701,7 @@ func TestSquash_MergeIdentical(t *testing.T) {
 		makeFP(path{
 			makeNode("body", nil, nil),
 			makeNode("div", []string{"container"}, nil),
-		}, "", 0, 2, []string{"one", "two"}, 0),
+		}, "", 0, 2, []string{"two", "one"}, 0),
 	}
 
 	fm.squash(1)
@@ -743,13 +743,95 @@ func TestSquash_MergeOverlappingClassesBeforeIStrip(t *testing.T) {
 		makeFP(path{
 			makeNode("body", nil, nil),
 			makeNode("div", []string{"b"}, nil),
-		}, "", 0, 2, []string{"A", "B"}, 1),
+		}, "", 0, 2, []string{"B", "A"}, 1),
 	}
 
 	(&fm).squash(1)
 
 	if !fm.equals(&expected) {
 		t.Fatalf("squash did not merge overlapping classes before iStrip.\nGot: \n%s\nWant: \n%s", fm.string(), expected.string())
+	}
+}
+
+func TestSquash_MultiListStructure(t *testing.T) {
+	makeNode := func(tag string, classes []string, pcls []string) node {
+		return node{tagName: tag, classes: classes, pseudoClasses: pcls}
+	}
+	makeFP := func(p path, attr string, textIndex, count int, examples []string, iStrip int) *fieldProps {
+		return &fieldProps{
+			path:      p,
+			attr:      attr,
+			textIndex: textIndex,
+			count:     count,
+			examples:  append([]string{}, examples...),
+			iStrip:    iStrip,
+		}
+	}
+
+	fm := &fieldManager{
+		makeFP(path{
+			makeNode("body", nil, nil),
+			makeNode("ul", nil, nil),
+			makeNode("li", []string{"item"}, nil),
+			makeNode("span", nil, nil),
+		}, "", 0, 1, []string{"A1"}, 0),
+		makeFP(path{
+			makeNode("body", nil, nil),
+			makeNode("ul", nil, nil),
+			makeNode("li", []string{"item"}, []string{"nth-child(2)"}),
+			makeNode("span", nil, nil),
+		}, "", 0, 1, []string{"A2"}, 0),
+		makeFP(path{
+			makeNode("body", nil, nil),
+			makeNode("ul", nil, nil),
+			makeNode("li", []string{"item"}, nil),
+			makeNode("span", nil, nil),
+		}, "", 0, 1, []string{"B1"}, 0),
+		makeFP(path{
+			makeNode("body", nil, nil),
+			makeNode("ul", nil, nil),
+			makeNode("li", []string{"item"}, []string{"nth-child(2)"}),
+			makeNode("span", nil, nil),
+		}, "", 0, 1, []string{"B2"}, 0),
+		makeFP(path{
+			makeNode("body", nil, nil),
+			makeNode("ul", nil, nil),
+			makeNode("li", []string{"item"}, []string{"nth-child(3)"}),
+			makeNode("span", nil, nil),
+		}, "", 0, 1, []string{"B3"}, 0),
+		makeFP(path{
+			makeNode("body", nil, nil),
+			makeNode("ul", nil, nil),
+			makeNode("li", []string{"item"}, []string{"nth-child(4)"}),
+			makeNode("span", nil, nil),
+		}, "", 0, 1, []string{"B4"}, 0),
+		makeFP(path{
+			makeNode("body", nil, nil),
+			makeNode("ul", nil, nil),
+			makeNode("li", []string{"item"}, nil),
+			makeNode("span", nil, nil),
+		}, "", 0, 1, []string{"C1"}, 0),
+		makeFP(path{
+			makeNode("body", nil, nil),
+			makeNode("ul", nil, nil),
+			makeNode("li", []string{"item"}, []string{"nth-child(2)"}),
+			makeNode("span", nil, nil),
+		}, "", 0, 1, []string{"C2"}, 0),
+	}
+
+	expected := &fieldManager{
+		makeFP(path{
+			makeNode("body", nil, nil),
+			makeNode("ul", nil, nil),
+			makeNode("li", []string{"item"}, nil),
+			makeNode("span", nil, nil),
+		}, "", 0, 8, []string{"B4", "B3", "C2", "C1", "B2", "B1", "A2", "A1"}, 2),
+	}
+
+	fm.squash(3)
+
+	if !fm.equals(expected) {
+		t.Fatalf("squash did not work correctly.\nGot: \n%s\nWant: \n%s", fm.string(), expected.string())
 	}
 }
 

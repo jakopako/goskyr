@@ -29,6 +29,7 @@ func (n node) string() string {
 		cl = strings.ReplaceAll(cl, "/", "\\/")
 		cl = strings.ReplaceAll(cl, "!", "\\!")
 		cl = strings.ReplaceAll(cl, "%", "\\%")
+		cl = strings.ReplaceAll(cl, "'", "\\'")
 		// https://stackoverflow.com/questions/45293534/css-class-starting-with-number-is-not-getting-applied
 		if unicode.IsDigit(rune(cl[0])) {
 			cl = fmt.Sprintf(`\3%c %s`, cl[0], string(cl[1:]))

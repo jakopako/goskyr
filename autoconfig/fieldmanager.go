@@ -147,8 +147,8 @@ func (fm fieldManager) string() string {
 // compareFieldProps compares two fieldProps and returns an int indicating their order
 func compareFieldProps(fm1, fm2 *fieldProps) int {
 	// for now we ignore 'selected', 'color' & 'distance' in comparison
-	slices.Sort(fm1.examples)
-	slices.Sort(fm2.examples)
+	// slices.Sort(fm1.examples)
+	// slices.Sort(fm2.examples)
 	return cmp.Or(
 		cmp.Compare(fm1.path.string(), fm2.path.string()),
 		cmp.Compare(fm1.attr, fm2.attr),
@@ -514,9 +514,20 @@ outer:
 // fieldProps close enough to be merged into one?'
 func (fm *fieldManager) squash(minCount int) {
 	squashed := fieldManager{}
-	// iterate from the back to ensure that stripNthChild works correctly
-	// stripNthChild relies on x in nth-child(x) being >= minOcc which is
-	// more likely when iterating from the back over the fieldManager
+
+	// first compute iStrip for all fieldProps
+	for _, fp := range *fm {
+		fp.stripNthChild(minCount)
+	}
+
+	// now sort by iStrip ascending to ensure that fieldProps with
+	// higher iStrip are processed first in the following loop
+	// this ensures that fieldProps with low iStrip are more likely
+	// to be merged into existing squashed fieldProps
+	slices.SortFunc(*fm, func(a, b *fieldProps) int {
+		return a.iStrip - b.iStrip
+	})
+
 	for i := len(*fm) - 1; i >= 0; i-- {
 		fp := (*fm)[i]
 		updated := false
@@ -527,7 +538,6 @@ func (fm *fieldManager) squash(minCount int) {
 			}
 		}
 		if !updated {
-			fp.stripNthChild(minCount)
 			squashed = append(squashed, fp)
 		}
 	}

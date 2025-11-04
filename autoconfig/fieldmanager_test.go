@@ -164,6 +164,31 @@ func TestNewElementManagerFromHtml(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "child elements with comments",
+			html: `<html><body><div><!-- This is a comment -->Visible Text<p>Paragraph Text<!-- Another comment --></p></div></body></html>`,
+			expected: []*fieldProps{
+				{
+					path: []node{
+						{tagName: "body"},
+						{tagName: "div"},
+					},
+					count:     1,
+					textIndex: 1,
+					examples:  []string{"Visible Text"},
+				},
+				{
+					path: []node{
+						{tagName: "body"},
+						{tagName: "div"},
+						{tagName: "p"},
+					},
+					count:     1,
+					textIndex: 0,
+					examples:  []string{"Paragraph Text"},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -390,33 +415,110 @@ func TestCheckOverlapAndUpdate(t *testing.T) {
 			wantExamples:  []string{"a", "b"},
 		},
 		{
-			name: "overlapping classes after iStrip requires full match -> reject if partial",
+			name: "overlapping classes before iStrip -> accept intersection, real case",
 			fp: makeFP(path{
-				makeNode("body", nil, nil),
-				makeNode("div", []string{"a", "b"}, nil),
-			}, "", 0, []string{"a"}, 1, 0), // iStrip=0 so at i=1 we are > iStrip and require full match
+				makeNode("div", []string{"whats-on"}, nil),
+				makeNode("div", []string{"grid", "loading"}, nil),
+				makeNode("div", []string{"classical", "grid-item"}, nil),
+				makeNode("div", []string{"grid-item__inner", "lev"}, nil),
+				makeNode("div", []string{"classical", "text"}, []string{"nth-child(3)"}),
+				makeNode("h2", []string{"grid-item__title"}, nil),
+			}, "", 0, []string{"a"}, 1, 2),
 			other: makeFP(path{
-				makeNode("body", nil, nil),
-				makeNode("div", []string{"b", "c"}, nil),
+				makeNode("div", []string{"whats-on"}, nil),
+				makeNode("div", []string{"grid", "loading"}, nil),
+				makeNode("div", []string{"grid-item"}, nil),
+				makeNode("div", []string{"grid-item__inner", "lev"}, nil),
+				makeNode("div", []string{"classical", "text"}, []string{"nth-child(3)"}),
+				makeNode("h2", []string{"grid-item__title"}, nil),
 			}, "", 0, []string{"b"}, 1, 0),
+			wantUpdated: true,
+			wantPathAfter: path{
+				makeNode("div", []string{"whats-on"}, nil),
+				makeNode("div", []string{"grid", "loading"}, nil),
+				makeNode("div", []string{"grid-item"}, nil),
+				makeNode("div", []string{"grid-item__inner", "lev"}, nil),
+				makeNode("div", []string{"classical", "text"}, []string{"nth-child(3)"}),
+				makeNode("h2", []string{"grid-item__title"}, nil),
+			},
+			wantCount:    2,
+			wantExamples: []string{"a", "b"},
+		},
+		{
+			name: "overlapping classes before iStrip -> accept intersection, real case reverse",
+			fp: makeFP(path{
+				makeNode("div", []string{"whats-on"}, nil),
+				makeNode("div", []string{"grid", "loading"}, nil),
+				makeNode("div", []string{"grid-item"}, nil),
+				makeNode("div", []string{"grid-item__inner", "lev"}, nil),
+				makeNode("div", []string{"classical", "text"}, []string{"nth-child(3)"}),
+				makeNode("h2", []string{"grid-item__title"}, nil),
+			}, "", 0, []string{"b"}, 1, 2),
+			other: makeFP(path{
+				makeNode("div", []string{"whats-on"}, nil),
+				makeNode("div", []string{"grid", "loading"}, nil),
+				makeNode("div", []string{"classical", "grid-item"}, nil),
+				makeNode("div", []string{"grid-item__inner", "lev"}, nil),
+				makeNode("div", []string{"classical", "text"}, []string{"nth-child(3)"}),
+				makeNode("h2", []string{"grid-item__title"}, nil),
+			}, "", 0, []string{"a"}, 1, 0),
+			wantUpdated: true,
+			wantPathAfter: path{
+				makeNode("div", []string{"whats-on"}, nil),
+				makeNode("div", []string{"grid", "loading"}, nil),
+				makeNode("div", []string{"grid-item"}, nil),
+				makeNode("div", []string{"grid-item__inner", "lev"}, nil),
+				makeNode("div", []string{"classical", "text"}, []string{"nth-child(3)"}),
+				makeNode("h2", []string{"grid-item__title"}, nil),
+			},
+			wantCount:    2,
+			wantExamples: []string{"b", "a"},
+		},
+		{
+			name: "overlapping classes before iStrip, overlapping classes after iStrip, distinct nth-child -> reject",
+			fp: makeFP(
+				path{
+					makeNode("body", nil, nil),
+					makeNode("div", []string{"a", "b"}, nil),
+					makeNode("div", nil, nil),
+					makeNode("div", []string{"c", "d"}, []string{"nth-child(1)"}),
+				}, "", 0, []string{"a"}, 1, 1),
+			other: makeFP(
+				path{
+					makeNode("body", nil, nil),
+					makeNode("div", []string{"b", "e"}, nil),
+					makeNode("div", nil, nil),
+					makeNode("div", []string{"d", "f"}, []string{"nth-child(2)"}),
+				}, "", 0, []string{"b"}, 1, 0),
 			wantUpdated:  false,
 			wantCount:    1,
 			wantExamples: []string{"a"},
 		},
 		{
-			name: "overlapping classes after iStrip but no full match -> reject",
-			fp: makeFP(path{
+			name: "overlapping classes before iStrip, overlapping classes after iStrip, same nth-child -> accept",
+			fp: makeFP(
+				path{
+					makeNode("body", nil, nil),
+					makeNode("div", []string{"a", "b"}, nil),
+					makeNode("div", nil, nil),
+					makeNode("div", []string{"c", "d"}, []string{"nth-child(2)"}),
+				}, "", 0, []string{"a"}, 1, 1),
+			other: makeFP(
+				path{
+					makeNode("body", nil, nil),
+					makeNode("div", []string{"b", "e"}, nil),
+					makeNode("div", nil, nil),
+					makeNode("div", []string{"d", "f"}, []string{"nth-child(2)"}),
+				}, "", 0, []string{"b"}, 1, 0),
+			wantUpdated: true,
+			wantPathAfter: path{
 				makeNode("body", nil, nil),
-				makeNode("div", []string{"a", "b"}, nil),
-			}, "", 0, []string{"a"}, 1, 0), // iStrip=0 so at i=1 we are > iStrip
-			other: makeFP(path{
-				makeNode("body", nil, nil),
-				makeNode("div", []string{"a", "b", "c"}, nil),
-			}, "", 0, []string{"b"}, 1, 0),
-			wantUpdated: false,
-			// wantPathAfter: path{makeNode("body", nil, nil), makeNode("div", []string{"a", "b"}, nil)},
-			wantCount:    1,
-			wantExamples: []string{"a"},
+				makeNode("div", []string{"b"}, nil),
+				makeNode("div", nil, nil),
+				makeNode("div", []string{"d"}, []string{"nth-child(2)"}),
+			},
+			wantCount:    2,
+			wantExamples: []string{"a", "b"},
 		},
 	}
 
@@ -570,7 +672,7 @@ func TestSquash_MergeIdentical(t *testing.T) {
 		makeFP(path{
 			makeNode("body", nil, nil),
 			makeNode("div", []string{"container"}, nil),
-		}, "", 0, 2, []string{"one", "two"}, 0),
+		}, "", 0, 2, []string{"two", "one"}, 0),
 	}
 
 	fm.squash(1)
@@ -612,13 +714,95 @@ func TestSquash_MergeOverlappingClassesBeforeIStrip(t *testing.T) {
 		makeFP(path{
 			makeNode("body", nil, nil),
 			makeNode("div", []string{"b"}, nil),
-		}, "", 0, 2, []string{"A", "B"}, 1),
+		}, "", 0, 2, []string{"B", "A"}, 1),
 	}
 
 	(&fm).squash(1)
 
 	if !fm.equals(&expected) {
 		t.Fatalf("squash did not merge overlapping classes before iStrip.\nGot: \n%s\nWant: \n%s", fm.string(), expected.string())
+	}
+}
+
+func TestSquash_MultiListStructure(t *testing.T) {
+	makeNode := func(tag string, classes []string, pcls []string) node {
+		return node{tagName: tag, classes: classes, pseudoClasses: pcls}
+	}
+	makeFP := func(p path, attr string, textIndex, count int, examples []string, iStrip int) *fieldProps {
+		return &fieldProps{
+			path:      p,
+			attr:      attr,
+			textIndex: textIndex,
+			count:     count,
+			examples:  append([]string{}, examples...),
+			iStrip:    iStrip,
+		}
+	}
+
+	fm := &fieldManager{
+		makeFP(path{
+			makeNode("body", nil, nil),
+			makeNode("ul", nil, nil),
+			makeNode("li", []string{"item"}, nil),
+			makeNode("span", nil, nil),
+		}, "", 0, 1, []string{"A1"}, 0),
+		makeFP(path{
+			makeNode("body", nil, nil),
+			makeNode("ul", nil, nil),
+			makeNode("li", []string{"item"}, []string{"nth-child(2)"}),
+			makeNode("span", nil, nil),
+		}, "", 0, 1, []string{"A2"}, 0),
+		makeFP(path{
+			makeNode("body", nil, nil),
+			makeNode("ul", nil, nil),
+			makeNode("li", []string{"item"}, nil),
+			makeNode("span", nil, nil),
+		}, "", 0, 1, []string{"B1"}, 0),
+		makeFP(path{
+			makeNode("body", nil, nil),
+			makeNode("ul", nil, nil),
+			makeNode("li", []string{"item"}, []string{"nth-child(2)"}),
+			makeNode("span", nil, nil),
+		}, "", 0, 1, []string{"B2"}, 0),
+		makeFP(path{
+			makeNode("body", nil, nil),
+			makeNode("ul", nil, nil),
+			makeNode("li", []string{"item"}, []string{"nth-child(3)"}),
+			makeNode("span", nil, nil),
+		}, "", 0, 1, []string{"B3"}, 0),
+		makeFP(path{
+			makeNode("body", nil, nil),
+			makeNode("ul", nil, nil),
+			makeNode("li", []string{"item"}, []string{"nth-child(4)"}),
+			makeNode("span", nil, nil),
+		}, "", 0, 1, []string{"B4"}, 0),
+		makeFP(path{
+			makeNode("body", nil, nil),
+			makeNode("ul", nil, nil),
+			makeNode("li", []string{"item"}, nil),
+			makeNode("span", nil, nil),
+		}, "", 0, 1, []string{"C1"}, 0),
+		makeFP(path{
+			makeNode("body", nil, nil),
+			makeNode("ul", nil, nil),
+			makeNode("li", []string{"item"}, []string{"nth-child(2)"}),
+			makeNode("span", nil, nil),
+		}, "", 0, 1, []string{"C2"}, 0),
+	}
+
+	expected := &fieldManager{
+		makeFP(path{
+			makeNode("body", nil, nil),
+			makeNode("ul", nil, nil),
+			makeNode("li", []string{"item"}, nil),
+			makeNode("span", nil, nil),
+		}, "", 0, 8, []string{"B4", "B3", "C2", "C1", "B2", "B1", "A2", "A1"}, 2),
+	}
+
+	fm.squash(3)
+
+	if !fm.equals(expected) {
+		t.Fatalf("squash did not work correctly.\nGot: \n%s\nWant: \n%s", fm.string(), expected.string())
 	}
 }
 

@@ -55,43 +55,31 @@ func (fp *fieldProps) checkOverlapAndUpdate(other *fieldProps) bool {
 		newPath := path{}
 		for i, fpNode := range fp.path {
 			if fpNode.tagName == other.path[i].tagName {
-				pseudoClassesTmp := []string{}
 				if i > fp.iStrip {
-					pseudoClassesTmp = other.path[i].pseudoClasses
-				}
-				// the following checks are not complete yet but suffice for now
-				// with nth-child being our only pseudo class
-				if len(fpNode.pseudoClasses) == len(pseudoClassesTmp) {
-					if len(fpNode.pseudoClasses) == 1 {
-						if fpNode.pseudoClasses[0] != pseudoClassesTmp[0] {
-							return false
-						}
-					}
-					newNode := node{
-						tagName:       fpNode.tagName,
-						pseudoClasses: fpNode.pseudoClasses,
-					}
-					if len(fpNode.classes) == 0 && len(other.path[i].classes) == 0 {
-						newPath = append(newPath, newNode)
-						continue
-					}
-					intersectionCls := utils.IntersectionSlices(fpNode.classes, other.path[i].classes)
-					if len(intersectionCls) > 0 {
-						if i > fp.iStrip {
-							// if we're past iStrip we only consider nodes equal if they have the exact same classes
-							// if len(other.path[i].classes) == len(fpNode.classes) && len(intersectionCls) == len(fpNode.classes) {
-							if utils.SliceEquals(other.path[i].classes, fpNode.classes) {
-								newNode.classes = fpNode.classes
-								newPath = append(newPath, newNode)
-								continue
+					// the following checks are not complete yet but suffice for now
+					// with nth-child being our only pseudo class
+					if len(fpNode.pseudoClasses) == len(other.path[i].pseudoClasses) {
+						if len(fpNode.pseudoClasses) == 1 {
+							if fpNode.pseudoClasses[0] != other.path[i].pseudoClasses[0] {
+								return false
 							}
-						} else {
-							// if nodes have more than 0 classes and we're not past iStrip there has to be at least 1 overlapping class
-							newNode.classes = intersectionCls
-							newPath = append(newPath, newNode)
-							continue
 						}
 					}
+				}
+
+				newNode := node{
+					tagName:       fpNode.tagName,
+					pseudoClasses: fpNode.pseudoClasses,
+				}
+				if len(fpNode.classes) == 0 && len(other.path[i].classes) == 0 {
+					newPath = append(newPath, newNode)
+					continue
+				}
+				intersectionCls := utils.IntersectionSlices(fpNode.classes, other.path[i].classes)
+				if len(intersectionCls) > 0 {
+					newNode.classes = intersectionCls
+					newPath = append(newPath, newNode)
+					continue
 				}
 			}
 			return false
@@ -159,8 +147,6 @@ func (fm fieldManager) string() string {
 // compareFieldProps compares two fieldProps and returns an int indicating their order
 func compareFieldProps(fm1, fm2 *fieldProps) int {
 	// for now we ignore 'selected', 'color' & 'distance' in comparison
-	slices.Sort(fm1.examples)
-	slices.Sort(fm2.examples)
 	return cmp.Or(
 		cmp.Compare(fm1.path.string(), fm2.path.string()),
 		cmp.Compare(fm1.attr, fm2.attr),
@@ -290,6 +276,11 @@ parse:
 					}
 					continue
 				}
+			}
+		case html.CommentToken:
+			// ignore comments but increase child count
+			if inBody {
+				nrChildren[nodePath.string()] += 1
 			}
 		}
 	}
@@ -521,9 +512,20 @@ outer:
 // fieldProps close enough to be merged into one?'
 func (fm *fieldManager) squash(minCount int) {
 	squashed := fieldManager{}
-	// iterate from the back to ensure that stripNthChild works correctly
-	// stripNthChild relies on x in nth-child(x) being >= minOcc which is
-	// more likely when iterating from the back over the fieldManager
+
+	// first compute iStrip for all fieldProps
+	for _, fp := range *fm {
+		fp.stripNthChild(minCount)
+	}
+
+	// now sort by iStrip ascending to ensure that fieldProps with
+	// higher iStrip are processed first in the following loop
+	// this ensures that fieldProps with low iStrip are more likely
+	// to be merged into existing squashed fieldProps
+	slices.SortFunc(*fm, func(a, b *fieldProps) int {
+		return a.iStrip - b.iStrip
+	})
+
 	for i := len(*fm) - 1; i >= 0; i-- {
 		fp := (*fm)[i]
 		updated := false
@@ -534,7 +536,6 @@ func (fm *fieldManager) squash(minCount int) {
 			}
 		}
 		if !updated {
-			fp.stripNthChild(minCount)
 			squashed = append(squashed, fp)
 		}
 	}
@@ -656,14 +657,12 @@ func getTagMetadata(tagName string, z *html.Tokenizer, siblingNodes []node) (map
 	}
 	var pCls []string // pseudo classes
 	// only add nth-child if there has been another node before at the same
-	// level (sibling node) with same tag --and the same classes--
+	// level (sibling node) with same tag
 	for i := range siblingNodes {
 		childNode := siblingNodes[i]
 		if childNode.tagName == tagName {
-			// if utils.SliceEquals(childNode.classes, cls) {
 			pCls = []string{fmt.Sprintf("nth-child(%d)", len(siblingNodes)+1)}
 			break
-			// }
 		}
 
 	}

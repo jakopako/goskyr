@@ -22,16 +22,22 @@ type fieldProps struct {
 	attr      string
 	textIndex int // this will translate into child index within scraper.ElementLocation
 	count     int // number of occurrences of this fieldProps (might be redundant, because len(examples) could be used)
-	examples  []string
+	examples  []fieldExample
 	selected  bool
 	color     tcell.Color
 	distance  float64
 	name      string
 	iStrip    int // this is needed for the squashLocationManager function
+	origI     int // original index in fieldManager before sorting by iStrip
+}
+
+type fieldExample struct {
+	example string
+	origI   int
 }
 
 func (fp *fieldProps) string() string {
-	return fmt.Sprintf("path: %s,\nattr: %s,\ntextIndex: %d,\ncount: %d,\nexamples: %v,\ncolor: %v,\ndistance: %f,\nname: %s,\niStrip: %d\n",
+	return fmt.Sprintf("path: %s,\nattr: %s,\ntextIndex: %d,\ncount: %d,\nexamples: %v,\ncolor: %v,\ndistance: %f,\nname: %s,\niStrip: %d,\norigI: %d\n",
 		fp.path.string(),
 		fp.attr,
 		fp.textIndex,
@@ -41,6 +47,7 @@ func (fp *fieldProps) string() string {
 		fp.distance,
 		fp.name,
 		fp.iStrip,
+		fp.origI,
 	)
 }
 
@@ -64,6 +71,8 @@ func (fp *fieldProps) checkOverlapAndUpdate(other *fieldProps) bool {
 								return false
 							}
 						}
+					} else {
+						return false
 					}
 				}
 
@@ -88,6 +97,7 @@ func (fp *fieldProps) checkOverlapAndUpdate(other *fieldProps) bool {
 		fp.path = newPath
 		fp.count += other.count
 		fp.examples = append(fp.examples, other.examples...)
+		fp.origI = min(fp.origI, other.origI)
 		return true
 	}
 	return false
@@ -147,19 +157,33 @@ func (fm fieldManager) string() string {
 // compareFieldProps compares two fieldProps and returns an int indicating their order
 func compareFieldProps(fm1, fm2 *fieldProps) int {
 	// for now we ignore 'selected', 'color' & 'distance' in comparison
-	return cmp.Or(
+
+	cmps := []int{
 		cmp.Compare(fm1.path.string(), fm2.path.string()),
 		cmp.Compare(fm1.attr, fm2.attr),
 		cmp.Compare(fm1.textIndex, fm2.textIndex),
 		cmp.Compare(fm1.count, fm2.count),
-		cmp.Compare(strings.Join(fm1.examples, ","), strings.Join(fm2.examples, ",")),
+		// cmp.Compare(strings.Join(fm1.examples, ","), strings.Join(fm2.examples, ",")),
+		cmp.Compare(len(fm1.examples), len(fm2.examples)),
 		cmp.Compare(fm1.name, fm2.name),
 		cmp.Compare(fm1.iStrip, fm2.iStrip),
-	)
+		cmp.Compare(fm1.origI, fm2.origI),
+	}
+
+	// not sure if this makes sense
+	for i := 0; i < min(len(fm1.examples), len(fm2.examples)); i++ {
+		cmps = append(cmps, cmp.Compare(fm1.examples[i].example, fm2.examples[i].example))
+		cmps = append(cmps, cmp.Compare(fm1.examples[i].origI, fm2.examples[i].origI))
+	}
+
+	return cmp.Or(cmps...)
 }
 
 // newFieldManagerFromHtml creates a fieldManager by parsing the provided html string
 func newFieldManagerFromHtml(htmlStr string) *fieldManager {
+	// add index to fieldProps so we can eventually
+	// sort them back to original order
+	index := 0
 	z := html.NewTokenizer(strings.NewReader(htmlStr))
 	fieldMgr := fieldManager{}
 	nrChildren := map[string]int{}    // the nr of children a node (represented by a path) has, including non-html-tag nodes (ie text)
@@ -182,10 +206,12 @@ parse:
 					ti := nrChildren[p]
 					lp := fieldProps{
 						path:      make([]node, len(nodePath)),
-						examples:  []string{textTrimmed},
+						examples:  []fieldExample{{example: textTrimmed, origI: index}},
 						textIndex: ti,
 						count:     1,
+						origI:     index,
 					}
+					index++
 					copy(lp.path, nodePath)
 					fieldMgr = append(fieldMgr, &lp)
 				}
@@ -221,10 +247,12 @@ parse:
 					for attrKey, attrValue := range attrs {
 						lp := fieldProps{
 							path:     make([]node, len(nodePath)),
-							examples: []string{attrValue},
+							examples: []fieldExample{{example: attrValue, origI: index}},
 							attr:     attrKey,
 							count:    1,
+							origI:    index,
 						}
+						index++
 						copy(lp.path, nodePath)
 						fieldMgr = append(fieldMgr, &lp)
 					}
@@ -266,10 +294,12 @@ parse:
 						for attrKey, attrValue := range attrs {
 							lp := fieldProps{
 								path:     make([]node, len(tmpNodePath)),
-								examples: []string{attrValue},
+								examples: []fieldExample{{example: attrValue, origI: index}},
 								attr:     attrKey,
 								count:    1,
+								origI:    index,
 							}
+							index++
 							copy(lp.path, tmpNodePath)
 							fieldMgr = append(fieldMgr, &lp)
 						}
@@ -361,7 +391,7 @@ func (fm fieldManager) showInteractiveTable() error {
 			} else {
 				var ss string
 				if len(fm[r-1].examples) >= c {
-					ss = utils.ShortenString(fm[r-1].examples[c-1], 40)
+					ss = utils.ShortenString(fm[r-1].examples[c-1].example, 40)
 				}
 				table.SetCell(r, c,
 					tview.NewTableCell(ss).
@@ -479,7 +509,11 @@ outer:
 				Year:  strings.Contains(e.name, "year"),
 				Time:  strings.Contains(e.name, "time"),
 			}
-			format, lang := date.GetDateFormatMulti(e.examples, cd)
+			exampleStrs := []string{}
+			for _, ex := range e.examples {
+				exampleStrs = append(exampleStrs, ex.example)
+			}
+			format, lang := date.GetDateFormatMulti(exampleStrs, cd)
 			dateField.Components = append(dateField.Components, scraper.DateComponent{
 				ElementLocation: loc,
 				Covers:          cd,
@@ -540,6 +574,18 @@ func (fm *fieldManager) squash(minCount int) {
 		}
 	}
 
+	// finally sort back to original order
+	slices.SortFunc(squashed, func(a, b *fieldProps) int {
+		return a.origI - b.origI
+	})
+
+	// also, sort examples within each fieldProps by their origI
+	for _, fp := range squashed {
+		slices.SortFunc(fp.examples, func(a, b fieldExample) int {
+			return a.origI - b.origI
+		})
+	}
+
 	*fm = squashed
 }
 
@@ -550,15 +596,11 @@ func (fm *fieldManager) filter(minCount int, removeStaticFields bool) {
 	i := 0
 	for _, p := range *fm {
 		if p.count >= minCount {
-			// first reverse the examples list and only take the first x
-			// we reverse because the reverse iteration over the fieldManager
-			// in squash resulted in the last examples being first
-			utils.ReverseSlice(p.examples)
 			p.examples = p.examples[:minCount]
 			if removeStaticFields {
 				eqEx := true
 				for _, ex := range p.examples {
-					if ex != p.examples[0] {
+					if ex.example != p.examples[0].example {
 						eqEx = false
 						break
 					}
@@ -606,7 +648,11 @@ func (fm fieldManager) findFieldNames(modelName, wordsDir string) error {
 			return err
 		}
 		for _, e := range fm {
-			pred, err := ll.PredictLabel(e.examples...)
+			exampleStrs := []string{}
+			for _, ex := range e.examples {
+				exampleStrs = append(exampleStrs, ex.example)
+			}
+			pred, err := ll.PredictLabel(exampleStrs...)
 			if err != nil {
 				return err
 			}

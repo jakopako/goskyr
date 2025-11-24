@@ -10,14 +10,13 @@ require (
 	github.com/goodsign/monday v1.0.2
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/rivo/tview v0.0.0-20250501113434-0c592cd31026
-	golang.org/x/net v0.46.0
+	golang.org/x/net v0.47.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
 	github.com/antchfx/jsonquery v1.3.6
 	github.com/sjwhitworth/golearn v0.0.0-20221228163002-74ae077eafb2
-	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
 )
 
 require (
@@ -31,7 +30,8 @@ require (
 	github.com/guptarohit/asciigraph v0.7.3 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/rocketlaunchr/dataframe-go v0.0.0-20211025052708-a1030444159b // indirect
-	golang.org/x/sync v0.17.0 // indirect
+	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0 // indirect
+	golang.org/x/sync v0.18.0 // indirect
 	gonum.org/v1/gonum v0.16.0 // indirect
 )
 
@@ -42,7 +42,6 @@ require (
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/gdamore/encoding v1.0.1 // indirect
-	github.com/go-test/deep v1.1.1
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/gobwas/ws v1.4.0 // indirect
@@ -50,8 +49,8 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	golang.org/x/sys v0.37.0 // indirect
-	golang.org/x/term v0.36.0 // indirect
-	golang.org/x/text v0.30.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/term v0.37.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	olympos.io/encoding/edn v0.0.0-20201019073823-d3554ca0b0a3 // indirect
 )

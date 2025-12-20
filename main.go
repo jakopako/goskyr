@@ -11,6 +11,7 @@ import (
 	"math"
 	"os"
 	"runtime/debug"
+	"strings"
 	"sync"
 
 	"github.com/alecthomas/kong"
@@ -21,10 +22,13 @@ import (
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/scraper"
 	"github.com/jakopako/goskyr/types"
+	"github.com/miekg/king"
 	"gopkg.in/yaml.v3"
 )
 
 var version = "dev"
+
+const name = "goskyr"
 
 type VersionFlag string
 
@@ -40,14 +44,52 @@ type cli struct {
 	Version VersionFlag `short:"v" long:"version" help:"Print the version and exit."`
 	Debug   bool        `short:"d" long:"debug" help:"Set log level to 'debug' and store additional helpful debugging data."`
 
+	Completion CompletionCommand `cmd:"" help:"Generate autocompletion file."`
+
 	Scrape   ScrapeCmd   `cmd:"" help:"Scrape data"`
 	Generate GenerateCmd `cmd:"" help:"Generate a scraper configuration file for the given URL"`
 	Extract  ExtractCmd  `cmd:"" help:"Extract ML features based on the given configuration file"`
 	Train    TrainCmd    `cmd:"" help:"Train ML model based on the given features file. This will generate 2 files, goskyr.model and goskyr.class"`
 }
 
+type ShellType string
+
+const (
+	BASH ShellType = "bash"
+	ZSH  ShellType = "zsh"
+	FISH ShellType = "fish"
+)
+
+var shellTypes = []string{string(BASH), string(ZSH), string(FISH)}
+
+type CompletionCommand struct {
+	Shell ShellType `short:"s" help:"The shell that you want to create the autocompletion file for." required:""`
+}
+
+func (acc *CompletionCommand) Run() error {
+	cli := &cli{}
+	parser := kong.Must(cli)
+
+	switch acc.Shell {
+	case BASH:
+		b := &king.Bash{}
+		b.Completion(parser.Model.Node, name)
+		return b.Write()
+	case ZSH:
+		z := &king.Zsh{}
+		z.Completion(parser.Model.Node, name)
+		return z.Write()
+	case FISH:
+		f := &king.Fish{}
+		f.Completion(parser.Model.Node, name)
+		return f.Write()
+	default:
+		return fmt.Errorf("shell type not supported: %s. Must be one of [%s].", acc.Shell, strings.Join(shellTypes, ", "))
+	}
+}
+
 type ScrapeCmd struct {
-	Config string `short:"c" default:"./config.yml" help:"The location of the configuration. Can be a directory containing config files or a single config file."`
+	Config string `short:"c" default:"./config.yml" help:"The location of the configuration. Can be a directory containing config files or a single config file." completion:"<file>"`
 	Name   string `short:"n" help:"The name of the scraper to be run, if only one of the configured ones should be run."`
 	Stdout bool   `short:"o" help:"If set to true the scraped data will be written to stdout despite any other existing writer configurations."`
 	DryRun bool   `short:"D" help:"If set to true the scraper will not persist any scraped data (currently only has an effect on the APIWriter)."`
@@ -198,10 +240,10 @@ type GenerateCmd struct {
 	MinOccurrence int    `short:"m" default:"20" help:"The minimum number of occurrences of a certain field on an html page to be included in the suggested fields. This is needed to filter out noise."`
 	Distinct      bool   `short:"D" help:"If set to true only fields with distinct values will be included in the suggested fields."`
 	RenderJS      bool   `short:"r" help:"Render javascript before analyzing the html page."`
-	WordLists     string `short:"w" default:"word-lists" help:"The directory that contains a number of files containing words of different languages, needed for extracting ML features."`
-	ModelName     string `short:"M" help:"The name to a pre-trained ML model to infer names of extracted fields."`
+	WordLists     string `short:"w" default:"word-lists" help:"The directory that contains a number of files containing words of different languages, needed for extracting ML features." completion:"<directory>"`
+	ModelName     string `short:"M" help:"The name to a pre-trained ML model to infer names of extracted fields." completion:"<file>"`
 	Stdout        bool   `short:"o" long:"stdout" help:"If set to true the the generated configuration will be written to stdout."`
-	Config        string `short:"c" long:"config" default:"./config.yml" help:"The file that the generated configuration will be written to."`
+	Config        string `short:"c" long:"config" default:"./config.yml" help:"The file that the generated configuration will be written to." completion:"<file>"`
 }
 
 func (g *GenerateCmd) Run() error {
@@ -257,9 +299,9 @@ func (g *GenerateCmd) Run() error {
 }
 
 type ExtractCmd struct {
-	Config    string `short:"c" default:"./config.yml" help:"The location of the configuration file."`
+	Config    string `short:"c" default:"./config.yml" help:"The location of the configuration file." completion:"<file>"`
 	OutFile   string `short:"o" help:"The file to which the extracted features will be written in csv format." required:""`
-	WordLists string `short:"w" default:"word-lists" help:"The directory that contains a number of files containing words of different languages, needed for extracting ML features."`
+	WordLists string `short:"w" default:"word-lists" help:"The directory that contains a number of files containing words of different languages, needed for extracting ML features." completion:"<directory>"`
 }
 
 func (e *ExtractCmd) Run() error {
@@ -319,6 +361,7 @@ func main() {
 	cli := cli{
 		Version: VersionFlag(getVersion()),
 	}
+
 	ctx := kong.Parse(&cli,
 		kong.Vars{
 			"version": string(cli.Version),

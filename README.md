@@ -8,6 +8,7 @@
 
 1. [Quick Start](#quick-start)
 1. [Installation](#installation)
+1. [Shell Auto-completion](#auto-completion)
 1. [Semi-Automatic Configuration](#semi-automatic-configuration)
 1. [Manual Configuration & Usage](#manual-configuration--usage)
    1. [Static fields](#static-fields)
@@ -73,6 +74,14 @@ go install github.com/jakopako/goskyr@latest
 ```
 
 Or clone the repository and then run with `go run main.go ...` or build it yourself.
+
+## Auto-completion
+
+You can run the following command to create a completion file. Once it has been created move it to the correct location, e.g. `/etc/bash_completion.d/`.
+
+```
+$ goskyr completion -s bash|zsh|fish
+```
 
 ## Semi-Automatic Configuration
 

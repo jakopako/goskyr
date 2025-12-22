@@ -65,7 +65,7 @@ const (
 var shellTypes = []string{string(BASH), string(ZSH), string(FISH)}
 
 type CompletionCommand struct {
-	Shell ShellType `short:"s" help:"The shell that you want to create the autocompletion file for." required:""`
+	Shell ShellType `short:"s" help:"The shell that you want to create the autocompletion file for." required:"" enum:"bash,zsh,fish"`
 }
 
 func (acc *CompletionCommand) Run() error {
@@ -86,13 +86,14 @@ func (acc *CompletionCommand) Run() error {
 		f.Completion(parser.Model.Node, name)
 		return f.Write()
 	default:
+		// should not happen due to enum constraint
 		return fmt.Errorf("shell type not supported: %s. Must be one of [%s].", acc.Shell, strings.Join(shellTypes, ", "))
 	}
 }
 
 type ScrapeCmd struct {
 	Config string `short:"c" default:"./config.yml" help:"The location of the configuration. Can be a directory containing config files or a single config file." completion:"<file>"`
-	Name   string `short:"n" help:"The name of the scraper to be run, if only one of the configured ones should be run."`
+	Name   string `short:"n" help:"The name of the scraper to be run, if only one of the configured ones should be run." completion:"goskyr list -C 2>/dev/null"`
 	Stdout bool   `short:"o" help:"If set to true the scraped data will be written to stdout despite any other existing writer configurations."`
 	DryRun bool   `short:"D" help:"If set to true the scraper will not persist any scraped data (currently only has an effect on the APIWriter)."`
 }

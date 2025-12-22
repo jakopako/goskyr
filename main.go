@@ -334,6 +334,24 @@ func (t *TrainCmd) Run() error {
 	return nil
 }
 
+type ListCmd struct {
+	Config string `short:"c" default:"./config.yml" help:"The location of the configuration. Can be a directory containing config files or a single config file." completion:"<file>"`
+}
+
+func (lc *ListCmd) Run() error {
+	config, err := scraper.NewConfig(lc.Config)
+	if err != nil {
+		slog.Error(fmt.Sprintf("%v", err))
+		return err
+	}
+
+	for _, s := range config.Scrapers {
+		fmt.Println(s.Name)
+	}
+
+	return nil
+}
+
 func getVersion() string {
 	buildInfo, ok := debug.ReadBuildInfo()
 	if ok {

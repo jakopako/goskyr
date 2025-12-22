@@ -337,7 +337,7 @@ func (t *TrainCmd) Run() error {
 
 type ListCmd struct {
 	Config     string `short:"c" default:"./config.yml" help:"The location of the configuration. Can be a directory containing config files or a single config file." completion:"<file>"`
-	Completion bool   `short:"C" help:"If set to true, the output will be formatted for autocompletion scripts."`
+	Completion bool   `short:"C" help:"If set to true, the output will be formatted for autocompletion scripts and errors will not be printed."`
 }
 
 func (lc *ListCmd) Run() error {

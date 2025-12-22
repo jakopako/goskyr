@@ -50,6 +50,7 @@ type cli struct {
 	Generate GenerateCmd `cmd:"" help:"Generate a scraper configuration file for the given URL"`
 	Extract  ExtractCmd  `cmd:"" help:"Extract ML features based on the given configuration file"`
 	Train    TrainCmd    `cmd:"" help:"Train ML model based on the given features file. This will generate 2 files, goskyr.model and goskyr.class"`
+	List     ListCmd     `cmd:"" help:"List available scrapers in the given configuration file(s)"`
 }
 
 type ShellType string

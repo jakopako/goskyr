@@ -11,6 +11,7 @@ import (
 	"math"
 	"os"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"sync"
 
@@ -50,6 +51,7 @@ type cli struct {
 	Generate GenerateCmd `cmd:"" help:"Generate a scraper configuration file for the given URL"`
 	Extract  ExtractCmd  `cmd:"" help:"Extract ML features based on the given configuration file"`
 	Train    TrainCmd    `cmd:"" help:"Train ML model based on the given features file. This will generate 2 files, goskyr.model and goskyr.class"`
+	List     ListCmd     `cmd:"" help:"List available scrapers in the given configuration file(s)"`
 }
 
 type ShellType string
@@ -330,6 +332,35 @@ func (t *TrainCmd) Run() error {
 	}
 
 	slog.Info("successfully trained model")
+	return nil
+}
+
+type ListCmd struct {
+	Config     string `short:"c" default:"./config.yml" help:"The location of the configuration. Can be a directory containing config files or a single config file." completion:"<file>"`
+	Completion bool   `short:"C" help:"If set to true, the output will be formatted for autocompletion scripts."`
+}
+
+func (lc *ListCmd) Run() error {
+	config, err := scraper.NewConfig(lc.Config)
+	if err != nil {
+		if lc.Completion {
+			// in completion mode, we just return an empty output on error
+			return nil
+		}
+		slog.Error(fmt.Sprintf("%v", err))
+		return err
+	}
+
+	names := make([]string, 0, len(config.Scrapers))
+	for _, s := range config.Scrapers {
+		names = append(names, s.Name)
+	}
+
+	slices.Sort(names)
+	for _, name := range names {
+		fmt.Println(name)
+	}
+
 	return nil
 }
 

@@ -11,6 +11,7 @@ import (
 	"math"
 	"os"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"sync"
 
@@ -335,18 +336,29 @@ func (t *TrainCmd) Run() error {
 }
 
 type ListCmd struct {
-	Config string `short:"c" default:"./config.yml" help:"The location of the configuration. Can be a directory containing config files or a single config file." completion:"<file>"`
+	Config     string `short:"c" default:"./config.yml" help:"The location of the configuration. Can be a directory containing config files or a single config file." completion:"<file>"`
+	Completion bool   `short:"C" help:"If set to true, the output will be formatted for autocompletion scripts."`
 }
 
 func (lc *ListCmd) Run() error {
 	config, err := scraper.NewConfig(lc.Config)
 	if err != nil {
+		if lc.Completion {
+			// in completion mode, we just return an empty output on error
+			return nil
+		}
 		slog.Error(fmt.Sprintf("%v", err))
 		return err
 	}
 
+	names := make([]string, 0, len(config.Scrapers))
 	for _, s := range config.Scrapers {
-		fmt.Println(s.Name)
+		names = append(names, s.Name)
+	}
+
+	slices.Sort(names)
+	for _, name := range names {
+		fmt.Println(name)
 	}
 
 	return nil

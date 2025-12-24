@@ -9,6 +9,6 @@ goskyr.model
 .local-env
 config-test-dir
 mock-items
-_goskyr
-goskyr.bash
-goskyr.fish
+/_goskyr
+/goskyr.bash
+/goskyr.fish

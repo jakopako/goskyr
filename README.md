@@ -77,17 +77,24 @@ Or clone the repository and then run with `go run main.go ...` or build it yours
 
 ## Auto-completion
 
-You can run the following command to create a completion file. Once it has been created move it to the correct location, e.g. `/etc/bash_completion.d/`.
+You can run the following command to create a basic completion file for bash, zsh or fish. Once it has been created move it to the correct location, e.g. `/etc/bash_completion.d/`.
 
+```bash
+goskyr completion -s bash|zsh|fish
 ```
-$ goskyr completion -s bash|zsh|fish
+
+Alternatively, a slightly enhanced version has been created for bash, see `completions/goskyr.bash`. More specifically, that version allows for scraper names to be autocompleted based on the configuration, e.g. in the repo `https://github.com/jakopako/croncert-config` you could run:
+
+```bash
+$ goskyr scrape -c config -n Jazz <tab> <tab>
+JazzCafeAlto    JazzCafeLondon  JazzNoJazz      JazzOnze        JazzStudio      Jazzkantine
 ```
 
 ## Semi-Automatic Configuration
 
 As shown under [Quick Start](#quick-start) goskyr can be used to automatically extract a configuration for a given url. A number of different options are available.
 
-```
+```bash
 $ goskyr generate -h
 Usage: goskyr generate --url=STRING [flags]
 
@@ -126,9 +133,9 @@ Despite the option to automatically generate a configuration file for goskyr the
 
 A very simple configuration would look something like this:
 
-```yml
+```yaml
 scrapers:
-  - name: LifeQuotes # The name is only for logging and scraper selection (with -s) and does not appear in the json output.
+  - name: LifeQuotes # The name is only for logging and scraper selection (with -n|--name) and does not appear in the json output.
     url: "https://www.goodreads.com/quotes/tag/life"
     item: ".quote"
     fields:
@@ -158,7 +165,7 @@ Save this to a file, e.g. `quotes-config.yml` and run `goskyr -c quotes-config.y
 
 A more complex configuration might look like this:
 
-```yml
+```yaml
 scrapers:
   - name: Kaufleuten
     url: "https://kaufleuten.ch/events/kultur/konzerte/"
@@ -239,7 +246,7 @@ Basically, a config file contains a list of scrapers that each may have static a
 
 Each scraper can define a number of static fields. Those fields are the same over all returned items. For the event scraping use case this might be the location name as shown in the example above. For a static field only a name and a value need to be defined:
 
-```yml
+```yaml
 fields:
   - name: "location"
     value: "Kaufleuten"
@@ -249,7 +256,7 @@ fields:
 
 Dynamic fields are a little more complex as their values are extracted from the web page and can have different types. In the most trivial case it suffices to define a field name and a selector so the scraper knows where to look for the corresponding value. The quotes scraper is a good example for that:
 
-```yml
+```yaml
 fields:
   - name: "quote"
     type: "text" # defaults to 'text' if ommited
@@ -284,7 +291,7 @@ If set to `false`, an error message will be printed for each item where this fie
 
 This key contains the configuration for the different date components that are needed to extract a valid date. A list of the following form needs to be defined.
 
-```yml
+```yaml
 components:
   - covers: # what part of the date is covered by the element located at 'location'?
       day: bool # optional
@@ -301,7 +308,7 @@ components:
 
 The following example should give you a better idea how such the definition of `components` might actually look like.
 
-```yml
+```yaml
 components:
   - covers:
       day: true
@@ -363,7 +370,7 @@ _Subkey: `regex_extract`_
 
 In some cases, it might be a bit more complex to extract the desired information. Take for instance the concert scraper configuration for "Kaufleuten", shown above, more specifically the config snippet for the `title` field.
 
-```yml
+```yaml
 fields:
   - name: "title"
     location:
@@ -403,7 +410,7 @@ Next, let's say we want to extract the time "20h00" from the following html snip
 
 This can be achieved with the following configuration:
 
-```yml
+```yaml
 location:
   selector: ".col-sm-8 i"
   child_index: 3
@@ -523,14 +530,14 @@ The `date_language` key needs to correspond to the language on the website. Curr
 
 Different ways of fetching a web page are supported. The two supported types are `static` and `dynamic`. By default a scraper uses a static fetcher, i.e. does not render any javascript. You can configure a static fetcher explicitly if you like.
 
-```yml
+```yaml
 fetcher:
   type: static
 ```
 
 To render javascript before extracting any data from a web page, you need to use the dynamic fetcher. For this to work the `google-chrome` binary needs to be installed.
 
-```yml
+```yaml
 fetcher:
   type: dynamic
   page_load_wait_ms: 1000 # optional. Defaults to 2000 ms
@@ -540,7 +547,7 @@ If using the dynamic fetcher there are ways of interacting with the page, see be
 
 For both types of fetcher, there is an option to customize the user agent.
 
-```yml
+```yaml
 fetcher:
   user_agent: "Mozilla"
 ```
@@ -553,7 +560,7 @@ If a dynamic web page does initially not load all the items it might be necessar
 
 **`click`**
 
-```yml
+```yaml
 interaction:
   - type: click
     selector: .some > div.selector
@@ -563,7 +570,7 @@ interaction:
 
 **`scroll`**
 
-```yml
+```yaml
 interaction:
   - type: scroll # scroll to the bottom of a page
     delay: 2000 # milliseconds that the scraper waits after triggering the scroll. Default is 500
@@ -575,7 +582,7 @@ Note that interactions are executed before the data is scraped. Also the interac
 
 Filters can be used to define what items should make it into the resulting list of items. A filter configuration can look as follows:
 
-```yml
+```yaml
 filters:
   - field: "status"
     exp: "cancelled"
@@ -596,7 +603,7 @@ The expression `exp` can be either a regular expression or a date comparison. De
 
 If the list of items on a web page spans multiple pages pagination can be configured as follows:
 
-```yml
+```yaml
 paginator:
   location:
     selector: ".pagination .selector"
@@ -604,7 +611,7 @@ paginator:
 
 If the static fetcher is used by default the value of the `href` key is taken as url for the next page. However, you can change this and other parameters in the paginator configuration.
 
-```yml
+```yaml
 paginator:
   location:
     selector: ".pagination .selector"

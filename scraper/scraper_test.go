@@ -493,7 +493,7 @@ func TestExtractFieldUrlOrText(t *testing.T) {
 					},
 				},
 			},
-			err: fmt.Errorf("regex index out of bounds. regex '[0-9]{2}:[0-9]{2}' gave only 1 matches"),
+			err: fmt.Errorf("regex index out of bounds. regex '[0-9]{2}:[0-9]{2}' gave only 1 matches, string was: Fr, 10.03.2023 - 20:00"),
 		},
 		"text regex negative out of bound": {
 			htmlString: htmlString,
@@ -509,7 +509,7 @@ func TestExtractFieldUrlOrText(t *testing.T) {
 					},
 				},
 			},
-			err: fmt.Errorf("regex index out of bounds. regex '[0-9]{2}' gave only 6 matches"),
+			err: fmt.Errorf("regex index out of bounds. regex '[0-9]{2}' gave only 6 matches, string was: Fr, 10.03.2023 - 20:00"),
 		},
 		"text regex expression error": {
 			htmlString: htmlString,

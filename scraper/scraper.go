@@ -1066,6 +1066,7 @@ func extractStringRegex(rc *RegexConfig, s string) (string, error) {
 			}
 		}
 		if errMsg != "" {
+			errMsg += fmt.Sprintf(", string was: %s", s)
 			if rc.IgnoreErrors {
 				slog.Info(fmt.Sprintf("ignoring regex error: %s", errMsg))
 				return "", nil

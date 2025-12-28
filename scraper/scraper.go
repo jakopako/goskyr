@@ -137,7 +137,6 @@ type RegexConfig struct {
 
 // ElementLocation is used to find a specific string in a html document
 type ElementLocation struct {
-	// We use a yaml.Node here so that we can add a comment to the marshaled yaml
 	Selector      string      `yaml:"selector,omitempty"`
 	JsonSelector  string      `yaml:"json_selector,omitempty"`
 	ChildIndex    int         `yaml:"child_index,omitempty"`

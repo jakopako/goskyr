@@ -137,6 +137,7 @@ type RegexConfig struct {
 
 // ElementLocation is used to find a specific string in a html document
 type ElementLocation struct {
+	// We use a yaml.Node here so that we can add a comment to the marshaled yaml
 	Selector      string      `yaml:"selector,omitempty"`
 	JsonSelector  string      `yaml:"json_selector,omitempty"`
 	ChildIndex    int         `yaml:"child_index,omitempty"`
@@ -147,6 +148,7 @@ type ElementLocation struct {
 	AllNodes      bool        `yaml:"all_nodes,omitempty"`
 	Separator     string      `yaml:"separator,omitempty"`
 	Default       string      `yaml:"default,omitempty"`
+	Examples      []string    `yaml:"examples,omitempty,flow"` // only used for autoconfig generation
 }
 
 // TransformConfig is used to replace an existing substring with some other

@@ -15,7 +15,7 @@ import (
 // minOcc specifies the minimum occurrences a field must have to be included.
 // If removeStaticFields is true, fields that have static values will be removed from the configuration.
 // modelName and wordsDir are used for text analysis to predict field names.
-func GenerateConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool, modelName, wordsDir string) error {
+func GenerateConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool, modelName, wordsDir string, interactive bool) error {
 	if s.URL == "" {
 		return errors.New("URL field cannot be empty")
 	}
@@ -50,5 +50,5 @@ func GenerateConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool, mod
 		return err
 	}
 
-	return fieldMgr.interactiveFieldSelection(s)
+	return fieldMgr.fieldSelection(s, interactive)
 }

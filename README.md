@@ -34,7 +34,7 @@ Next to [manually configuring](#manual-configuration--usage) the scraper there i
 First, [install goskyr](#installation) and then run the following steps to generate a configuration file for the scraper. The configuration file is written to the default location `config.yml`. Navigation in the interactive terminal window is done with the arrow keys, the return key and the tab key.
 
 ```bash
-goskyr generate -u https://www.imdb.com/chart/top/ -D
+goskyr generate -u https://www.imdb.com/chart/top/ -D -i
 ```
 
 Note, that different colors are used to show how 'close' certain fields are to each other in the html tree. This should help when there are multiple list-like structures on a web page and you need to figure out which fields belong together.
@@ -92,27 +92,10 @@ JazzCafeAlto    JazzCafeLondon  JazzNoJazz      JazzOnze        JazzStudio      
 
 ## Semi-Automatic Configuration
 
-As shown under [Quick Start](#quick-start) goskyr can be used to automatically extract a configuration for a given url. A number of different options are available.
+As shown under [Quick Start](#quick-start) goskyr can be used to automatically extract a configuration for a given url. A number of different options are available. For details check the help section.
 
 ```bash
-$ goskyr generate -h
-Usage: goskyr generate --url=STRING [flags]
-
-Generate a scraper configuration file for the given URL
-
-Flags:
-  -h, --help                       Show context-sensitive help.
-  -v, --version                    Print the version and exit.
-  -d, --debug                      Set log level to 'debug' and store additional helpful debugging data.
-
-  -u, --url=STRING                 The URL for which to generate the scraper configuration file.
-  -m, --min-occurrence=20          The minimum number of occurrences of a certain field on an html page to be included in the suggested fields. This is needed to filter out noise.
-  -D, --distinct                   If set to true only fields with distinct values will be included in the suggested fields.
-  -r, --render-js                  Render javascript before analyzing the html page.
-  -w, --word-lists="word-lists"    The directory that contains a number of files containing words of different languages, needed for extracting ML features.
-  -M, --model-name=STRING          The name to a pre-trained ML model to infer names of extracted fields.
-  -o, --stdout                     If set to true the the generated configuration will be written to stdout.
-  -c, --config="./config.yml"      The file that the generated configuration will be written to.
+goskyr generate -h
 ```
 
 A few more details on the ML part.
@@ -123,7 +106,7 @@ The flag `-w` / `--word-lists` is used to pass a the name of a directory that co
 
 Note that when using machine learning & a properly trained model, the auto configuration is capable of determining what fields could be a date and what date components they contain. With that information another algorithm then tries to derive the format of the date that is needed for proper parsing. So in the best case you have to do nothing more than rename some of the fields to get the desired configuration.
 
-Note that the machine learning feature is rather limited and might not always work well, especially since it only takes into account a fields value and not its position in the DOM. A basic model is contained in the `ml-models` directory. It uses the labels `text`, `url` and `date-component-*`. You could for instance run `goskyr generate -u https://www.schuur.ch/programm/ --model-name ml-models/knn-types-v0.4.4` which would suggest the following fields to you.
+Note that the machine learning feature is rather limited and might not always work well, especially since it only takes into account a fields value and not its position in the DOM. A basic model is contained in the `ml-models` directory. It uses the labels `text`, `url` and `date-component-*`. You could for instance run `goskyr generate -u https://www.schuur.ch/programm/ --model-name ml-models/knn-types-v0.4.4 -i` which would suggest the following fields to you.
 
 ![screenshot field extraction](schuur-extract.png)
 

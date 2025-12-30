@@ -247,6 +247,7 @@ type GenerateCmd struct {
 	ModelName     string `short:"M" help:"The name to a pre-trained ML model to infer names of extracted fields." completion:"<file>"`
 	Stdout        bool   `short:"o" long:"stdout" help:"If set to true the the generated configuration will be written to stdout."`
 	Config        string `short:"c" long:"config" default:"./config.yml" help:"The file that the generated configuration will be written to." completion:"<file>"`
+	Interactive   bool   `short:"i" help:"If set to true, the user will be prompted to select which fields to include in the generated configuration interactively."`
 }
 
 func (g *GenerateCmd) Run() error {
@@ -263,7 +264,7 @@ func (g *GenerateCmd) Run() error {
 	}
 
 	slog.Debug(fmt.Sprintf("analyzing url %s", s.URL))
-	err := autoconfig.GenerateConfig(s, g.MinOccurrence, g.Distinct, g.ModelName, g.WordLists)
+	err := autoconfig.GenerateConfig(s, g.MinOccurrence, g.Distinct, g.ModelName, g.WordLists, g.Interactive)
 	if err != nil {
 		slog.Error(fmt.Sprintf("%v", err))
 		return err
@@ -280,8 +281,11 @@ func (g *GenerateCmd) Run() error {
 		return err
 	}
 
+	// A bit hacky but easier for now to implement. Will probably change in the future.
+	yamlStr := strings.ReplaceAll(string(yamlData), "examples: [", "# examples: [")
+
 	if g.Stdout {
-		fmt.Println(string(yamlData))
+		fmt.Println(yamlStr)
 	} else {
 		f, err := os.Create(g.Config)
 		if err != nil {
@@ -290,7 +294,7 @@ func (g *GenerateCmd) Run() error {
 		}
 		defer f.Close()
 
-		_, err = f.Write(yamlData)
+		_, err = f.Write([]byte(yamlStr))
 		if err != nil {
 			slog.Error(fmt.Sprintf("error writing to file: %v", err))
 			return err

@@ -349,15 +349,21 @@ func (fm *fieldManager) process(minCount int, removeStaticFields bool, modelName
 	return fm.findFieldNames(modelName, wordsDir)
 }
 
-// interactiveFieldSelection shows an interactive table for selecting fields
-// and updates the scraper config accordingly
-func (fm *fieldManager) interactiveFieldSelection(s *scraper.Scraper) error {
+// fieldSelection either shows an interactive table for selecting fields (interactive=true)
+// or simply selects all fields (interactive=false) and consequently updates the scraper config accordingly
+func (fm *fieldManager) fieldSelection(s *scraper.Scraper, interactive bool) error {
 	if len(*fm) == 0 {
 		return fmt.Errorf("no fields found")
 	}
 
-	if err := fm.showInteractiveTable(); err != nil {
-		return err
+	if !interactive {
+		for _, fp := range *fm {
+			fp.selected = true
+		}
+	} else {
+		if err := fm.showInteractiveTable(); err != nil {
+			return err
+		}
 	}
 
 	return fm.elementsToConfig(s)
@@ -495,11 +501,17 @@ outer:
 		DateLocation: zone,
 	}
 	for _, e := range fm {
+		exampleStrs := []string{}
+		for _, ex := range e.examples {
+			exampleStrs = append(exampleStrs, ex.example)
+		}
 		loc := scraper.ElementLocation{
 			Selector:   e.path[len(rootSelector):].string(),
 			ChildIndex: e.textIndex,
 			Attr:       e.attr,
+			Examples:   exampleStrs[:4],
 		}
+
 		fieldType := "text"
 		var d scraper.Field
 		if strings.HasPrefix(e.name, "date-component") {
@@ -508,10 +520,6 @@ outer:
 				Month: strings.Contains(e.name, "month"),
 				Year:  strings.Contains(e.name, "year"),
 				Time:  strings.Contains(e.name, "time"),
-			}
-			exampleStrs := []string{}
-			for _, ex := range e.examples {
-				exampleStrs = append(exampleStrs, ex.example)
 			}
 			format, lang := date.GetDateFormatMulti(exampleStrs, cd)
 			dateField.Components = append(dateField.Components, scraper.DateComponent{

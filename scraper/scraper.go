@@ -42,7 +42,7 @@ type GlobalConfig struct {
 type Config struct {
 	// We cannot use a pointer for Writer otherwise reading from
 	// env vars for the Writer output.WriterConfig fields does
-	// not work with cleanenv.ReadConfig because it does not supported
+	// not work with cleanenv.ReadConfig because it does not support
 	// nested structs with pointers
 	Writer   output.WriterConfig `yaml:"writer,omitempty"`
 	Scrapers []Scraper           `yaml:"scrapers,omitempty"`
@@ -137,7 +137,7 @@ type RegexConfig struct {
 
 // ElementLocation is used to find a specific string in a html document
 type ElementLocation struct {
-	Selector      string      `yaml:"selector,omitempty"`
+	Selector      string      `yaml:"selector"`
 	JsonSelector  string      `yaml:"json_selector,omitempty"`
 	ChildIndex    int         `yaml:"child_index,omitempty"`
 	RegexExtract  RegexConfig `yaml:"regex_extract,omitempty"`
@@ -147,6 +147,7 @@ type ElementLocation struct {
 	AllNodes      bool        `yaml:"all_nodes,omitempty"`
 	Separator     string      `yaml:"separator,omitempty"`
 	Default       string      `yaml:"default,omitempty"`
+	Examples      []string    `yaml:"examples,omitempty,flow"` // only used for autoconfig generation
 }
 
 // TransformConfig is used to replace an existing substring with some other

@@ -349,8 +349,8 @@ func (fm *fieldManager) process(minCount int, removeStaticFields bool, modelName
 	return fm.findFieldNames(modelName, wordsDir)
 }
 
-// fieldSelection shows an interactive table for selecting fields
-// and updates the scraper config accordingly
+// fieldSelection either shows an interactive table for selecting fields (interactive=true)
+// or simply selects all fields (interactive=false) and consequently updates the scraper config accordingly
 func (fm *fieldManager) fieldSelection(s *scraper.Scraper, interactive bool) error {
 	if len(*fm) == 0 {
 		return fmt.Errorf("no fields found")

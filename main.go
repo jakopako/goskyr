@@ -239,15 +239,16 @@ func collector(itemChan <-chan map[string]any, statusChan <-chan types.ScraperSt
 }
 
 type GenerateCmd struct {
-	URL           string `short:"u" long:"url" help:"The URL for which to generate the scraper configuration file." required:""`
-	MinOccurrence int    `short:"m" default:"20" help:"The minimum number of occurrences of a certain field on an html page to be included in the suggested fields. This is needed to filter out noise."`
-	Distinct      bool   `short:"D" help:"If set to true only fields with distinct values will be included in the suggested fields."`
-	RenderJS      bool   `short:"r" help:"Render javascript before analyzing the html page."`
-	WordLists     string `short:"w" default:"word-lists" help:"The directory that contains a number of files containing words of different languages, needed for extracting ML features." completion:"<directory>"`
-	ModelName     string `short:"M" help:"The name to a pre-trained ML model to infer names of extracted fields." completion:"<file>"`
-	Stdout        bool   `short:"o" long:"stdout" help:"If set to true the the generated configuration will be written to stdout."`
-	Config        string `short:"c" long:"config" default:"./config.yml" help:"The file that the generated configuration will be written to." completion:"<file>"`
-	Interactive   bool   `short:"i" help:"If set to true, the user will be prompted to select which fields to include in the generated configuration interactively."`
+	URL            string `short:"u" long:"url" help:"The URL for which to generate the scraper configuration file." required:""`
+	MinOccurrence  int    `short:"m" default:"20" help:"The minimum number of occurrences of a certain field on an html page to be included in the suggested fields. This is needed to filter out noise."`
+	Distinct       bool   `short:"D" help:"If set to true only fields with distinct values will be included in the suggested fields."`
+	RenderJS       bool   `short:"r" help:"Render javascript before analyzing the html page."`
+	PageLoadWaitMS int    `short:"p" default:"2000" help:"The number of milliseconds to wait for the page to load when rendering javascript."`
+	WordLists      string `short:"w" default:"word-lists" help:"The directory that contains a number of files containing words of different languages, needed for extracting ML features." completion:"<directory>"`
+	ModelName      string `short:"M" help:"The name to a pre-trained ML model to infer names of extracted fields." completion:"<file>"`
+	Stdout         bool   `short:"o" long:"stdout" help:"If set to true the the generated configuration will be written to stdout."`
+	Config         string `short:"c" long:"config" default:"./config.yml" help:"The file that the generated configuration will be written to." completion:"<file>"`
+	Interactive    bool   `short:"i" help:"If set to true, the user will be prompted to select which fields to include in the generated configuration interactively."`
 }
 
 func (g *GenerateCmd) Run() error {
@@ -261,6 +262,7 @@ func (g *GenerateCmd) Run() error {
 
 	if g.RenderJS {
 		s.FetcherConfig.Type = fetch.DYNAMIC_FETCHER_TYPE
+		s.FetcherConfig.PageLoadWaitMS = g.PageLoadWaitMS
 	}
 
 	slog.Debug(fmt.Sprintf("analyzing url %s", s.URL))

@@ -5,6 +5,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+
+	"github.com/jakopako/goskyr/config"
 )
 
 // The StaticFetcher fetches static page content
@@ -43,6 +45,9 @@ func (s *StaticFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 		return resString, err
 	}
 	resString = string(bytes)
+	if config.Debug {
+		writeHTMLToFile(url, resString)
+	}
 	return resString, nil
 }
 

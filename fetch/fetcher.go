@@ -3,8 +3,12 @@ package fetch
 
 import (
 	"fmt"
+	"log/slog"
+	"net/url"
+	"os"
 
 	"github.com/jakopako/goskyr/types"
+	"github.com/jakopako/goskyr/utils"
 )
 
 type FetcherType string
@@ -33,6 +37,8 @@ type FetchOpts struct {
 
 // A Fetcher allows to fetch the content of a web page
 type Fetcher interface {
+	// Fetch retrieves the content of the page at the given URL
+	// according to the provided options.
 	Fetch(url string, opts FetchOpts) (string, error)
 	Cancel() // only needed for the dynamic fetcher
 }
@@ -48,4 +54,27 @@ func NewFetcher(fc *FetcherConfig) (Fetcher, error) {
 	default:
 		return nil, fmt.Errorf("fetcher of type %s not implemented", fc.Type)
 	}
+}
+
+// writeHTMLToFile writes the given HTML content to a file for debugging purposes.
+func writeHTMLToFile(urlStr, htmlStr string) error {
+	u, _ := url.Parse(urlStr)
+	r, err := utils.RandomString(u.Host)
+	if err != nil {
+		return err
+	}
+
+	filename := fmt.Sprintf("%s.html", r)
+	slog.Debug(fmt.Sprintf("writing html to file %s", filename), slog.String("url", urlStr))
+	f, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("failed to write html file: %v", err)
+	}
+	defer f.Close()
+
+	_, err = f.WriteString(htmlStr)
+	if err != nil {
+		return fmt.Errorf("failed to write html file: %v", err)
+	}
+	return nil
 }

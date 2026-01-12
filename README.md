@@ -77,7 +77,7 @@ Or clone the repository and then run with `go run main.go ...` or build it yours
 
 ## Auto-completion
 
-You can run the following command to create a basic completion file for bash, zsh or fish. Once it has been created move it to the correct location, e.g. `/etc/bash_completion.d/`.
+You can run the following command to create a basic completion file for bash, zsh or fish. Once it has been created move it to the correct location, e.g. `/usr/share/bash-completion/completions/`.
 
 ```bash
 goskyr completion -s bash|zsh|fish

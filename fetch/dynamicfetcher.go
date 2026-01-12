@@ -138,5 +138,13 @@ func (d *DynamicFetcher) Fetch(urlStr string, opts FetchOpts) (string, error) {
 	)
 	// elapsed := time.Since(start)
 	// log.Printf("fetching %s took %s", url, elapsed)
-	return body, err
+
+	if err != nil {
+		return "", err
+	}
+
+	if config.Debug {
+		writeHTMLToFile(urlStr, body)
+	}
+	return body, nil
 }

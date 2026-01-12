@@ -2,6 +2,8 @@ package fetch
 
 import (
 	"errors"
+
+	"github.com/jakopako/goskyr/config"
 )
 
 type MockFetcher struct {
@@ -22,8 +24,12 @@ func NewMockFetcher(fc *FetcherConfig) *MockFetcher {
 
 func (d *MockFetcher) Fetch(urlStr string, opts FetchOpts) (string, error) {
 	if p, ok := d.pagesMap[urlStr]; ok {
+		if config.Debug {
+			writeHTMLToFile(urlStr, p)
+		}
 		return p, nil
 	}
+
 	return "", errors.New("page not found")
 }
 

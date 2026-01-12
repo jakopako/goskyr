@@ -19,7 +19,6 @@ import (
 	"github.com/antchfx/jsonquery"
 	"github.com/goodsign/monday"
 	"github.com/ilyakaznacheev/cleanenv"
-	"github.com/jakopako/goskyr/config"
 	"github.com/jakopako/goskyr/date"
 	"github.com/jakopako/goskyr/fetch"
 	"github.com/jakopako/goskyr/output"
@@ -615,35 +614,10 @@ func (c *Scraper) fetchToDoc(urlStr string, opts fetch.FetchOpts) (*goquery.Docu
 	if err != nil {
 		return nil, err
 	}
-	// fmt.Println(res)
+
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(res))
 	if err != nil {
 		return nil, err
-	}
-
-	// in debug mode we want to write all the html's to files
-	if config.Debug {
-		u, _ := url.Parse(urlStr)
-		r, err := utils.RandomString(u.Host)
-		if err != nil {
-			return nil, err
-		}
-		filename := fmt.Sprintf("%s.html", r)
-		slog.Debug(fmt.Sprintf("writing html to file %s", filename), slog.String("url", urlStr))
-		htmlStr, err := goquery.OuterHtml(doc.Children())
-		if err != nil {
-			return nil, fmt.Errorf("failed to write html file: %v", err)
-		}
-
-		f, err := os.Create(filename)
-		if err != nil {
-			return nil, fmt.Errorf("failed to write html file: %v", err)
-		}
-		defer f.Close()
-		_, err = f.WriteString(htmlStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to write html file: %v", err)
-		}
 	}
 	return doc, nil
 }

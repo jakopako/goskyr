@@ -57,6 +57,9 @@ _goskyr_completions() {
     'extract'*'--word-lists')
       while read -r; do COMPREPLY+=("$REPLY"); done < <(compgen -A directory -- "$cur")
       ;;
+    'completion'*'--shell')
+      while read -r; do COMPREPLY+=("$REPLY"); done < <(compgen -W "$(_goskyr_filter "bash zsh fish")" -- "$cur")
+      ;;
     'generate'*'--config')
       while read -r; do COMPREPLY+=("$REPLY"); done < <(compgen -A file -- "$cur")
       ;;
@@ -65,6 +68,9 @@ _goskyr_completions() {
       ;;
     'scrape'*'--config')
       while read -r; do COMPREPLY+=("$REPLY"); done < <(compgen -A file -- "$cur")
+      ;;
+    'completion'*'-s')
+      while read -r; do COMPREPLY+=("$REPLY"); done < <(compgen -W "$(_goskyr_filter "bash zsh fish")" -- "$cur")
       ;;
     'list'*'--config')
       while read -r; do COMPREPLY+=("$REPLY"); done < <(compgen -A file -- "$cur")
@@ -97,7 +103,7 @@ _goskyr_completions() {
       while read -r; do COMPREPLY+=("$REPLY"); done < <(compgen -W "$(_goskyr_filter "$(goskyr list -c "$config" -C 2>/dev/null)")" -- "$cur")
       ;;
     'generate'*)
-      while read -r; do COMPREPLY+=("$REPLY"); done < <(compgen -W "$(_goskyr_filter "--url -u --min-occurrence -m --distinct -D --render-js -r --word-lists -w --model-name -M --stdout -o --config -c")" -- "$cur")
+      while read -r; do COMPREPLY+=("$REPLY"); done < <(compgen -W "$(_goskyr_filter "--url -u --min-occurrence -m --distinct -D --render-js -r --page-load-wait-ms -p --word-lists -w --model-name -M --stdout -o --config -c --interactive -i")" -- "$cur")
       ;;
     'list'*'-c')
       while read -r; do COMPREPLY+=("$REPLY"); done < <(compgen -A file -- "$cur")

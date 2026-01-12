@@ -93,7 +93,7 @@ func (acc *CompletionCommand) Run() error {
 
 type ScrapeCmd struct {
 	Config string `short:"c" default:"./config.yml" help:"The location of the configuration. Can be a directory containing config files or a single config file." completion:"<file>"`
-	Name   string `short:"n" help:"The name of the scraper to be run, if only one of the configured ones should be run." completion:"goskyr list -C 2>/dev/null"`
+	Name   string `short:"n" help:"The name of the scraper to be run, if only one of the configured ones should be run." completion:"goskyr list -c \"$config\" -C 2>/dev/null"`
 	Stdout bool   `short:"o" help:"If set to true the scraped data will be written to stdout despite any other existing writer configurations."`
 	DryRun bool   `short:"D" help:"If set to true the scraper will not persist any scraped data (currently only has an effect on the APIWriter)."`
 }

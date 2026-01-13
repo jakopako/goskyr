@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/chromedp"
@@ -60,12 +61,29 @@ func (d *DynamicFetcher) Fetch(urlStr string, opts FetchOpts) (string, error) {
 	// 	chromedp.WithErrorf(log.Printf),
 	// )
 	defer cancel()
+
+	actions := []chromedp.Action{}
+
+	// log chrome version in debug mode
+	if config.Debug {
+		actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
+			protocolVersion, product, revision, userAgent, jsVersion, err := browser.GetVersion().Do(ctx)
+			if err != nil {
+				logger.Warn("failed to get chrome version", slog.String("err", err.Error()))
+				return nil
+			}
+			logger.Debug(fmt.Sprintf("chrome version: protocolVersion=%s, product=%s, revision=%s, userAgent=%s, jsVersion=%s",
+				protocolVersion, product, revision, userAgent, jsVersion))
+			return nil
+		}))
+	}
+
 	var body string
 	sleepTime := time.Duration(d.PageLoadWaitMS) * time.Millisecond
-	actions := []chromedp.Action{
+	actions = append(actions,
 		chromedp.Navigate(urlStr),
 		chromedp.Sleep(sleepTime),
-	}
+	)
 	logger.Debug(fmt.Sprintf("appended chrome actions: Navigate, Sleep(%v)", sleepTime))
 	for j, ia := range opts.Interaction {
 		logger.Debug(fmt.Sprintf("processing interaction nr %d, type %s", j, ia.Type))

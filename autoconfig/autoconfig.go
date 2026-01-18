@@ -17,8 +17,6 @@ import (
 // If removeStaticFields is true, fields that have static values will be removed from the configuration.
 // modelName and wordsDir are used for text analysis to predict field names.
 func GenerateConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool, modelName, wordsDir string, interactive bool) error {
-	// TODO make sure context contains logger
-	ctx := context.Background()
 	if s.URL == "" {
 		return errors.New("URL field cannot be empty")
 	}
@@ -29,6 +27,11 @@ func GenerateConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool, mod
 		return fmt.Errorf("error creating fetcher: %v", err)
 	}
 
+	// currently the ctx is only used to pass a logger. If it
+	// we don't need a custom logger, we can just use context.Background()
+	// and anything that gets the logger from the context will use the default logger,
+	// IF the log.LoggerFromContext function is used.
+	ctx := context.Background()
 	res, err := fetcher.Fetch(ctx, s.URL, fetch.FetchOpts{})
 	if err != nil {
 		return err

@@ -2,10 +2,6 @@ package config
 
 import "log/slog"
 
-const (
-	LoggerCtxKey = "logger"
-)
-
 var (
 	Debug bool
 )

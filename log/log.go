@@ -8,17 +8,21 @@ import (
 	"github.com/jakopako/goskyr/config"
 )
 
+const (
+	LoggerCtxKey = "logger"
+)
+
 func InitializeDefaultLogger() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: config.GetLogLevel()}))
 	slog.SetDefault(logger)
 }
 
 func ContextWithLogger(ctx context.Context, logger *slog.Logger) context.Context {
-	return context.WithValue(ctx, config.LoggerCtxKey, logger)
+	return context.WithValue(ctx, LoggerCtxKey, logger)
 }
 
 func LoggerFromContext(ctx context.Context) *slog.Logger {
-	if logger, ok := ctx.Value(config.LoggerCtxKey).(*slog.Logger); ok {
+	if logger, ok := ctx.Value(LoggerCtxKey).(*slog.Logger); ok {
 		return logger
 	}
 	return slog.Default()

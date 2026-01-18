@@ -19,6 +19,7 @@ import (
 	"github.com/jakopako/goskyr/autoconfig"
 	"github.com/jakopako/goskyr/config"
 	"github.com/jakopako/goskyr/fetch"
+	"github.com/jakopako/goskyr/log"
 	"github.com/jakopako/goskyr/ml"
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/scraper"
@@ -375,24 +376,10 @@ func getVersion() string {
 	buildInfo, ok := debug.ReadBuildInfo()
 	if ok {
 		if buildInfo.Main.Version != "" && buildInfo.Main.Version != "(devel)" {
-			// fmt.Println(buildInfo.Main.Version)
 			return buildInfo.Main.Version
 		}
 	}
-	// fmt.Println(version)
 	return version
-}
-
-func initializeLogging(debug bool) {
-	var logLevel slog.Level
-	if debug {
-		logLevel = slog.LevelDebug
-	} else {
-		logLevel = slog.LevelInfo
-	}
-
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
-	slog.SetDefault(logger)
 }
 
 func main() {
@@ -405,8 +392,10 @@ func main() {
 			"version": string(cli.Version),
 		})
 
-	initializeLogging(cli.Debug)
 	config.Debug = cli.Debug
+	// not very nice that the config package is global state,
+	// and that the following function relies on the config.Debug variable being set
+	log.InitializeDefaultLogger()
 
 	err := ctx.Run()
 	ctx.FatalIfErrorf(err)

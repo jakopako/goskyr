@@ -1,6 +1,7 @@
 package fetch
 
 import (
+	"context"
 	"errors"
 
 	"github.com/jakopako/goskyr/config"
@@ -22,10 +23,10 @@ func NewMockFetcher(fc *FetcherConfig) *MockFetcher {
 	return df
 }
 
-func (d *MockFetcher) Fetch(urlStr string, opts FetchOpts) (string, error) {
+func (d *MockFetcher) Fetch(ctx context.Context, urlStr string, opts FetchOpts) (string, error) {
 	if p, ok := d.pagesMap[urlStr]; ok {
 		if config.Debug {
-			writeHTMLToFile(urlStr, p)
+			writeHTMLToFile(ctx, urlStr, p)
 		}
 		return p, nil
 	}

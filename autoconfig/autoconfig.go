@@ -1,6 +1,7 @@
 package autoconfig
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -16,6 +17,8 @@ import (
 // If removeStaticFields is true, fields that have static values will be removed from the configuration.
 // modelName and wordsDir are used for text analysis to predict field names.
 func GenerateConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool, modelName, wordsDir string, interactive bool) error {
+	// TODO make sure context contains logger
+	ctx := context.Background()
 	if s.URL == "" {
 		return errors.New("URL field cannot be empty")
 	}
@@ -26,7 +29,7 @@ func GenerateConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool, mod
 		return fmt.Errorf("error creating fetcher: %v", err)
 	}
 
-	res, err := fetcher.Fetch(s.URL, fetch.FetchOpts{})
+	res, err := fetcher.Fetch(ctx, s.URL, fetch.FetchOpts{})
 	if err != nil {
 		return err
 	}

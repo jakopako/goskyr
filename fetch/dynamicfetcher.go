@@ -14,6 +14,7 @@ import (
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
 	"github.com/jakopako/goskyr/config"
+	"github.com/jakopako/goskyr/log"
 	"github.com/jakopako/goskyr/types"
 	"github.com/jakopako/goskyr/utils"
 )
@@ -50,8 +51,8 @@ func (d *DynamicFetcher) Cancel() {
 	d.cancelAlloc()
 }
 
-func (d *DynamicFetcher) Fetch(urlStr string, opts FetchOpts) (string, error) {
-	logger := slog.With(slog.String("fetcher", "dynamic"), slog.String("url", urlStr))
+func (d *DynamicFetcher) Fetch(ctx context.Context, urlStr string, opts FetchOpts) (string, error) {
+	logger := log.LoggerFromContext(ctx).With(slog.String("fetcher", "dynamic"), slog.String("url", urlStr))
 	logger.Debug("fetching page", slog.String("user-agent", d.UserAgent))
 	// start := time.Now()
 	ctx, cancel := chromedp.NewContext(d.allocContext)
@@ -162,7 +163,7 @@ func (d *DynamicFetcher) Fetch(urlStr string, opts FetchOpts) (string, error) {
 	}
 
 	if config.Debug {
-		writeHTMLToFile(urlStr, body)
+		writeHTMLToFile(ctx, urlStr, body)
 	}
 	return body, nil
 }

@@ -2,11 +2,13 @@
 package fetch
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/url"
 	"os"
 
+	"github.com/jakopako/goskyr/log"
 	"github.com/jakopako/goskyr/types"
 	"github.com/jakopako/goskyr/utils"
 )
@@ -38,8 +40,8 @@ type FetchOpts struct {
 // A Fetcher allows to fetch the content of a web page
 type Fetcher interface {
 	// Fetch retrieves the content of the page at the given URL
-	// according to the provided options.
-	Fetch(url string, opts FetchOpts) (string, error)
+	// according to the provided options. The context is used for logging.
+	Fetch(ctx context.Context, url string, opts FetchOpts) (string, error)
 	Cancel() // only needed for the dynamic fetcher
 }
 
@@ -57,7 +59,8 @@ func NewFetcher(fc *FetcherConfig) (Fetcher, error) {
 }
 
 // writeHTMLToFile writes the given HTML content to a file for debugging purposes.
-func writeHTMLToFile(urlStr, htmlStr string) error {
+func writeHTMLToFile(ctx context.Context, urlStr, htmlStr string) error {
+	logger := log.LoggerFromContext(ctx)
 	u, _ := url.Parse(urlStr)
 	r, err := utils.RandomString(u.Host)
 	if err != nil {
@@ -65,7 +68,7 @@ func writeHTMLToFile(urlStr, htmlStr string) error {
 	}
 
 	filename := fmt.Sprintf("%s.html", r)
-	slog.Debug(fmt.Sprintf("writing html to file %s", filename), slog.String("url", urlStr))
+	logger.Debug(fmt.Sprintf("writing html to file %s", filename), slog.String("url", urlStr))
 	f, err := os.Create(filename)
 	if err != nil {
 		return fmt.Errorf("failed to write html file: %v", err)

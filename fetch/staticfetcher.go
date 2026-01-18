@@ -1,12 +1,14 @@
 package fetch
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 
 	"github.com/jakopako/goskyr/config"
+	"github.com/jakopako/goskyr/log"
 )
 
 // The StaticFetcher fetches static page content
@@ -20,8 +22,9 @@ func NewStaticFetcher(fc *FetcherConfig) *StaticFetcher {
 	}
 }
 
-func (s *StaticFetcher) Fetch(url string, opts FetchOpts) (string, error) {
-	slog.Debug("fetching page", slog.String("fetcher", "static"), slog.String("url", url), slog.String("user-agent", s.UserAgent))
+func (s *StaticFetcher) Fetch(ctx context.Context, url string, opts FetchOpts) (string, error) {
+	logger := log.LoggerFromContext(ctx)
+	logger.Debug("fetching page", slog.String("fetcher", "static"), slog.String("url", url), slog.String("user-agent", s.UserAgent))
 	var resString string
 	client := &http.Client{}
 
@@ -46,7 +49,7 @@ func (s *StaticFetcher) Fetch(url string, opts FetchOpts) (string, error) {
 	}
 	resString = string(bytes)
 	if config.Debug {
-		writeHTMLToFile(url, resString)
+		writeHTMLToFile(ctx, url, resString)
 	}
 	return resString, nil
 }

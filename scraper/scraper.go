@@ -3,8 +3,10 @@ package scraper
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
 	"net/url"
@@ -19,8 +21,10 @@ import (
 	"github.com/antchfx/jsonquery"
 	"github.com/goodsign/monday"
 	"github.com/ilyakaznacheev/cleanenv"
+	"github.com/jakopako/goskyr/config"
 	"github.com/jakopako/goskyr/date"
 	"github.com/jakopako/goskyr/fetch"
+	"github.com/jakopako/goskyr/log"
 	"github.com/jakopako/goskyr/output"
 	"github.com/jakopako/goskyr/types"
 	"github.com/jakopako/goskyr/utils"
@@ -28,11 +32,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	UserAgentDefault = "goskyr web scraper (github.com/jakopako/goskyr)"
+	DebugDirDefault  = "debug"
+)
+
 // GlobalConfig is used for storing global configuration parameters that
 // are needed across all scrapers
 type GlobalConfig struct {
 	UserAgent string `yaml:"user_agent"`
-	// WriteScraperStatus bool   `yaml:"write_scraper_status,omitempty"` // if true, the scraper will write the status of each scraper to the writer. TODO: move to writer config?
+	// DebugDir is a directory where debug files (eg html files of fetched pages)
+	// are stored
+	DebugDir string `yaml:"debug_dir,omitempty"`
 }
 
 // Config defines the overall structure of the scraper configuration.
@@ -53,6 +64,7 @@ type Config struct {
 // in that directory and merge them into one Config struct.
 func NewConfig(configPath string) (*Config, error) {
 	var config Config
+
 	fileInfo, err := os.Stat(configPath)
 	if err != nil {
 		return nil, err
@@ -61,6 +73,7 @@ func NewConfig(configPath string) (*Config, error) {
 		err := filepath.WalkDir(configPath, func(path string, d fs.DirEntry, err error) error {
 			if !d.IsDir() {
 				var configTmp Config
+
 				if err := cleanenv.ReadConfig(path, &configTmp); err != nil {
 					return err
 				}
@@ -95,9 +108,18 @@ func NewConfig(configPath string) (*Config, error) {
 		}
 	}
 
+	// global defaults
 	if config.Global == nil {
 		config.Global = &GlobalConfig{
-			UserAgent: "goskyr web scraper (github.com/jakopako/goskyr)",
+			UserAgent: UserAgentDefault,
+			DebugDir:  DebugDirDefault,
+		}
+	} else {
+		if config.Global.UserAgent == "" {
+			config.Global.UserAgent = UserAgentDefault
+		}
+		if config.Global.DebugDir == "" {
+			config.Global.DebugDir = DebugDirDefault
 		}
 	}
 
@@ -312,9 +334,17 @@ type ScraperResult struct {
 // of dynamic fields, ie fields that don't have a predefined value and that are
 // present on the main page (not subpages). This is used by the ML feature generation.
 func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScraperResult, error) {
-	scrLogger := slog.With(slog.String("name", c.Name))
+	// we create a separate context so that we can pass a custom logger via context
+	ctx := context.Background()
 
-	// initialize fetcher
+	var logBuffer bytes.Buffer
+
+	// initialize special logger with handler that writes to both stdout and logBuffer
+	handler := slog.NewTextHandler(io.MultiWriter(os.Stdout, &logBuffer), &slog.HandlerOptions{Level: config.GetLogLevel()})
+	scrLogger := slog.New(handler).With(slog.String("name", c.Name))
+	ctx = log.ContextWithLogger(ctx, scrLogger)
+
+	// set fetcher config defaults
 	// default fetcher type is static
 	if c.FetcherConfig.Type == "" {
 		c.FetcherConfig.Type = fetch.STATIC_FETCHER_TYPE
@@ -325,6 +355,12 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScraperResult
 		c.FetcherConfig.UserAgent = globalConfig.UserAgent
 	}
 
+	// if local DebugDir empty, set global one
+	if c.FetcherConfig.DebugDir == "" {
+		c.FetcherConfig.DebugDir = globalConfig.DebugDir
+	}
+
+	// initialize fetcher
 	fetcher, err := fetch.NewFetcher(&c.FetcherConfig)
 	if err != nil {
 		return nil, err
@@ -351,7 +387,7 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScraperResult
 	currentPage := 0
 	var doc *goquery.Document
 
-	hasNextPage, pageURL, doc, err := c.fetchPage(nil, currentPage, c.URL, c.Interaction)
+	hasNextPage, pageURL, doc, err := c.fetchPage(ctx, nil, currentPage, c.URL, c.Interaction)
 	if err != nil {
 		return result, err
 	}
@@ -401,7 +437,7 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScraperResult
 						subpageURL := fmt.Sprint(currentItem[f.OnSubpage])
 						_, found := subDocs[subpageURL]
 						if !found {
-							subDoc, err := c.fetchToDoc(subpageURL, fetch.FetchOpts{})
+							subDoc, err := c.fetchToDoc(ctx, subpageURL, fetch.FetchOpts{})
 							if err != nil {
 								scrLogger.Error(fmt.Sprintf("%v. Skipping item %v.", err, currentItem))
 								result.Stats.NrErrors++
@@ -434,7 +470,7 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScraperResult
 		})
 
 		currentPage++
-		hasNextPage, pageURL, doc, err = c.fetchPage(doc, currentPage, pageURL, nil)
+		hasNextPage, pageURL, doc, err = c.fetchPage(ctx, doc, currentPage, pageURL, nil)
 		if err != nil {
 			return result, err
 		}
@@ -443,6 +479,7 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScraperResult
 	c.guessYear(result.Items, time.Now())
 
 	result.Stats.LastScrapeEnd = time.Now().UTC()
+	result.Stats.ScraperLogs = logBuffer.String()
 
 	return result, nil
 }
@@ -560,9 +597,9 @@ func (c *Scraper) removeHiddenFields(item map[string]any) map[string]any {
 	return item
 }
 
-func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl string, i []*types.Interaction) (bool, string, *goquery.Document, error) {
+func (c *Scraper) fetchPage(ctx context.Context, doc *goquery.Document, nextPageI int, currentPageUrl string, i []*types.Interaction) (bool, string, *goquery.Document, error) {
 	if nextPageI == 0 {
-		newDoc, err := c.fetchToDoc(currentPageUrl, fetch.FetchOpts{Interaction: i})
+		newDoc, err := c.fetchToDoc(ctx, currentPageUrl, fetch.FetchOpts{Interaction: i})
 		if err != nil {
 			return false, "", nil, err
 		}
@@ -581,7 +618,7 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 								Count:    nextPageI, // we always need to 'restart' the clicks because we always re-fetch the page
 							},
 						}
-						nextPageDoc, err := c.fetchToDoc(currentPageUrl, fetch.FetchOpts{Interaction: ia})
+						nextPageDoc, err := c.fetchToDoc(ctx, currentPageUrl, fetch.FetchOpts{Interaction: ia})
 						if err != nil {
 							return false, "", nil, err
 						}
@@ -595,7 +632,7 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 					return false, "", nil, err
 				}
 				if nextPageUrl != "" {
-					nextPageDoc, err := c.fetchToDoc(nextPageUrl, fetch.FetchOpts{})
+					nextPageDoc, err := c.fetchToDoc(ctx, nextPageUrl, fetch.FetchOpts{})
 					if err != nil {
 						return false, "", nil, err
 					}
@@ -609,8 +646,8 @@ func (c *Scraper) fetchPage(doc *goquery.Document, nextPageI int, currentPageUrl
 	}
 }
 
-func (c *Scraper) fetchToDoc(urlStr string, opts fetch.FetchOpts) (*goquery.Document, error) {
-	res, err := c.fetcher.Fetch(urlStr, opts)
+func (c *Scraper) fetchToDoc(ctx context.Context, urlStr string, opts fetch.FetchOpts) (*goquery.Document, error) {
+	res, err := c.fetcher.Fetch(ctx, urlStr, opts)
 	if err != nil {
 		return nil, err
 	}

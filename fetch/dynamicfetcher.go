@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"path"
 	"time"
 
 	"github.com/chromedp/cdproto/browser"
@@ -14,6 +15,7 @@ import (
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
 	"github.com/jakopako/goskyr/config"
+	"github.com/jakopako/goskyr/log"
 	"github.com/jakopako/goskyr/types"
 	"github.com/jakopako/goskyr/utils"
 )
@@ -50,8 +52,8 @@ func (d *DynamicFetcher) Cancel() {
 	d.cancelAlloc()
 }
 
-func (d *DynamicFetcher) Fetch(urlStr string, opts FetchOpts) (string, error) {
-	logger := slog.With(slog.String("fetcher", "dynamic"), slog.String("url", urlStr))
+func (d *DynamicFetcher) Fetch(ctx context.Context, urlStr string, opts FetchOpts) (string, error) {
+	logger := log.LoggerFromContext(ctx).With(slog.String("fetcher", "dynamic"), slog.String("url", urlStr))
 	logger.Debug("fetching page", slog.String("user-agent", d.UserAgent))
 	// start := time.Now()
 	ctx, cancel := chromedp.NewContext(d.allocContext)
@@ -135,13 +137,21 @@ func (d *DynamicFetcher) Fetch(urlStr string, opts FetchOpts) (string, error) {
 	}))
 
 	if config.Debug {
+		// ensure debug directory exists
+		if d.DebugDir != "" {
+			err := os.MkdirAll(d.DebugDir, os.ModePerm)
+			if err != nil {
+				return "", fmt.Errorf("failed to create debug directory: %v", err)
+			}
+		}
+
 		u, _ := url.Parse(urlStr)
 		var buf []byte
 		r, err := utils.RandomString(u.Host)
 		if err != nil {
 			return "", err
 		}
-		filename := fmt.Sprintf("%s.png", r)
+		filename := path.Join(d.DebugDir, fmt.Sprintf("%s.png", r))
 		actions = append(actions, chromedp.CaptureScreenshot(&buf))
 		actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
 			logger.Debug(fmt.Sprintf("writing screenshot to file %s", filename))
@@ -162,7 +172,7 @@ func (d *DynamicFetcher) Fetch(urlStr string, opts FetchOpts) (string, error) {
 	}
 
 	if config.Debug {
-		writeHTMLToFile(urlStr, body)
+		writeHTMLToFile(ctx, urlStr, body, d.DebugDir)
 	}
 	return body, nil
 }

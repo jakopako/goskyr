@@ -49,7 +49,7 @@ func (s *StaticFetcher) Fetch(ctx context.Context, url string, opts FetchOpts) (
 	}
 	resString = string(bytes)
 	if config.Debug {
-		writeHTMLToFile(ctx, url, resString)
+		writeHTMLToFile(ctx, url, resString, s.DebugDir)
 	}
 	return resString, nil
 }

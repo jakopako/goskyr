@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"path"
 	"time"
 
 	"github.com/chromedp/cdproto/browser"
@@ -136,13 +137,21 @@ func (d *DynamicFetcher) Fetch(ctx context.Context, urlStr string, opts FetchOpt
 	}))
 
 	if config.Debug {
+		// ensure debug directory exists
+		if d.DebugDir != "" {
+			err := os.MkdirAll(d.DebugDir, os.ModePerm)
+			if err != nil {
+				return "", fmt.Errorf("failed to create debug directory: %v", err)
+			}
+		}
+
 		u, _ := url.Parse(urlStr)
 		var buf []byte
 		r, err := utils.RandomString(u.Host)
 		if err != nil {
 			return "", err
 		}
-		filename := fmt.Sprintf("%s.png", r)
+		filename := path.Join(d.DebugDir, fmt.Sprintf("%s.png", r))
 		actions = append(actions, chromedp.CaptureScreenshot(&buf))
 		actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
 			logger.Debug(fmt.Sprintf("writing screenshot to file %s", filename))
@@ -163,7 +172,7 @@ func (d *DynamicFetcher) Fetch(ctx context.Context, urlStr string, opts FetchOpt
 	}
 
 	if config.Debug {
-		writeHTMLToFile(ctx, urlStr, body)
+		writeHTMLToFile(ctx, urlStr, body, d.DebugDir)
 	}
 	return body, nil
 }

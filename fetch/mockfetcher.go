@@ -26,7 +26,7 @@ func NewMockFetcher(fc *FetcherConfig) *MockFetcher {
 func (d *MockFetcher) Fetch(ctx context.Context, urlStr string, opts FetchOpts) (string, error) {
 	if p, ok := d.pagesMap[urlStr]; ok {
 		if config.Debug {
-			writeHTMLToFile(ctx, urlStr, p)
+			writeHTMLToFile(ctx, urlStr, p, d.DebugDir)
 		}
 		return p, nil
 	}

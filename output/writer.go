@@ -31,6 +31,7 @@ type WriterConfig struct {
 	UriDryRun   string     `yaml:"uri_dryrun"`
 	UriStatus   string     `yaml:"uri_status"`
 	WriteStatus bool       `yaml:"write_status"`
+	BatchSize   int        `yaml:"batch_size,omitempty"`
 }
 
 // WriterType encapsulates the type of a writer

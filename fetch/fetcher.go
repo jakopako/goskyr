@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"path"
 
 	"github.com/jakopako/goskyr/log"
 	"github.com/jakopako/goskyr/types"
@@ -31,6 +32,7 @@ type FetcherConfig struct {
 	UserAgent      string      `yaml:"user_agent,omitempty"`
 	PageLoadWaitMS int         `yaml:"page_load_wait_ms,omitempty"`
 	MockPages      []MockPage  `yaml:"mock_pages,omitempty"`
+	DebugDir       string      `yaml:"debug_dir,omitempty"`
 }
 
 type FetchOpts struct {
@@ -59,15 +61,24 @@ func NewFetcher(fc *FetcherConfig) (Fetcher, error) {
 }
 
 // writeHTMLToFile writes the given HTML content to a file for debugging purposes.
-func writeHTMLToFile(ctx context.Context, urlStr, htmlStr string) error {
+func writeHTMLToFile(ctx context.Context, urlStr, htmlStr, dir string) error {
 	logger := log.LoggerFromContext(ctx)
+
+	// ensure debug directory exists
+	if dir != "" {
+		err := os.MkdirAll(dir, os.ModePerm)
+		if err != nil {
+			return fmt.Errorf("failed to create debug directory: %v", err)
+		}
+	}
+
 	u, _ := url.Parse(urlStr)
 	r, err := utils.RandomString(u.Host)
 	if err != nil {
 		return err
 	}
 
-	filename := fmt.Sprintf("%s.html", r)
+	filename := path.Join(dir, fmt.Sprintf("%s.html", r))
 	logger.Debug(fmt.Sprintf("writing html to file %s", filename), slog.String("url", urlStr))
 	f, err := os.Create(filename)
 	if err != nil {

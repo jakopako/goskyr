@@ -27,6 +27,9 @@ func NewAPIWriter(wc *WriterConfig) (*APIWriter, error) {
 	if wc.WriteStatus && wc.UriStatus == "" {
 		return nil, errors.New("if write_status is true, uri_status needs to be set")
 	}
+	if wc.BatchSize == 0 {
+		wc.BatchSize = 100 // default
+	}
 	return &APIWriter{
 		WriterConfig: wc,
 		logger:       slog.With(slog.String("writer", string(API_WRITER_TYPE))),
@@ -85,7 +88,7 @@ func (w *APIWriter) Write(itemChan <-chan map[string]any) {
 		}
 
 		batch = append(batch, item)
-		if len(batch) == 100 {
+		if len(batch) == w.BatchSize {
 			nrItemsWritten += w.writeBatch(client, batch)
 			batch = []map[string]any{}
 		}
@@ -145,7 +148,7 @@ func (w *APIWriter) writeBatch(client *http.Client, batch []map[string]any) int 
 		// in dry run mode we do not write anything to the api
 		return 0
 	} else {
-		if err := persistBatch(client, batch, w.Uri, w.User, w.Password); err != nil {
+		if err := w.persistBatch(client, batch, w.Uri, w.User, w.Password); err != nil {
 			w.logger.Error(fmt.Sprintf("error while posting batch: %v", err))
 			// not correct. With the latest api implementation it can happen that in one request some events are successfully written while others are not.
 			return 0
@@ -156,7 +159,7 @@ func (w *APIWriter) writeBatch(client *http.Client, batch []map[string]any) int 
 
 }
 
-func persistBatch(client *http.Client, batch []map[string]any, apiURL, apiUser, apiPassword string) error {
+func (w *APIWriter) persistBatch(client *http.Client, batch []map[string]any, apiURL, apiUser, apiPassword string) error {
 	concertJSON, err := json.Marshal(batch)
 	if err != nil {
 		return err
@@ -168,6 +171,7 @@ func persistBatch(client *http.Client, batch []map[string]any, apiURL, apiUser, 
 	req.SetBasicAuth(apiUser, apiPassword)
 	resp, err := client.Do(req)
 	if err != nil {
+		w.logger.Debug(fmt.Sprintf("post request body %s", concertJSON))
 		return fmt.Errorf("error while sending post request: %v", err)
 	}
 	defer resp.Body.Close()

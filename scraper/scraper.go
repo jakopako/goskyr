@@ -32,11 +32,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	UserAgentDefault = "goskyr web scraper (github.com/jakopako/goskyr)"
+	DebugDirDefault  = "debug"
+)
+
 // GlobalConfig is used for storing global configuration parameters that
 // are needed across all scrapers
 type GlobalConfig struct {
 	UserAgent string `yaml:"user_agent"`
-	// WriteScraperStatus bool   `yaml:"write_scraper_status,omitempty"` // if true, the scraper will write the status of each scraper to the writer. TODO: move to writer config?
+	// DebugDir is a directory where debug files (eg html files of fetched pages)
+	// are stored
+	DebugDir string `yaml:"debug_dir,omitempty"`
 }
 
 // Config defines the overall structure of the scraper configuration.
@@ -57,6 +64,7 @@ type Config struct {
 // in that directory and merge them into one Config struct.
 func NewConfig(configPath string) (*Config, error) {
 	var config Config
+
 	fileInfo, err := os.Stat(configPath)
 	if err != nil {
 		return nil, err
@@ -65,6 +73,7 @@ func NewConfig(configPath string) (*Config, error) {
 		err := filepath.WalkDir(configPath, func(path string, d fs.DirEntry, err error) error {
 			if !d.IsDir() {
 				var configTmp Config
+
 				if err := cleanenv.ReadConfig(path, &configTmp); err != nil {
 					return err
 				}
@@ -99,9 +108,18 @@ func NewConfig(configPath string) (*Config, error) {
 		}
 	}
 
+	// global defaults
 	if config.Global == nil {
 		config.Global = &GlobalConfig{
-			UserAgent: "goskyr web scraper (github.com/jakopako/goskyr)",
+			UserAgent: UserAgentDefault,
+			DebugDir:  DebugDirDefault,
+		}
+	} else {
+		if config.Global.UserAgent == "" {
+			config.Global.UserAgent = UserAgentDefault
+		}
+		if config.Global.DebugDir == "" {
+			config.Global.DebugDir = DebugDirDefault
 		}
 	}
 
@@ -326,7 +344,7 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScraperResult
 	scrLogger := slog.New(handler).With(slog.String("name", c.Name))
 	ctx = log.ContextWithLogger(ctx, scrLogger)
 
-	// initialize fetcher
+	// set fetcher config defaults
 	// default fetcher type is static
 	if c.FetcherConfig.Type == "" {
 		c.FetcherConfig.Type = fetch.STATIC_FETCHER_TYPE
@@ -337,6 +355,12 @@ func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScraperResult
 		c.FetcherConfig.UserAgent = globalConfig.UserAgent
 	}
 
+	// if local DebugDir empty, set global one
+	if c.FetcherConfig.DebugDir == "" {
+		c.FetcherConfig.DebugDir = globalConfig.DebugDir
+	}
+
+	// initialize fetcher
 	fetcher, err := fetch.NewFetcher(&c.FetcherConfig)
 	if err != nil {
 		return nil, err

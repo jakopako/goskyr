@@ -948,7 +948,7 @@ func getURLString(e *ElementLocation, s *goquery.Selection, baseURL string) (str
 	return urlRes, nil
 }
 
-func getTextString(e *ElementLocation, s *goquery.Selection) (string, error) {
+func getTextStrings(e *ElementLocation, s *goquery.Selection) ([]string, error) {
 	var fieldStrings []string
 	var fieldSelection *goquery.Selection
 	if e.Selector == "" {
@@ -1024,7 +1024,7 @@ func getTextString(e *ElementLocation, s *goquery.Selection) (string, error) {
 	for i, f := range fieldStrings {
 		fieldString, err := extractJsonField(e.JsonSelector, f)
 		if err != nil {
-			return "", err
+			return []string{}, err
 		}
 		fieldStrings[i] = fieldString
 	}
@@ -1032,7 +1032,7 @@ func getTextString(e *ElementLocation, s *goquery.Selection) (string, error) {
 	for i, f := range fieldStrings {
 		fieldString, err := extractStringRegex(&e.RegexExtract, f)
 		if err != nil {
-			return "", err
+			return []string{}, err
 		}
 		fieldStrings[i] = fieldString
 	}
@@ -1045,11 +1045,22 @@ func getTextString(e *ElementLocation, s *goquery.Selection) (string, error) {
 	for i, f := range fieldStrings {
 		fieldStrings[i] = utils.ShortenString(f, e.MaxLength)
 	}
+
+	return fieldStrings, nil
+}
+
+func getTextString(e *ElementLocation, s *goquery.Selection) (string, error) {
+	fieldStrings, err := getTextStrings(e, s)
+	if err != nil {
+		return "", nil
+	}
+
 	finalString := strings.Join(fieldStrings, e.Separator)
 
 	if finalString == "" && e.Default != "" {
 		return e.Default, nil
 	}
+
 	return finalString, nil
 }
 

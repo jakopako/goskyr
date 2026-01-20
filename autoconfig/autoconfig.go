@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -17,6 +18,7 @@ import (
 // If removeStaticFields is true, fields that have static values will be removed from the configuration.
 // modelName and wordsDir are used for text analysis to predict field names.
 func GenerateConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool, modelName, wordsDir string, interactive bool) error {
+	slog.Info(fmt.Sprintf("analyzing url %s", s.URL))
 	if s.URL == "" {
 		return errors.New("URL field cannot be empty")
 	}

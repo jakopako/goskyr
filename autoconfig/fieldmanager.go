@@ -346,7 +346,7 @@ func (fm *fieldManager) process(minCount int, removeStaticFields bool, modelName
 	fm.squash(minCount)
 	fm.filter(minCount, removeStaticFields)
 	fm.setColors()
-	return fm.findFieldNames(modelName, wordsDir)
+	return fm.labelFields(lablerConfig)
 }
 
 // fieldSelection either shows an interactive table for selecting fields (interactive=true)
@@ -648,8 +648,8 @@ func (fm fieldManager) setColors() {
 	}
 }
 
-// findFieldNames uses a labler model to predict field names
-func (fm fieldManager) findFieldNames(modelName, wordsDir string) error {
+// labelFields uses a labler model to predict field names
+func (fm fieldManager) labelFields(modelName, wordsDir string) error {
 	if modelName != "" {
 		ll, err := ml.LoadLabler(modelName, wordsDir)
 		if err != nil {

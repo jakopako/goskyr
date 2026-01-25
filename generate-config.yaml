@@ -1,0 +1,6 @@
+generate:
+  min_occurrences: 5
+  remove_static_fields: true
+  labler:
+    type: "local-random-forest" # options: local-random-forest, remote-llm
+    model_path: "models/random_forest_model.pkl" # only for local-random-forest

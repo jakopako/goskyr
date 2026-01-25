@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/jakopako/goskyr/config"
 	"github.com/jakopako/goskyr/log"
 )
 
@@ -48,7 +47,7 @@ func (s *StaticFetcher) Fetch(ctx context.Context, url string, opts FetchOpts) (
 		return resString, err
 	}
 	resString = string(bytes)
-	if config.Debug {
+	if log.Debug {
 		writeHTMLToFile(ctx, url, resString, s.DebugDir)
 	}
 	return resString, nil

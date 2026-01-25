@@ -52,7 +52,7 @@ var NonAlphaFeatureList []string = []string{
 // ExtractFeatures extracts features based on a given configuration and a directory
 // containing words of different languages. Those features can then be used to train
 // a ML model to automatically classify scraped fields for new websites.
-func ExtractFeatures(config *scraper.Config, featureFile, wordsDir string) error {
+func ExtractFeatures(config *scraper.ScraperConfig, featureFile, wordsDir string) error {
 	var calcWg sync.WaitGroup
 	var writerWg sync.WaitGroup
 	wordMap, err := loadWords(wordsDir)
@@ -136,7 +136,7 @@ func writeFeaturesToFile(filename string, featuresChan <-chan *Features, wg *syn
 	writer.Flush()
 }
 
-func calculateScraperFeatures(s scraper.Scraper, featuresChan chan<- *Features, wordMap map[string]bool, globalConfig *scraper.GlobalConfig, wg *sync.WaitGroup) {
+func calculateScraperFeatures(s scraper.Scraper, featuresChan chan<- *Features, wordMap map[string]bool, globalConfig *scraper.GlobalScraperConfig, wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Printf("calculating features for %s\n", s.Name)
 	result, err := s.Scrape(globalConfig, true)

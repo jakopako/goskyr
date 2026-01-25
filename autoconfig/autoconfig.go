@@ -17,7 +17,7 @@ import (
 // minOcc specifies the minimum occurrences a field must have to be included.
 // If removeStaticFields is true, fields that have static values will be removed from the configuration.
 // modelName and wordsDir are used for text analysis to predict field names.
-func GenerateConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool, modelName, wordsDir string, interactive bool) error {
+func GenerateConfig(s *scraper.Scraper, genConfig *scraper.GenConfig, minOcc int, removeStaticFields bool, interactive bool) error {
 	slog.Info(fmt.Sprintf("analyzing url %s", s.URL))
 	if s.URL == "" {
 		return errors.New("URL field cannot be empty")
@@ -53,7 +53,7 @@ func GenerateConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool, mod
 	}
 
 	fieldMgr := newFieldManagerFromHtml(htmlStr)
-	err = fieldMgr.process(minOcc, removeStaticFields, modelName, wordsDir)
+	err = fieldMgr.process(minOcc, removeStaticFields, lablerConfig)
 	if err != nil {
 		return err
 	}

@@ -17,7 +17,6 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/jakopako/goskyr/autoconfig"
-	"github.com/jakopako/goskyr/config"
 	"github.com/jakopako/goskyr/fetch"
 	"github.com/jakopako/goskyr/log"
 	"github.com/jakopako/goskyr/ml"
@@ -100,7 +99,7 @@ type ScrapeCmd struct {
 }
 
 func (scc *ScrapeCmd) Run() error {
-	config, err := scraper.NewConfig(scc.Config)
+	config, err := scraper.NewScraperConfig(scc.Config)
 	if err != nil {
 		slog.Error(fmt.Sprintf("%v", err))
 		return err
@@ -192,7 +191,7 @@ func (scc *ScrapeCmd) Run() error {
 	return nil
 }
 
-func worker(sc <-chan scraper.Scraper, ic chan<- map[string]any, stc chan<- types.ScraperStatus, gc *scraper.GlobalConfig, threadNr int) {
+func worker(sc <-chan scraper.Scraper, ic chan<- map[string]any, stc chan<- types.ScraperStatus, gc *scraper.GlobalScraperConfig, threadNr int) {
 	workerLogger := slog.With(slog.Int("thread", threadNr))
 	for s := range sc {
 		scraperLogger := workerLogger.With(slog.String("name", s.Name))
@@ -271,7 +270,7 @@ func (g *GenerateCmd) Run() error {
 		return err
 	}
 
-	c := scraper.Config{
+	c := scraper.ScraperConfig{
 		Scrapers: []scraper.Scraper{
 			*s,
 		},
@@ -313,7 +312,7 @@ type ExtractCmd struct {
 }
 
 func (e *ExtractCmd) Run() error {
-	config, err := scraper.NewConfig(e.Config)
+	config, err := scraper.NewScraperConfig(e.Config)
 	if err != nil {
 		slog.Error(fmt.Sprintf("%v", err))
 		return err
@@ -347,7 +346,7 @@ type ListCmd struct {
 }
 
 func (lc *ListCmd) Run() error {
-	config, err := scraper.NewConfig(lc.Config)
+	config, err := scraper.NewScraperConfig(lc.Config)
 	if err != nil {
 		if lc.Completion {
 			// in completion mode, we just return an empty output on error
@@ -390,9 +389,9 @@ func main() {
 			"version": string(cli.Version),
 		})
 
-	config.Debug = cli.Debug
-	// not very nice that the config package is global state,
-	// and that the following function relies on the config.Debug variable being set
+	log.Debug = cli.Debug
+	// not very nice that the log package contains global state,
+	// and that the following function relies on the log.Debug variable being set
 	log.InitializeDefaultLogger()
 
 	err := ctx.Run()

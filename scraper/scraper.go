@@ -21,7 +21,6 @@ import (
 	"github.com/antchfx/jsonquery"
 	"github.com/goodsign/monday"
 	"github.com/ilyakaznacheev/cleanenv"
-	"github.com/jakopako/goskyr/config"
 	"github.com/jakopako/goskyr/date"
 	"github.com/jakopako/goskyr/fetch"
 	"github.com/jakopako/goskyr/log"
@@ -37,33 +36,33 @@ const (
 	DebugDirDefault  = "debug"
 )
 
-// GlobalConfig is used for storing global configuration parameters that
+// GlobalScraperConfig is used for storing global configuration parameters that
 // are needed across all scrapers
-type GlobalConfig struct {
+type GlobalScraperConfig struct {
 	UserAgent string `yaml:"user_agent"`
 	// DebugDir is a directory where debug files (eg html files of fetched pages)
 	// are stored
 	DebugDir string `yaml:"debug_dir,omitempty"`
 }
 
-// Config defines the overall structure of the scraper configuration.
+// ScraperConfig defines the overall structure of the scraper configuration.
 // Values will be taken from a config yml file or environment variables
 // or both.
-type Config struct {
+type ScraperConfig struct {
 	// We cannot use a pointer for Writer otherwise reading from
 	// env vars for the Writer output.WriterConfig fields does
 	// not work with cleanenv.ReadConfig because it does not support
 	// nested structs with pointers
-	Writer   output.WriterConfig `yaml:"writer,omitempty"`
-	Scrapers []Scraper           `yaml:"scrapers,omitempty"`
-	Global   *GlobalConfig       `yaml:"global,omitempty"`
+	Writer   output.WriterConfig  `yaml:"writer,omitempty"`
+	Scrapers []Scraper            `yaml:"scrapers,omitempty"`
+	Global   *GlobalScraperConfig `yaml:"global,omitempty"`
 }
 
 // NewConfig reads a configuration file from the given path and returns
 // a Config struct. If the path is a directory it will read all files
 // in that directory and merge them into one Config struct.
-func NewConfig(configPath string) (*Config, error) {
-	var config Config
+func NewScraperConfig(configPath string) (*ScraperConfig, error) {
+	var config ScraperConfig
 
 	fileInfo, err := os.Stat(configPath)
 	if err != nil {
@@ -72,7 +71,7 @@ func NewConfig(configPath string) (*Config, error) {
 	if fileInfo.IsDir() {
 		err := filepath.WalkDir(configPath, func(path string, d fs.DirEntry, err error) error {
 			if !d.IsDir() {
-				var configTmp Config
+				var configTmp ScraperConfig
 
 				if err := cleanenv.ReadConfig(path, &configTmp); err != nil {
 					return err
@@ -110,7 +109,7 @@ func NewConfig(configPath string) (*Config, error) {
 
 	// global defaults
 	if config.Global == nil {
-		config.Global = &GlobalConfig{
+		config.Global = &GlobalScraperConfig{
 			UserAgent: UserAgentDefault,
 			DebugDir:  DebugDirDefault,
 		}
@@ -333,14 +332,14 @@ type ScraperResult struct {
 // only on the location are returned (ignore regex_extract??). And only those
 // of dynamic fields, ie fields that don't have a predefined value and that are
 // present on the main page (not subpages). This is used by the ML feature generation.
-func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScraperResult, error) {
+func (c Scraper) Scrape(globalConfig *GlobalScraperConfig, rawDyn bool) (*ScraperResult, error) {
 	// we create a separate context so that we can pass a custom logger via context
 	ctx := context.Background()
 
 	var logBuffer bytes.Buffer
 
 	// initialize special logger with handler that writes to both stdout and logBuffer
-	handler := slog.NewTextHandler(io.MultiWriter(os.Stdout, &logBuffer), &slog.HandlerOptions{Level: config.GetLogLevel()})
+	handler := slog.NewTextHandler(io.MultiWriter(os.Stdout, &logBuffer), &slog.HandlerOptions{Level: log.GetLogLevel()})
 	scrLogger := slog.New(handler).With(slog.String("name", c.Name))
 	ctx = log.ContextWithLogger(ctx, scrLogger)
 

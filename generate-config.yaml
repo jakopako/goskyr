@@ -1,9 +1,9 @@
-min_occurrences: 10
+min_occurrences: 40
 distinct_values: true
 labler:
   type: "local-ml" # options: local-ml, remote-llm
-  model_path: "../croncert-config/concert-20230509-mod" # only for local-random-forest
-  words_dir: "../croncert-config/word-list" # only for local-random-forest
+  model_name: "ml-models/knn-types-v0.4.4" # only for local-ml
+  words_dir: "word-lists" # only for local-ml
 # fetcher:
 #   type: "dynamic"
 #   page_load_wait_ms: 2000§

@@ -16,10 +16,10 @@ import (
 )
 
 type Config struct {
-	MinOccurrences int                  `yaml:"min_occurrences"`
-	DistinctValues bool                 `yaml:"distinct_values"` // if true, only fields with distinct values will be included
-	LablerConfig   *LablerConfig        `yaml:"labler"`
-	FetcherConfig  *fetch.FetcherConfig `yaml:"fetcher"`
+	MinOccurrences int                 `yaml:"min_occurrences"`
+	DistinctValues bool                `yaml:"distinct_values"` // if true, only fields with distinct values will be included
+	LablerConfig   LablerConfig        `yaml:"labler"`
+	FetcherConfig  fetch.FetcherConfig `yaml:"fetcher"`
 }
 
 func NewConfigFromFile(path string) (*Config, error) {
@@ -49,7 +49,7 @@ func GenerateConfig(s *scraper.Scraper, gc *Config, interactive bool) error {
 	}
 	s.Name = s.URL
 
-	fetcher, err := fetch.NewFetcher(gc.FetcherConfig)
+	fetcher, err := fetch.NewFetcher(&gc.FetcherConfig)
 	if err != nil {
 		return fmt.Errorf("error creating fetcher: %v", err)
 	}

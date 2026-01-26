@@ -247,7 +247,7 @@ type GenerateCmd struct {
 	// WordLists      string `short:"w" default:"word-lists" help:"The directory that contains a number of files containing words of different languages, needed for extracting ML features." completion:"<directory>"`
 	// ModelName      string `short:"M" help:"The name to a pre-trained ML model to infer names of extracted fields." completion:"<file>"`
 	Stdout        bool   `short:"o" long:"stdout" help:"If set to true the the generated configuration will be written to stdout."`
-	ScraperConfig string `short:"s" long:"scraper-config" default:"./generated-scraper-config.yaml" help:"The file that the generated configuration will be written to." completion:"<file>"`
+	ScraperConfig string `short:"s" long:"scraper-config" default:"./config.yaml" help:"The file that the generated configuration will be written to." completion:"<file>"`
 	Interactive   bool   `short:"i" help:"If set to true, the user will be prompted to select which fields to include in the generated configuration interactively."`
 }
 
@@ -260,7 +260,7 @@ func (g *GenerateCmd) Run() error {
 
 	s := &scraper.Scraper{
 		URL:           g.URL,
-		FetcherConfig: *generateConfig.FetcherConfig,
+		FetcherConfig: generateConfig.FetcherConfig,
 	}
 
 	// if g.RenderJS {

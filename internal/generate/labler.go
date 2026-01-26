@@ -8,8 +8,8 @@ const (
 type LablerType string
 
 type LablerConfig struct {
-	LablerType LablerType
+	LablerType LablerType `yaml:"type"`
 	// Local ML labler config
-	ModelName string
-	WordsDir  string
+	ModelName string `yaml:"model_name,omitempty"`
+	WordsDir  string `yaml:"words_dir,omitempty"`
 }

@@ -345,7 +345,7 @@ func (fm *fieldManager) process(config *Config) error {
 	fm.squash(config.MinOccurrences)
 	fm.filter(config.MinOccurrences, config.DistinctValues)
 	fm.setColors()
-	return fm.labelFields(config.LablerConfig)
+	return fm.labelFields(&config.LablerConfig)
 }
 
 // fieldSelection either shows an interactive table for selecting fields (interactive=true)

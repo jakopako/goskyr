@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/jakopako/goskyr/log"
+	"github.com/jakopako/goskyr/internal/log"
 )
 
 type MockFetcher struct {

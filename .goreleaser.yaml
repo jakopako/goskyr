@@ -1,6 +1,6 @@
 builds:
   - id: darwin-amd64
-    main: ./
+    main: ./cmd/goskyr/
     binary: goskyr
     goos:
       - darwin
@@ -15,7 +15,7 @@ builds:
     ldflags:
       - -s -w -X main.version={{.Version}}
   - id: darwin-arm64
-    main: ./
+    main: ./cmd/goskyr/
     binary: goskyr
     goos:
       - darwin
@@ -30,7 +30,7 @@ builds:
     ldflags:
       - -s -w -X main.version={{.Version}}
   - id: linux-amd64
-    main: ./
+    main: ./cmd/goskyr/
     binary: goskyr
     goos:
       - linux
@@ -45,7 +45,7 @@ builds:
     ldflags:
       - -s -w -X main.version={{.Version}}
   - id: linux-armhf
-    main: ./
+    main: ./cmd/goskyr/
     binary: goskyr
     goos:
       - linux
@@ -62,7 +62,7 @@ builds:
     ldflags:
       - -s -w -X main.version={{.Version}}
   - id: windows-amd64
-    main: ./
+    main: ./cmd/goskyr/
     binary: goskyr
     goos:
       - windows
@@ -77,7 +77,7 @@ builds:
     ldflags:
       - -s -w -X main.version={{.Version}}
   - id: windows-arm64
-    main: ./
+    main: ./cmd/goskyr/
     binary: goskyr
     goos:
       - windows

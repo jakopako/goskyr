@@ -2,7 +2,7 @@
 html_pages
 dist/
 test-file.json
-config.yml
+generated-scraper-config.yaml
 goskyr.class
 goskyr.model
 .release-env

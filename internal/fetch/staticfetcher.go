@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/jakopako/goskyr/log"
+	"github.com/jakopako/goskyr/internal/log"
 )
 
 // The StaticFetcher fetches static page content

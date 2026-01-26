@@ -14,9 +14,9 @@ import (
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
-	"github.com/jakopako/goskyr/log"
-	"github.com/jakopako/goskyr/types"
-	"github.com/jakopako/goskyr/utils"
+	"github.com/jakopako/goskyr/internal/log"
+	"github.com/jakopako/goskyr/internal/types"
+	"github.com/jakopako/goskyr/internal/utils"
 )
 
 // The DynamicFetcher renders js

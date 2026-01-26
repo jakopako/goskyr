@@ -21,19 +21,14 @@ import (
 	"github.com/antchfx/jsonquery"
 	"github.com/goodsign/monday"
 	"github.com/ilyakaznacheev/cleanenv"
-	"github.com/jakopako/goskyr/date"
-	"github.com/jakopako/goskyr/fetch"
-	"github.com/jakopako/goskyr/log"
-	"github.com/jakopako/goskyr/output"
-	"github.com/jakopako/goskyr/types"
-	"github.com/jakopako/goskyr/utils"
+	"github.com/jakopako/goskyr/internal/date"
+	"github.com/jakopako/goskyr/internal/fetch"
+	"github.com/jakopako/goskyr/internal/log"
+	"github.com/jakopako/goskyr/internal/output"
+	"github.com/jakopako/goskyr/internal/types"
+	"github.com/jakopako/goskyr/internal/utils"
 	"golang.org/x/net/html"
 	"gopkg.in/yaml.v3"
-)
-
-const (
-	UserAgentDefault = "goskyr web scraper (github.com/jakopako/goskyr)"
-	DebugDirDefault  = "debug"
 )
 
 // GlobalScraperConfig is used for storing global configuration parameters that
@@ -107,41 +102,21 @@ func NewScraperConfig(configPath string) (*ScraperConfig, error) {
 		}
 	}
 
-	// global defaults
-	if config.Global == nil {
-		config.Global = &GlobalScraperConfig{
-			UserAgent: UserAgentDefault,
-			DebugDir:  DebugDirDefault,
-		}
-	} else {
-		if config.Global.UserAgent == "" {
-			config.Global.UserAgent = UserAgentDefault
-		}
-		if config.Global.DebugDir == "" {
-			config.Global.DebugDir = DebugDirDefault
+	// copy global config values to scrapers if not set locally
+	if config.Global != nil {
+		for i, scr := range config.Scrapers {
+			if scr.FetcherConfig.UserAgent == "" && config.Global.UserAgent != "" {
+				config.Scrapers[i].FetcherConfig.UserAgent = config.Global.UserAgent
+			}
+			if scr.FetcherConfig.DebugDir == "" && config.Global.DebugDir != "" {
+				config.Scrapers[i].FetcherConfig.DebugDir = config.Global.DebugDir
+			}
 		}
 	}
 
 	// default to stdout writer
 	if config.Writer.Type == "" {
 		config.Writer.Type = output.STDOUT_WRITER_TYPE
-	}
-
-	// log warnings for depricated fields
-	hasLogged := map[string]bool{}
-	for _, s := range config.Scrapers {
-		if s.RenderJs {
-			if !hasLogged["render_js"] {
-				slog.Warn("'render_js' is deprecated. Please use 'fetcher.type' instead")
-				hasLogged["render_js"] = true
-			}
-		}
-		if s.PageLoadWait > 0 {
-			if !hasLogged["page_load_wait"] {
-				slog.Warn("'page_load_wait' is deprecated. Please use 'fetcher.page_load_wait_ms' instead")
-				hasLogged["page_load_wait"] = true
-			}
-		}
 	}
 
 	return &config, nil
@@ -312,8 +287,6 @@ type Scraper struct {
 	Fields        []Field              `yaml:"fields,omitempty"`
 	Filters       []*Filter            `yaml:"filters,omitempty"`
 	Paginator     Paginator            `yaml:"paginator,omitempty"`
-	RenderJs      bool                 `yaml:"render_js,omitempty"`      // DEPRECATED
-	PageLoadWait  int                  `yaml:"page_load_wait,omitempty"` // DEPRECATED (milliseconds. Only taken into account when render_js = true)
 	Interaction   []*types.Interaction `yaml:"interaction,omitempty"`
 	FetcherConfig fetch.FetcherConfig  `yaml:"fetcher"`
 	fetcher       fetch.Fetcher
@@ -332,7 +305,7 @@ type ScraperResult struct {
 // only on the location are returned (ignore regex_extract??). And only those
 // of dynamic fields, ie fields that don't have a predefined value and that are
 // present on the main page (not subpages). This is used by the ML feature generation.
-func (c Scraper) Scrape(globalConfig *GlobalScraperConfig, rawDyn bool) (*ScraperResult, error) {
+func (c Scraper) Scrape(rawDyn bool) (*ScraperResult, error) {
 	// we create a separate context so that we can pass a custom logger via context
 	ctx := context.Background()
 
@@ -344,19 +317,8 @@ func (c Scraper) Scrape(globalConfig *GlobalScraperConfig, rawDyn bool) (*Scrape
 	ctx = log.ContextWithLogger(ctx, scrLogger)
 
 	// set fetcher config defaults
-	// default fetcher type is static
 	if c.FetcherConfig.Type == "" {
-		c.FetcherConfig.Type = fetch.STATIC_FETCHER_TYPE
-	}
-
-	// if local UserAgent empty, set global one
-	if c.FetcherConfig.UserAgent == "" {
-		c.FetcherConfig.UserAgent = globalConfig.UserAgent
-	}
-
-	// if local DebugDir empty, set global one
-	if c.FetcherConfig.DebugDir == "" {
-		c.FetcherConfig.DebugDir = globalConfig.DebugDir
+		c.FetcherConfig.Type = fetch.DefaultFetcherType()
 	}
 
 	// initialize fetcher

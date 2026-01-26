@@ -1,4 +1,4 @@
-package autoconfig
+package generate
 
 import (
 	"cmp"
@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell/v2"
-	"github.com/jakopako/goskyr/date"
-	"github.com/jakopako/goskyr/ml"
-	"github.com/jakopako/goskyr/scraper"
-	"github.com/jakopako/goskyr/utils"
+	"github.com/jakopako/goskyr/internal/date"
+	"github.com/jakopako/goskyr/internal/ml"
+	"github.com/jakopako/goskyr/internal/scraper"
+	"github.com/jakopako/goskyr/internal/utils"
 	"github.com/rivo/tview"
 	"golang.org/x/net/html"
 )
@@ -340,13 +340,12 @@ func (fm *fieldManager) equals(fm2 *fieldManager) bool {
 }
 
 // process processes the fieldManager by squashing similar fieldProps,
-// filtering based on minCount and removeStaticFields and setting colors
-// and field names
-func (fm *fieldManager) process(minCount int, removeStaticFields bool, modelName, wordsDir string) error {
-	fm.squash(minCount)
-	fm.filter(minCount, removeStaticFields)
+// filtering based the config and setting colors and field names
+func (fm *fieldManager) process(config *Config) error {
+	fm.squash(config.MinOccurrences)
+	fm.filter(config.MinOccurrences, config.DistinctValues)
 	fm.setColors()
-	return fm.labelFields(lablerConfig)
+	return fm.labelFields(config.LablerConfig)
 }
 
 // fieldSelection either shows an interactive table for selecting fields (interactive=true)
@@ -649,9 +648,9 @@ func (fm fieldManager) setColors() {
 }
 
 // labelFields uses a labler model to predict field names
-func (fm fieldManager) labelFields(modelName, wordsDir string) error {
-	if modelName != "" {
-		ll, err := ml.LoadLabler(modelName, wordsDir)
+func (fm fieldManager) labelFields(lc *LablerConfig) error {
+	if lc.ModelName != "" {
+		ll, err := ml.LoadLabler(lc.ModelName, lc.WordsDir)
 		if err != nil {
 			return err
 		}

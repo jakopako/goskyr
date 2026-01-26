@@ -12,7 +12,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/jakopako/goskyr/types"
+	"github.com/jakopako/goskyr/internal/types"
 )
 
 // APIWriter represents a writer that writes to a custom API.

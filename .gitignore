@@ -2,6 +2,7 @@
 html_pages
 dist/
 test-file.json
+config.yaml
 generated-scraper-config.yaml
 goskyr.class
 goskyr.model

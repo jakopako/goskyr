@@ -1,9 +1,9 @@
-min_occurrences: 40
+min_occurrences: 20
 distinct_values: true
 labler:
-  type: "local-ml" # options: local-ml, remote-llm
+  type: "local-ml" # options: basic, local-ml, remote-llm
   model_name: "ml-models/knn-types-v0.4.4" # only for local-ml
   words_dir: "word-lists" # only for local-ml
 # fetcher:
 #   type: "dynamic"
-#   page_load_wait_ms: 2000§
+#   page_load_wait_ms: 2000

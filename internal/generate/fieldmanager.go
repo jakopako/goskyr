@@ -10,7 +10,6 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/jakopako/goskyr/internal/date"
-	"github.com/jakopako/goskyr/internal/ml"
 	"github.com/jakopako/goskyr/internal/scraper"
 	"github.com/jakopako/goskyr/internal/utils"
 	"github.com/rivo/tview"
@@ -647,30 +646,14 @@ func (fm fieldManager) setColors() {
 	}
 }
 
-// labelFields uses a labler model to predict field names
+// labelFields uses a labler to predict field names
 func (fm fieldManager) labelFields(lc *LablerConfig) error {
-	if lc.ModelName != "" {
-		ll, err := ml.LoadLabler(lc.ModelName, lc.WordsDir)
-		if err != nil {
-			return err
-		}
-		for _, e := range fm {
-			exampleStrs := []string{}
-			for _, ex := range e.examples {
-				exampleStrs = append(exampleStrs, ex.example)
-			}
-			pred, err := ll.PredictLabel(exampleStrs...)
-			if err != nil {
-				return err
-			}
-			e.name = pred // TODO: if label has occured already, add index (eg text-1, text-2...)
-		}
-	} else {
-		for i, e := range fm {
-			e.name = fmt.Sprintf("field-%d", i)
-		}
+	labler, err := newLabler(lc)
+	if err != nil {
+		return err
 	}
-	return nil
+
+	return labler.labelFields(fm)
 }
 
 // getTagMetadata, for a given node returns a map of key value pairs (only for the attriutes we're interested in) and

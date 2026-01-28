@@ -9,9 +9,9 @@ import (
 	"os"
 	"path"
 
-	"github.com/jakopako/goskyr/log"
-	"github.com/jakopako/goskyr/types"
-	"github.com/jakopako/goskyr/utils"
+	"github.com/jakopako/goskyr/internal/log"
+	"github.com/jakopako/goskyr/internal/types"
+	"github.com/jakopako/goskyr/internal/utils"
 )
 
 type FetcherType string
@@ -20,6 +20,10 @@ const (
 	STATIC_FETCHER_TYPE  FetcherType = "static"
 	DYNAMIC_FETCHER_TYPE FetcherType = "dynamic"
 	MOCK_FETCHER_TYPE    FetcherType = "mock"
+
+	// default values
+	UserAgentDefault = "goskyr web scraper (github.com/jakopako/goskyr)"
+	DebugDirDefault  = "debug"
 )
 
 type MockPage struct {
@@ -48,6 +52,14 @@ type Fetcher interface {
 }
 
 func NewFetcher(fc *FetcherConfig) (Fetcher, error) {
+	// set defaults
+	if fc.UserAgent == "" {
+		fc.UserAgent = UserAgentDefault
+	}
+	if fc.DebugDir == "" {
+		fc.DebugDir = DebugDirDefault
+	}
+
 	switch fc.Type {
 	case STATIC_FETCHER_TYPE:
 		return NewStaticFetcher(fc), nil
@@ -58,6 +70,11 @@ func NewFetcher(fc *FetcherConfig) (Fetcher, error) {
 	default:
 		return nil, fmt.Errorf("fetcher of type %s not implemented", fc.Type)
 	}
+}
+
+// DefaultFetcherType returns the default fetcher type (static).
+func DefaultFetcherType() FetcherType {
+	return STATIC_FETCHER_TYPE
 }
 
 // writeHTMLToFile writes the given HTML content to a file for debugging purposes.

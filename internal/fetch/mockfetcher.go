@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/jakopako/goskyr/config"
+	"github.com/jakopako/goskyr/internal/log"
 )
 
 type MockFetcher struct {
@@ -25,7 +25,7 @@ func NewMockFetcher(fc *FetcherConfig) *MockFetcher {
 
 func (d *MockFetcher) Fetch(ctx context.Context, urlStr string, opts FetchOpts) (string, error) {
 	if p, ok := d.pagesMap[urlStr]; ok {
-		if config.Debug {
+		if log.Debug {
 			writeHTMLToFile(ctx, urlStr, p, d.DebugDir)
 		}
 		return p, nil

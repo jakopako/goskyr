@@ -9,7 +9,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/jakopako/goskyr/types"
+	"github.com/jakopako/goskyr/internal/types"
 )
 
 const (

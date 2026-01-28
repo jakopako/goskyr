@@ -1,4 +1,4 @@
-package autoconfig
+package generate
 
 import "testing"
 

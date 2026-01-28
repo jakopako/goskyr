@@ -1,4 +1,4 @@
-package autoconfig
+package generate
 
 import (
 	"cmp"
@@ -9,10 +9,9 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell/v2"
-	"github.com/jakopako/goskyr/date"
-	"github.com/jakopako/goskyr/ml"
-	"github.com/jakopako/goskyr/scraper"
-	"github.com/jakopako/goskyr/utils"
+	"github.com/jakopako/goskyr/internal/date"
+	"github.com/jakopako/goskyr/internal/scraper"
+	"github.com/jakopako/goskyr/internal/utils"
 	"github.com/rivo/tview"
 	"golang.org/x/net/html"
 )
@@ -340,13 +339,12 @@ func (fm *fieldManager) equals(fm2 *fieldManager) bool {
 }
 
 // process processes the fieldManager by squashing similar fieldProps,
-// filtering based on minCount and removeStaticFields and setting colors
-// and field names
-func (fm *fieldManager) process(minCount int, removeStaticFields bool, modelName, wordsDir string) error {
-	fm.squash(minCount)
-	fm.filter(minCount, removeStaticFields)
+// filtering based the config and setting colors and field names
+func (fm *fieldManager) process(config *Config) error {
+	fm.squash(config.MinOccurrences)
+	fm.filter(config.MinOccurrences, config.DistinctValues)
 	fm.setColors()
-	return fm.findFieldNames(modelName, wordsDir)
+	return fm.labelFields(&config.LablerConfig)
 }
 
 // fieldSelection either shows an interactive table for selecting fields (interactive=true)
@@ -648,30 +646,14 @@ func (fm fieldManager) setColors() {
 	}
 }
 
-// findFieldNames uses a labler model to predict field names
-func (fm fieldManager) findFieldNames(modelName, wordsDir string) error {
-	if modelName != "" {
-		ll, err := ml.LoadLabler(modelName, wordsDir)
-		if err != nil {
-			return err
-		}
-		for _, e := range fm {
-			exampleStrs := []string{}
-			for _, ex := range e.examples {
-				exampleStrs = append(exampleStrs, ex.example)
-			}
-			pred, err := ll.PredictLabel(exampleStrs...)
-			if err != nil {
-				return err
-			}
-			e.name = pred // TODO: if label has occured already, add index (eg text-1, text-2...)
-		}
-	} else {
-		for i, e := range fm {
-			e.name = fmt.Sprintf("field-%d", i)
-		}
+// labelFields uses a labler to predict field names
+func (fm fieldManager) labelFields(lc *LablerConfig) error {
+	labler, err := newLabler(lc)
+	if err != nil {
+		return err
 	}
-	return nil
+
+	return labler.labelFields(fm)
 }
 
 // getTagMetadata, for a given node returns a map of key value pairs (only for the attriutes we're interested in) and

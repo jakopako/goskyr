@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/jakopako/goskyr/types"
+	"github.com/jakopako/goskyr/internal/types"
 )
 
 // StdoutWriter represents a writer that writes to stdout

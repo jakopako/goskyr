@@ -14,10 +14,9 @@ import (
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
-	"github.com/jakopako/goskyr/config"
-	"github.com/jakopako/goskyr/log"
-	"github.com/jakopako/goskyr/types"
-	"github.com/jakopako/goskyr/utils"
+	"github.com/jakopako/goskyr/internal/log"
+	"github.com/jakopako/goskyr/internal/types"
+	"github.com/jakopako/goskyr/internal/utils"
 )
 
 // The DynamicFetcher renders js
@@ -67,7 +66,7 @@ func (d *DynamicFetcher) Fetch(ctx context.Context, urlStr string, opts FetchOpt
 	actions := []chromedp.Action{}
 
 	// log chrome version in debug mode
-	if config.Debug {
+	if log.Debug {
 		actions = append(actions, chromedp.ActionFunc(func(ctx context.Context) error {
 			protocolVersion, product, revision, userAgent, jsVersion, err := browser.GetVersion().Do(ctx)
 			if err != nil {
@@ -136,7 +135,7 @@ func (d *DynamicFetcher) Fetch(ctx context.Context, urlStr string, opts FetchOpt
 		return err
 	}))
 
-	if config.Debug {
+	if log.Debug {
 		// ensure debug directory exists
 		if d.DebugDir != "" {
 			err := os.MkdirAll(d.DebugDir, os.ModePerm)
@@ -171,7 +170,7 @@ func (d *DynamicFetcher) Fetch(ctx context.Context, urlStr string, opts FetchOpt
 		return "", err
 	}
 
-	if config.Debug {
+	if log.Debug {
 		writeHTMLToFile(ctx, urlStr, body, d.DebugDir)
 	}
 	return body, nil

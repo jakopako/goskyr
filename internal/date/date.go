@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/jakopako/goskyr/utils"
+	"github.com/jakopako/goskyr/internal/utils"
 )
 
 // CoveredDateParts is used to determine what parts of a date a

@@ -2,13 +2,16 @@ package scraper
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/jakopako/goskyr/date"
+	"github.com/jakopako/goskyr/internal/date"
+	"github.com/jakopako/goskyr/internal/output"
 )
 
 const (
@@ -1229,6 +1232,218 @@ func TestGetRawDateComponents(t *testing.T) {
 
 			if !reflect.DeepEqual(test.expected, d) {
 				t.Fatalf("expected '%v' but got '%v'", test.expected, d)
+			}
+		})
+	}
+}
+
+func TestNewScraperConfig(t *testing.T) {
+	tests := map[string]struct {
+		setup       func(t *testing.T) string
+		cleanup     func(path string)
+		expectError bool
+		validate    func(t *testing.T, config *ScraperConfig)
+	}{
+		"single file config": {
+			setup: func(t *testing.T) string {
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+				content := `
+writer:
+  type: stdout
+scrapers:
+  - name: test
+    url: https://example.com
+    item: .item
+global:
+  user_agent: TestAgent
+`
+				if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+					t.Fatalf("failed to write config file: %v", err)
+				}
+				return configPath
+			},
+			validate: func(t *testing.T, config *ScraperConfig) {
+				if config.Writer.Type != "stdout" {
+					t.Errorf("expected writer type stdout, got %s", config.Writer.Type)
+				}
+				if len(config.Scrapers) != 1 {
+					t.Errorf("expected 1 scraper, got %d", len(config.Scrapers))
+				}
+				if config.Global.UserAgent != "TestAgent" {
+					t.Errorf("expected user agent TestAgent, got %s", config.Global.UserAgent)
+				}
+				if config.Scrapers[0].FetcherConfig.UserAgent != "TestAgent" {
+					t.Errorf("expected scraper user agent TestAgent (inherit from global config), got %s", config.Scrapers[0].FetcherConfig.UserAgent)
+				}
+			},
+		},
+		"directory with multiple files": {
+			setup: func(t *testing.T) string {
+				tmpDir := t.TempDir()
+				content1 := `
+scrapers:
+  - name: test1
+    url: https://example.com
+    item: .item
+`
+				content2 := `
+scrapers:
+  - name: test2
+    url: https://example2.com
+    item: .item2
+writer:
+  type: stdout
+`
+				if err := os.WriteFile(filepath.Join(tmpDir, "config1.yml"), []byte(content1), 0644); err != nil {
+					t.Fatalf("failed to write config1: %v", err)
+				}
+				if err := os.WriteFile(filepath.Join(tmpDir, "config2.yml"), []byte(content2), 0644); err != nil {
+					t.Fatalf("failed to write config2: %v", err)
+				}
+				return tmpDir
+			},
+			validate: func(t *testing.T, config *ScraperConfig) {
+				if len(config.Scrapers) != 2 {
+					t.Errorf("expected 2 scrapers, got %d", len(config.Scrapers))
+				}
+				if config.Writer.Type != "stdout" {
+					t.Errorf("expected writer type stdout, got %s", config.Writer.Type)
+				}
+			},
+		},
+		"default writer type": {
+			setup: func(t *testing.T) string {
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+				content := `
+scrapers:
+  - name: test
+    url: https://example.com
+    item: .item
+`
+				if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+					t.Fatalf("failed to write config file: %v", err)
+				}
+				return configPath
+			},
+			validate: func(t *testing.T, config *ScraperConfig) {
+				if config.Writer.Type != output.STDOUT_WRITER_TYPE {
+					t.Errorf("expected default writer type, got %s", config.Writer.Type)
+				}
+			},
+		},
+		"global config propagation": {
+			setup: func(t *testing.T) string {
+				tmpDir := t.TempDir()
+				configPath := filepath.Join(tmpDir, "config.yml")
+				content := `
+global:
+  user_agent: CustomAgent
+  debug_dir: /tmp/debug
+scrapers:
+  - name: test
+    url: https://example.com
+    item: .item
+`
+				if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+					t.Fatalf("failed to write config file: %v", err)
+				}
+				return configPath
+			},
+			validate: func(t *testing.T, config *ScraperConfig) {
+				if len(config.Scrapers) != 1 {
+					t.Fatalf("expected 1 scraper, got %d", len(config.Scrapers))
+				}
+				if config.Scrapers[0].FetcherConfig.UserAgent != "CustomAgent" {
+					t.Errorf("expected user agent CustomAgent, got %s", config.Scrapers[0].FetcherConfig.UserAgent)
+				}
+				if config.Scrapers[0].FetcherConfig.DebugDir != "/tmp/debug" {
+					t.Errorf("expected debug dir /tmp/debug, got %s", config.Scrapers[0].FetcherConfig.DebugDir)
+				}
+			},
+		},
+		"multiple writer configs error": {
+			setup: func(t *testing.T) string {
+				tmpDir := t.TempDir()
+				content1 := `
+writer:
+  type: stdout
+scrapers:
+  - name: test
+    url: https://example.com
+    item: .item
+`
+				content2 := `
+writer:
+  type: csv
+scrapers:
+  - name: test2
+    url: https://example2.com
+    item: .item2
+`
+				if err := os.WriteFile(filepath.Join(tmpDir, "config1.yml"), []byte(content1), 0644); err != nil {
+					t.Fatalf("failed to write config1: %v", err)
+				}
+				if err := os.WriteFile(filepath.Join(tmpDir, "config2.yml"), []byte(content2), 0644); err != nil {
+					t.Fatalf("failed to write config2: %v", err)
+				}
+				return tmpDir
+			},
+			expectError: true,
+		},
+		"multiple global configs error": {
+			setup: func(t *testing.T) string {
+				tmpDir := t.TempDir()
+				content1 := `
+global:
+  user_agent: Agent1
+scrapers:
+  - name: test
+    url: https://example.com
+    item: .item
+`
+				content2 := `
+global:
+  user_agent: Agent2
+scrapers:
+  - name: test2
+    url: https://example2.com
+    item: .item2
+`
+				if err := os.WriteFile(filepath.Join(tmpDir, "config1.yml"), []byte(content1), 0644); err != nil {
+					t.Fatalf("failed to write config1: %v", err)
+				}
+				if err := os.WriteFile(filepath.Join(tmpDir, "config2.yml"), []byte(content2), 0644); err != nil {
+					t.Fatalf("failed to write config2: %v", err)
+				}
+				return tmpDir
+			},
+			expectError: true,
+		},
+		"nonexistent path error": {
+			setup: func(t *testing.T) string {
+				return "/nonexistent/path/config.yml"
+			},
+			expectError: true,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			configPath := test.setup(t)
+			config, err := NewScraperConfig(configPath)
+			if err != nil {
+				if !test.expectError {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if test.expectError {
+				t.Fatal("expected error but got nil")
+			}
+			if test.validate != nil {
+				test.validate(t, config)
 			}
 		})
 	}

@@ -4,16 +4,25 @@ import (
 	"context"
 	"log/slog"
 	"os"
+)
 
-	"github.com/jakopako/goskyr/config"
+var (
+	Debug bool
 )
 
 const (
 	LoggerCtxKey = "logger"
 )
 
+func GetLogLevel() slog.Level {
+	if Debug {
+		return slog.LevelDebug
+	}
+	return slog.LevelInfo
+}
+
 func InitializeDefaultLogger() {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: config.GetLogLevel()}))
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: GetLogLevel()}))
 	slog.SetDefault(logger)
 }
 

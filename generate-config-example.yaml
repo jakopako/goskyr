@@ -5,8 +5,6 @@ labler:
   model_name: "ml-models/knn-types-v0.4.4" # only for local-ml
   words_dir: "word-lists" # only for local-ml
   api_key: "API_KEY" # only for remote-llm
-  llm_provider: "googleai" # only for remote-llm, options: openai, googleai
-  llm_model: "gemini-2.5-flash" # only for remote-llm
 # fetcher:
 #   type: "dynamic"
 #   page_load_wait_ms: 2000

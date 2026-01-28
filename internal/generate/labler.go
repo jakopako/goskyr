@@ -1,9 +1,12 @@
 package generate
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/jakopako/goskyr/internal/ml"
+	"github.com/tmc/langchaingo/llms"
+	"github.com/tmc/langchaingo/llms/googleai"
 )
 
 const (
@@ -20,6 +23,8 @@ type LablerConfig struct {
 	// Local ML labler config
 	ModelName string `yaml:"model_name,omitempty"`
 	WordsDir  string `yaml:"words_dir,omitempty"`
+	// Remote LLM labler config
+	ApiKey string `yaml:"api_key,omitempty"`
 }
 
 // labler is an interface for labeling fields in a fieldManager
@@ -35,7 +40,7 @@ func newLabler(lc *LablerConfig) (labler, error) {
 	case LABLER_TYPE_LOCAL_ML:
 		return newLocalMLLabler(lc)
 	case LABLER_TYPE_REMOTE_LLM:
-		return newRemoteLLMLabler(lc), nil
+		return newRemoteLLMLabler(lc)
 	default:
 		return nil, fmt.Errorf("labler of type %s not implemented", lc.LablerType)
 	}
@@ -89,15 +94,27 @@ func (l *localMLLabler) labelFields(fm fieldManager) error {
 
 // remoteLLMLabler uses a remote LLM service to predict field names
 type remoteLLMLabler struct {
-	*LablerConfig
+	llm llms.Model
 }
 
-func newRemoteLLMLabler(lc *LablerConfig) *remoteLLMLabler {
-	return &remoteLLMLabler{
-		LablerConfig: lc,
+func newRemoteLLMLabler(lc *LablerConfig) (*remoteLLMLabler, error) {
+	gai, err := googleai.New(context.Background(), googleai.WithAPIKey(lc.ApiKey), googleai.WithDefaultModel("gemini-2.5-flash"))
+	if err != nil {
+		return nil, err
 	}
+
+	return &remoteLLMLabler{
+		llm: gai,
+	}, nil
 }
 
 func (r *remoteLLMLabler) labelFields(fm fieldManager) error {
+	prompt := "Who was the second person to walk on the moon?"
+	answer, err := llms.GenerateFromSinglePrompt(context.Background(), r.llm, prompt)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(answer)
 	return nil
 }

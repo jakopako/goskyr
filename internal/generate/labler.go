@@ -2,7 +2,9 @@ package generate
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/jakopako/goskyr/internal/ml"
 	"github.com/tmc/langchaingo/llms"
@@ -24,7 +26,8 @@ type LablerConfig struct {
 	ModelName string `yaml:"model_name,omitempty"`
 	WordsDir  string `yaml:"words_dir,omitempty"`
 	// Remote LLM labler config
-	ApiKey string `yaml:"api_key,omitempty"`
+	ApiKey   string   `yaml:"api_key,omitempty"`
+	LabelSet []string `yaml:"label_set,omitempty"`
 }
 
 // labler is an interface for labeling fields in a fieldManager
@@ -94,7 +97,8 @@ func (l *localMLLabler) labelFields(fm fieldManager) error {
 
 // remoteLLMLabler uses a remote LLM service to predict field names
 type remoteLLMLabler struct {
-	llm llms.Model
+	llm      llms.Model
+	labelSet []string
 }
 
 func newRemoteLLMLabler(lc *LablerConfig) (*remoteLLMLabler, error) {
@@ -104,17 +108,61 @@ func newRemoteLLMLabler(lc *LablerConfig) (*remoteLLMLabler, error) {
 	}
 
 	return &remoteLLMLabler{
-		llm: gai,
+		llm:      gai,
+		labelSet: lc.LabelSet,
 	}, nil
 }
 
 func (r *remoteLLMLabler) labelFields(fm fieldManager) error {
-	prompt := "Who was the second person to walk on the moon?"
+	promptTemplate := `Given the following examples of field values extracted from a webpage, provide a label for each field.
+The labels should always be one of the following: %s.
+If a field's values do not match any of the labels, label it as "other".
+
+Here are the field examples:
+
+%s
+
+Provide your answer as a plain JSON string where the keys are "field-0", "field-1", etc., and the values are the predicted labels.
+Just return the JSON and nothing else. Don't wrap the JSON in any quotes or code blocks.`
+
+	examplesStrs := []string{}
+	for i, e := range fm {
+		exStr := fmt.Sprintf("field-%d: [\"%s\"]", i, strings.Join(getExamplesStrings(e.examples), "\", \""))
+		examplesStrs = append(examplesStrs, exStr)
+	}
+
+	prompt := fmt.Sprintf(promptTemplate, strings.Join(r.labelSet, ", "), strings.Join(examplesStrs, "\n"))
+	fmt.Println(prompt)
+
 	answer, err := llms.GenerateFromSinglePrompt(context.Background(), r.llm, prompt)
 	if err != nil {
 		return err
 	}
 
+	// parse json answer as map[string]string
+	mapping := map[string]string{}
+	err = json.Unmarshal([]byte(answer), &mapping)
+	if err != nil {
+		return fmt.Errorf("error parsing LLM response: %v", err)
+	}
+
+	// assign labels to fields
+	for i, e := range fm {
+		fieldKey := fmt.Sprintf("field-%d", i)
+		if label, ok := mapping[fieldKey]; ok {
+			e.name = label
+		} else {
+			e.name = "other"
+		}
+	}
 	fmt.Println(answer)
 	return nil
+}
+
+func getExamplesStrings(examples []fieldExample) []string {
+	result := []string{}
+	for _, ex := range examples {
+		result = append(result, ex.exampleString())
+	}
+	return result
 }

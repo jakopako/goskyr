@@ -35,6 +35,10 @@ type fieldExample struct {
 	origI   int
 }
 
+func (fe fieldExample) exampleString() string {
+	return fe.example
+}
+
 func (fp *fieldProps) string() string {
 	return fmt.Sprintf("path: %s,\nattr: %s,\ntextIndex: %d,\ncount: %d,\nexamples: %v,\ncolor: %v,\ndistance: %f,\nname: %s,\niStrip: %d,\norigI: %d\n",
 		fp.path.string(),

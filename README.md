@@ -98,6 +98,8 @@ As shown under [Quick Start](#quick-start) goskyr can be used to automatically e
 goskyr generate -h
 ```
 
+TODO: UPDATE
+
 A few more details on the ML part.
 
 With the `-M` / `--model-name` flag, you can pass a reference to a ML model that suggests names for the extracted fields. Note that the model currently consists of two files that have to be named exactly the same except for the ending. The string that you have to pass to the `--model` flag has to be the filename without the ending. Check out the section on [building a ML model](#build-ml-model-for-improved-auto-config).

@@ -1,12 +1,39 @@
+# Example configuration file for generating a scraper configuration
+# This file contains all available options with example values and should
+# be modified according to your specific requirements.
+
+# min_occurrences defines the minimum number of times a field must appear to be considered.
+# For example, if you're scraping a list of products, which all have a 'price' field,
+# setting min_occurrences to 20 means that 'price' must appear in at least 20 different products
+# to be included in the final configuration.
 min_occurrences: 20
+# distinct_values indicates whether the field should have distinct values across occurrences.
+# Setting this to true ensures that fields with the same value across all items are filtered out.
 distinct_values: true
+# labler configuration for labeling fields in the extracted configuration.
 labler:
-  type: "basic" # options: basic, local-ml, remote-llm
-  model_name: "ml-models/knn-types-v0.4.4" # only for local-ml
-  words_dir: "word-lists" # only for local-ml
-  api_key: "remote-llm-api-key" # only for remote-llm
-  llm_provider: "googleai" # only for remote-llm
-  llm_model: "gemini-2.5-flash" # only for remote-llm
+  # type of labler to use. Options are:
+  # - basic: simple labeling without machine learning
+  # - local-ml: uses a local machine learning model for labeling
+  # - remote-llm: uses a remote large language model for labeling
+  type: "local-ml"
+  # model_name is required if type is local-ml and has to point to a valid model
+  # that has been created with goskyr. Note that the model currently consists of two files
+  # that have to be named exactly the same except for the ending. The value that you
+  # have to pass to model_name has to be the filename without the ending.
+  model_name: "ml-models/knn-types-v0.4.4"
+  # words_dir is required if type is local-ml and should point to a directory
+  # containing word lists used by the local ML model.
+  words_dir: "word-lists"
+  # The following fields are required if type is remote-llm
+  # api_key is the API key for accessing the remote LLM service.
+  api_key: "remote-llm-api-key"
+  # llm_provider specifies the provider of the remote LLM service. Currently supported:
+  # - googleai
+  llm_provider: "googleai"
+  # llm_model specifies the model to use from the remote LLM provider.
+  llm_model: "gemini-2.5-flash"
+  # label_set is a list of labels that the labler should use when labeling fields.
   label_set:
     - title
     - url
@@ -26,6 +53,6 @@ labler:
     - date-component-year
     - date-component-day-month-time
     - date-component-month-year
-fetcher: # optional. If not provided, a default static fetcher will be used.
-  type: "dynamic"
-  page_load_wait_ms: 2000
+# fetcher: # optional. If not provided, a default static fetcher will be used to fetch web pages.
+#   type: "dynamic"
+#   page_load_wait_ms: 2000

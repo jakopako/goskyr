@@ -238,21 +238,15 @@ func collector(itemChan <-chan map[string]any, statusChan <-chan types.ScraperSt
 }
 
 type GenerateCmd struct {
-	URL            string `short:"u" long:"url" help:"The URL for which to generate the scraper configuration file." required:""`
-	GenerateConfig string `short:"c" long:"config" default:"./generate-config.yaml" help:"The generate configuration file to use." completion:"<file>"`
-	// MinOccurrence  int    `short:"m" default:"10" help:"The minimum number of occurrences of a certain field on an html page to be included in the suggested fields. This is needed to filter out noise."`
-	// Distinct       bool   `short:"D" help:"If set to true only fields with distinct values will be included in the suggested fields."`
-	// RenderJS       bool   `short:"r" help:"Render javascript before analyzing the html page."`
-	// PageLoadWaitMS int    `short:"p" default:"2000" help:"The number of milliseconds to wait for the page to load when rendering javascript."`
-	// WordLists      string `short:"w" default:"word-lists" help:"The directory that contains a number of files containing words of different languages, needed for extracting ML features." completion:"<directory>"`
-	// ModelName      string `short:"M" help:"The name to a pre-trained ML model to infer names of extracted fields." completion:"<file>"`
+	URL           string `short:"u" long:"url" help:"The URL for which to generate the scraper configuration file." required:""`
+	Config        string `short:"c" long:"config" default:"./generate-config.yaml" help:"The generate configuration file to use." completion:"<file>"`
 	Stdout        bool   `short:"o" long:"stdout" help:"If set to true the the generated configuration will be written to stdout."`
 	ScraperConfig string `short:"s" long:"scraper-config" default:"./config.yaml" help:"The file that the generated configuration will be written to." completion:"<file>"`
 	Interactive   bool   `short:"i" help:"If set to true, the user will be prompted to select which fields to include in the generated configuration interactively."`
 }
 
 func (g *GenerateCmd) Run() error {
-	generateConfig, err := generate.NewConfigFromFile(g.GenerateConfig)
+	generateConfig, err := generate.NewConfigFromFile(g.Config)
 	if err != nil {
 		slog.Error(fmt.Sprintf("error reading generate config file: %v", err))
 		return err
@@ -262,18 +256,6 @@ func (g *GenerateCmd) Run() error {
 		URL:           g.URL,
 		FetcherConfig: generateConfig.FetcherConfig,
 	}
-
-	// if g.RenderJS {
-	// 	s.FetcherConfig.Type = fetch.DYNAMIC_FETCHER_TYPE
-	// 	s.FetcherConfig.PageLoadWaitMS = g.PageLoadWaitMS
-	// }
-
-	// generateConfig := generate.Config{
-	// 	MinOccurrences:     g.MinOccurrence,
-	// 	RemoveStaticFields: g.Distinct,
-	// 	Interactive:        g.Interactive,
-	// 	// LablerType and LablerConfig can be set here if needed
-	// }
 
 	if err = generate.GenerateConfig(s, generateConfig, g.Interactive); err != nil {
 		slog.Error(fmt.Sprintf("%v", err))

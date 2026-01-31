@@ -358,6 +358,7 @@ func (fm *fieldManager) fieldSelection(s *scraper.Scraper, interactive bool) err
 		return fmt.Errorf("no fields found")
 	}
 
+	// TODO: implement non-interactive selection based on some heuristics
 	if !interactive {
 		for _, fp := range *fm {
 			fp.selected = true
@@ -546,6 +547,18 @@ outer:
 		}
 	}
 	if len(dateField.Components) > 0 {
+		// set guessYear to true if no year component found
+		yearFound := false
+		for _, comp := range dateField.Components {
+			if comp.Covers.Year {
+				yearFound = true
+				break
+			}
+		}
+		if !yearFound {
+			dateField.GuessYear = true
+		}
+
 		s.Fields = append(s.Fields, dateField)
 	}
 	return nil

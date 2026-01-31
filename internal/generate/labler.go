@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 
+	"github.com/jakopako/goskyr/internal/log"
 	"github.com/jakopako/goskyr/internal/ml"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/googleai"
@@ -26,8 +28,10 @@ type LablerConfig struct {
 	ModelName string `yaml:"model_name,omitempty"`
 	WordsDir  string `yaml:"words_dir,omitempty"`
 	// Remote LLM labler config
-	ApiKey   string   `yaml:"api_key,omitempty"`
-	LabelSet []string `yaml:"label_set,omitempty"`
+	LLMModel    string   `yaml:"llm_model,omitempty"`
+	LLMProvider string   `yaml:"llm_provider,omitempty"`
+	ApiKey      string   `yaml:"api_key,omitempty"`
+	LabelSet    []string `yaml:"label_set,omitempty"`
 }
 
 // labler is an interface for labeling fields in a fieldManager
@@ -102,18 +106,30 @@ type remoteLLMLabler struct {
 }
 
 func newRemoteLLMLabler(lc *LablerConfig) (*remoteLLMLabler, error) {
-	gai, err := googleai.New(context.Background(), googleai.WithAPIKey(lc.ApiKey), googleai.WithDefaultModel("gemini-2.5-flash"))
-	if err != nil {
-		return nil, err
+	var llm llms.Model
+	switch lc.LLMProvider {
+	case "googleai":
+		// currently only googleai is supported
+		gai, err := googleai.New(context.Background(), googleai.WithAPIKey(lc.ApiKey), googleai.WithDefaultModel(lc.LLMModel))
+		if err != nil {
+			return nil, err
+		}
+		llm = gai
+	default:
+		return nil, fmt.Errorf("LLM provider %s not supported", lc.LLMProvider)
 	}
 
 	return &remoteLLMLabler{
-		llm:      gai,
+		llm:      llm,
 		labelSet: lc.LabelSet,
 	}, nil
 }
 
 func (r *remoteLLMLabler) labelFields(fm fieldManager) error {
+	ctx := context.Background()
+	logger := log.LoggerFromContext(ctx) // doesn't really make sense now with the background ctx, but in future we might pass a more meaningful ctx
+	logger.Debug("Using remote LLM labler", slog.String("provider", fmt.Sprintf("%T", r.llm)))
+
 	promptTemplate := `Given the following examples of field values extracted from a webpage, provide a label for each field.
 The labels should always be one of the following: %s.
 If a field's values do not match any of the labels, label it as "other".
@@ -123,21 +139,22 @@ Here are the field examples:
 %s
 
 Provide your answer as a plain JSON string where the keys are "field-0", "field-1", etc., and the values are the predicted labels.
-Just return the JSON and nothing else. Don't wrap the JSON in any quotes or code blocks.`
+Just return the JSON and nothing else. Don't wrap the JSON in any quotes or code blocks. JUST DON'T!`
 
 	examplesStrs := []string{}
 	for i, e := range fm {
-		exStr := fmt.Sprintf("field-%d: [\"%s\"]", i, strings.Join(getExamplesStrings(e.examples), "\", \""))
+		exStr := fmt.Sprintf("field-%d: [\"%s\"]", i, strings.Join(getExamplesStrings(e.examples, 10, 200), "\", \""))
 		examplesStrs = append(examplesStrs, exStr)
 	}
 
 	prompt := fmt.Sprintf(promptTemplate, strings.Join(r.labelSet, ", "), strings.Join(examplesStrs, "\n"))
-	fmt.Println(prompt)
+	logger.Debug("LLM labler prompt", slog.String("prompt", prompt))
 
 	answer, err := llms.GenerateFromSinglePrompt(context.Background(), r.llm, prompt)
 	if err != nil {
 		return err
 	}
+	logger.Debug("LLM labler answer", slog.String("answer", answer))
 
 	// parse json answer as map[string]string
 	mapping := map[string]string{}
@@ -155,13 +172,21 @@ Just return the JSON and nothing else. Don't wrap the JSON in any quotes or code
 			e.name = "other"
 		}
 	}
-	fmt.Println(answer)
 	return nil
 }
 
-func getExamplesStrings(examples []fieldExample) []string {
+// getExamplesStrings returns a slice of example strings from the provided fieldExample slice,
+// limited to maxNrExamples and maxExampleStrLen per example.
+func getExamplesStrings(examples []fieldExample, maxNrExamples, maxExampleStrLen int) []string {
 	result := []string{}
-	for _, ex := range examples {
+	for i, ex := range examples {
+		if i >= maxNrExamples {
+			break
+		}
+		if len(ex.example) > maxExampleStrLen {
+			result = append(result, ex.exampleString()[:maxExampleStrLen])
+			continue
+		}
 		result = append(result, ex.exampleString())
 	}
 	return result

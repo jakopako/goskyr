@@ -1,10 +1,31 @@
 min_occurrences: 20
 distinct_values: true
 labler:
-  type: "remote-llm" # options: basic, local-ml, remote-llm
+  type: "basic" # options: basic, local-ml, remote-llm
   model_name: "ml-models/knn-types-v0.4.4" # only for local-ml
   words_dir: "word-lists" # only for local-ml
-  api_key: "API_KEY" # only for remote-llm
-# fetcher:
-#   type: "dynamic"
-#   page_load_wait_ms: 2000
+  api_key: "remote-llm-api-key" # only for remote-llm
+  llm_provider: "googleai" # only for remote-llm
+  llm_model: "gemini-2.5-flash" # only for remote-llm
+  label_set:
+    - title
+    - url
+    - imageUrl
+    - comment
+    - genresText
+    - city
+    # The date component labels below correspond to different parts of a date
+    # which when labeled accordingly will be combined into a full date field
+    # by the config generator.
+    - date-component-day
+    - date-component-month
+    - date-component-time
+    - date-component-day-month-year
+    - date-component-day-month-year-time
+    - date-component-day-month
+    - date-component-year
+    - date-component-day-month-time
+    - date-component-month-year
+fetcher: # optional. If not provided, a default static fetcher will be used.
+  type: "dynamic"
+  page_load_wait_ms: 2000

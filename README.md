@@ -70,7 +70,7 @@ yay -S goskyr
 Or if you have recent go compiler installed download goskyr by running
 
 ```bash
-go install github.com/jakopako/goskyr@latest
+go install github.com/jakopako/goskyr/cmd/goskyr@latest
 ```
 
 Or clone the repository and then run with `go run main.go ...` or build it yourself.

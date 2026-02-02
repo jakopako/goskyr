@@ -33,7 +33,8 @@ labler:
   llm_provider: "googleai"
   # llm_model specifies the model to use from the remote LLM provider.
   llm_model: "gemini-2.5-flash"
-  # label_set is a list of labels that the labler should use when labeling fields.
+  # label_set is a list of labels that the labler should use when labeling fields. This is included
+  # in the prompt that is passed to the remote LLM service.
   label_set:
     - title
     - url

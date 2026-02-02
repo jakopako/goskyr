@@ -18,7 +18,7 @@
    1. [Interaction](#interaction)
    1. [Pagination](#pagination)
    1. [Output](#output)
-1. [Build ML Model for Auto-Config](#build-ml-model-for-improved-auto-config)
+1. [Build local ML Model for Auto-Config](#build-local-ml-model-for-auto-config)
 1. [Related Projects](#related-projects)
 1. [Build & Release](#build--release)
 1. [Contributing](#contributing)
@@ -100,7 +100,7 @@ goskyr generate -h
 
 More settings are available by passing a config file (option `-c/--config`) to the `generate` target. Read the comments in the example configuration file `generate-config-example.yaml` for more details.
 
-Note that when using machine learning & a properly trained model, the auto configuration is capable of determining what fields could be a date and what date components they contain. With that information another algorithm then tries to derive the format of the date that is needed for proper parsing. So in the best case you have to do nothing more than rename some of the fields to get the desired configuration.
+Note that when using machine learning & a properly trained model or a remote LLM with the correct label_set, the auto configuration is capable of determining what fields could be a date and what date components they contain. With that information another algorithm then tries to derive the format of the date that is needed for proper parsing. So in the best case you have to do nothing more than rename some of the fields to get the desired configuration.
 
 Note that the local machine learning feature is rather limited and might not always work well, especially since it only takes into account a fields value and not its position in the DOM. A basic model is contained in the `ml-models` directory. It uses the labels `text`, `url` and `date-component-*`. You could for instance run `goskyr generate -u https://www.schuur.ch/programm/ -c generate-config-example.yaml -i` which would among others suggest the following fields to you.
 
@@ -610,12 +610,12 @@ writer:
   filepath: test-file.json
 ```
 
-## Build ML Model for Auto-Config
+## Build local ML Model for Auto-Config
 
-In order for the auto configuration feature to find suitable names for the extracted fields, since `v0.4.0` machine learning can be used. Goskyr allows you to extract a fixed set of features based on an existing goskyr configuration. Basically, goskyr scrapes all the websites you configured, extracts the raw text values based on the configured fields per site and then calculates the features for each extracted value, labeling the resulting vector with the field name you defined in the configuration. Currently, all features are based on the extracted text only, i.e. not on the location within the website. Checkout the `Features` struct in the `ml/ml.go` file if you want to know what exactly those features are. Extraction command:
+In order for the auto configuration feature to find suitable names for the extracted fields machine learning can be used. Goskyr allows you to extract a fixed set of features based on an existing goskyr configuration. Basically, goskyr scrapes all the websites you configured, extracts the raw text values based on the configured fields per site and then calculates the features for each extracted value, labeling the resulting vector with the field name you defined in the configuration. Currently, all features are based on the extracted text only, i.e. not on the location within the website. Checkout the `Features` struct in the `ml/ml.go` file if you want to know what exactly those features are. Extraction command:
 
 ```bash
-goskyr extract -o features.csv -w word-lists -c some-goskyr-config.yml
+goskyr extract -o features.csv -w word-lists -c some-goskyr-scraper-config.yml
 ```
 
 Note that `-w` and `-c` are optional. The respective defaults are `word-lists` and `config.yml`. The resulting csv file can optionally be edited (eg if you want to remove or replace some labels) and consequently be used to build a ML model, like so:

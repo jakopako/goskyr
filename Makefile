@@ -1,5 +1,5 @@
 PACKAGE_NAME          := github.com/jakopako/goskyr
-GOLANG_CROSS_VERSION  ?= v1.23
+GOLANG_CROSS_VERSION  ?= v1.24
 
 .PHONY: release-dry-run
 release-dry-run:
@@ -11,7 +11,7 @@ release-dry-run:
 		-v `pwd`/sysroot:/sysroot \
 		-w /go/src/$(PACKAGE_NAME) \
 		ghcr.io/goreleaser/goreleaser-cross:${GOLANG_CROSS_VERSION} \
-		--clean --skip-validate --skip-publish
+		--clean --skip=validate,publish
 
 .PHONY: release
 release:

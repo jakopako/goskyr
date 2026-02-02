@@ -21,49 +21,43 @@ import (
 	"github.com/antchfx/jsonquery"
 	"github.com/goodsign/monday"
 	"github.com/ilyakaznacheev/cleanenv"
-	"github.com/jakopako/goskyr/config"
-	"github.com/jakopako/goskyr/date"
-	"github.com/jakopako/goskyr/fetch"
-	"github.com/jakopako/goskyr/log"
-	"github.com/jakopako/goskyr/output"
-	"github.com/jakopako/goskyr/types"
-	"github.com/jakopako/goskyr/utils"
+	"github.com/jakopako/goskyr/internal/date"
+	"github.com/jakopako/goskyr/internal/fetch"
+	"github.com/jakopako/goskyr/internal/log"
+	"github.com/jakopako/goskyr/internal/output"
+	"github.com/jakopako/goskyr/internal/types"
+	"github.com/jakopako/goskyr/internal/utils"
 	"golang.org/x/net/html"
 	"gopkg.in/yaml.v3"
 )
 
-const (
-	UserAgentDefault = "goskyr web scraper (github.com/jakopako/goskyr)"
-	DebugDirDefault  = "debug"
-)
-
-// GlobalConfig is used for storing global configuration parameters that
+// GlobalScraperConfig is used for storing global configuration parameters that
 // are needed across all scrapers
-type GlobalConfig struct {
+type GlobalScraperConfig struct {
 	UserAgent string `yaml:"user_agent"`
 	// DebugDir is a directory where debug files (eg html files of fetched pages)
 	// are stored
 	DebugDir string `yaml:"debug_dir,omitempty"`
 }
 
-// Config defines the overall structure of the scraper configuration.
+// ScraperConfig defines the overall structure of the scraper configuration.
 // Values will be taken from a config yml file or environment variables
 // or both.
-type Config struct {
+type ScraperConfig struct {
 	// We cannot use a pointer for Writer otherwise reading from
 	// env vars for the Writer output.WriterConfig fields does
 	// not work with cleanenv.ReadConfig because it does not support
 	// nested structs with pointers
-	Writer   output.WriterConfig `yaml:"writer,omitempty"`
-	Scrapers []Scraper           `yaml:"scrapers,omitempty"`
-	Global   *GlobalConfig       `yaml:"global,omitempty"`
+	Writer   output.WriterConfig  `yaml:"writer,omitempty"`
+	Scrapers []Scraper            `yaml:"scrapers,omitempty"`
+	Global   *GlobalScraperConfig `yaml:"global,omitempty"`
 }
 
 // NewConfig reads a configuration file from the given path and returns
 // a Config struct. If the path is a directory it will read all files
 // in that directory and merge them into one Config struct.
-func NewConfig(configPath string) (*Config, error) {
-	var config Config
+func NewScraperConfig(configPath string) (*ScraperConfig, error) {
+	var config ScraperConfig
 
 	fileInfo, err := os.Stat(configPath)
 	if err != nil {
@@ -72,7 +66,7 @@ func NewConfig(configPath string) (*Config, error) {
 	if fileInfo.IsDir() {
 		err := filepath.WalkDir(configPath, func(path string, d fs.DirEntry, err error) error {
 			if !d.IsDir() {
-				var configTmp Config
+				var configTmp ScraperConfig
 
 				if err := cleanenv.ReadConfig(path, &configTmp); err != nil {
 					return err
@@ -108,41 +102,21 @@ func NewConfig(configPath string) (*Config, error) {
 		}
 	}
 
-	// global defaults
-	if config.Global == nil {
-		config.Global = &GlobalConfig{
-			UserAgent: UserAgentDefault,
-			DebugDir:  DebugDirDefault,
-		}
-	} else {
-		if config.Global.UserAgent == "" {
-			config.Global.UserAgent = UserAgentDefault
-		}
-		if config.Global.DebugDir == "" {
-			config.Global.DebugDir = DebugDirDefault
+	// copy global config values to scrapers if not set locally
+	if config.Global != nil {
+		for i, scr := range config.Scrapers {
+			if scr.FetcherConfig.UserAgent == "" && config.Global.UserAgent != "" {
+				config.Scrapers[i].FetcherConfig.UserAgent = config.Global.UserAgent
+			}
+			if scr.FetcherConfig.DebugDir == "" && config.Global.DebugDir != "" {
+				config.Scrapers[i].FetcherConfig.DebugDir = config.Global.DebugDir
+			}
 		}
 	}
 
 	// default to stdout writer
 	if config.Writer.Type == "" {
 		config.Writer.Type = output.STDOUT_WRITER_TYPE
-	}
-
-	// log warnings for depricated fields
-	hasLogged := map[string]bool{}
-	for _, s := range config.Scrapers {
-		if s.RenderJs {
-			if !hasLogged["render_js"] {
-				slog.Warn("'render_js' is deprecated. Please use 'fetcher.type' instead")
-				hasLogged["render_js"] = true
-			}
-		}
-		if s.PageLoadWait > 0 {
-			if !hasLogged["page_load_wait"] {
-				slog.Warn("'page_load_wait' is deprecated. Please use 'fetcher.page_load_wait_ms' instead")
-				hasLogged["page_load_wait"] = true
-			}
-		}
 	}
 
 	return &config, nil
@@ -313,8 +287,6 @@ type Scraper struct {
 	Fields        []Field              `yaml:"fields,omitempty"`
 	Filters       []*Filter            `yaml:"filters,omitempty"`
 	Paginator     Paginator            `yaml:"paginator,omitempty"`
-	RenderJs      bool                 `yaml:"render_js,omitempty"`      // DEPRECATED
-	PageLoadWait  int                  `yaml:"page_load_wait,omitempty"` // DEPRECATED (milliseconds. Only taken into account when render_js = true)
 	Interaction   []*types.Interaction `yaml:"interaction,omitempty"`
 	FetcherConfig fetch.FetcherConfig  `yaml:"fetcher"`
 	fetcher       fetch.Fetcher
@@ -333,31 +305,20 @@ type ScraperResult struct {
 // only on the location are returned (ignore regex_extract??). And only those
 // of dynamic fields, ie fields that don't have a predefined value and that are
 // present on the main page (not subpages). This is used by the ML feature generation.
-func (c Scraper) Scrape(globalConfig *GlobalConfig, rawDyn bool) (*ScraperResult, error) {
+func (c Scraper) Scrape(rawDyn bool) (*ScraperResult, error) {
 	// we create a separate context so that we can pass a custom logger via context
 	ctx := context.Background()
 
 	var logBuffer bytes.Buffer
 
 	// initialize special logger with handler that writes to both stdout and logBuffer
-	handler := slog.NewTextHandler(io.MultiWriter(os.Stdout, &logBuffer), &slog.HandlerOptions{Level: config.GetLogLevel()})
+	handler := slog.NewTextHandler(io.MultiWriter(os.Stdout, &logBuffer), &slog.HandlerOptions{Level: log.GetLogLevel()})
 	scrLogger := slog.New(handler).With(slog.String("name", c.Name))
 	ctx = log.ContextWithLogger(ctx, scrLogger)
 
 	// set fetcher config defaults
-	// default fetcher type is static
 	if c.FetcherConfig.Type == "" {
-		c.FetcherConfig.Type = fetch.STATIC_FETCHER_TYPE
-	}
-
-	// if local UserAgent empty, set global one
-	if c.FetcherConfig.UserAgent == "" {
-		c.FetcherConfig.UserAgent = globalConfig.UserAgent
-	}
-
-	// if local DebugDir empty, set global one
-	if c.FetcherConfig.DebugDir == "" {
-		c.FetcherConfig.DebugDir = globalConfig.DebugDir
+		c.FetcherConfig.Type = fetch.DefaultFetcherType()
 	}
 
 	// initialize fetcher

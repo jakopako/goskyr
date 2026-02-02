@@ -11,8 +11,8 @@ import (
 	"sync"
 	"unicode"
 
-	"github.com/jakopako/goskyr/scraper"
-	"github.com/jakopako/goskyr/utils"
+	"github.com/jakopako/goskyr/internal/scraper"
+	"github.com/jakopako/goskyr/internal/utils"
 	"github.com/sjwhitworth/golearn/base"
 	"github.com/sjwhitworth/golearn/evaluation"
 	"github.com/sjwhitworth/golearn/knn"
@@ -52,7 +52,7 @@ var NonAlphaFeatureList []string = []string{
 // ExtractFeatures extracts features based on a given configuration and a directory
 // containing words of different languages. Those features can then be used to train
 // a ML model to automatically classify scraped fields for new websites.
-func ExtractFeatures(config *scraper.Config, featureFile, wordsDir string) error {
+func ExtractFeatures(config *scraper.ScraperConfig, featureFile, wordsDir string) error {
 	var calcWg sync.WaitGroup
 	var writerWg sync.WaitGroup
 	wordMap, err := loadWords(wordsDir)
@@ -64,7 +64,7 @@ func ExtractFeatures(config *scraper.Config, featureFile, wordsDir string) error
 	go writeFeaturesToFile(featureFile, featuresChan, &writerWg)
 	for _, s := range config.Scrapers {
 		calcWg.Add(1)
-		go calculateScraperFeatures(s, featuresChan, wordMap, config.Global, &calcWg)
+		go calculateScraperFeatures(s, featuresChan, wordMap, &calcWg)
 	}
 	calcWg.Wait()
 	close(featuresChan)
@@ -136,10 +136,10 @@ func writeFeaturesToFile(filename string, featuresChan <-chan *Features, wg *syn
 	writer.Flush()
 }
 
-func calculateScraperFeatures(s scraper.Scraper, featuresChan chan<- *Features, wordMap map[string]bool, globalConfig *scraper.GlobalConfig, wg *sync.WaitGroup) {
+func calculateScraperFeatures(s scraper.Scraper, featuresChan chan<- *Features, wordMap map[string]bool, wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Printf("calculating features for %s\n", s.Name)
-	result, err := s.Scrape(globalConfig, true)
+	result, err := s.Scrape(true)
 	if err != nil {
 		log.Printf("%s ERROR: %s", s.Name, err)
 		return

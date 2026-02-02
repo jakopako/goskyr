@@ -4,7 +4,7 @@ package output
 import (
 	"fmt"
 
-	"github.com/jakopako/goskyr/types"
+	"github.com/jakopako/goskyr/internal/types"
 )
 
 // Writer defines the interface for all writers that are responsible

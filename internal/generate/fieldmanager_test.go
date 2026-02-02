@@ -1,10 +1,10 @@
-package autoconfig
+package generate
 
 import (
 	"slices"
 	"testing"
 
-	"github.com/jakopako/goskyr/utils"
+	"github.com/jakopako/goskyr/internal/utils"
 )
 
 // helper to extract example strings from []fieldExample

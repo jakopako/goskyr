@@ -1,4 +1,6 @@
-package autoconfig
+// Package generate provides functionality to generate scraper configurations
+// by analyzing web pages and labeling found fields.
+package generate
 
 import (
 	"context"
@@ -8,23 +10,46 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/jakopako/goskyr/fetch"
-	"github.com/jakopako/goskyr/scraper"
+	"github.com/ilyakaznacheev/cleanenv"
+	"github.com/jakopako/goskyr/internal/fetch"
+	"github.com/jakopako/goskyr/internal/scraper"
 )
+
+type Config struct {
+	MinOccurrences int                 `yaml:"min_occurrences"`
+	DistinctValues bool                `yaml:"distinct_values"` // if true, only fields with distinct values will be included
+	LablerConfig   LablerConfig        `yaml:"labler"`
+	FetcherConfig  fetch.FetcherConfig `yaml:"fetcher"`
+}
+
+func NewConfigFromFile(path string) (*Config, error) {
+	var config Config
+
+	err := cleanenv.ReadConfig(path, &config)
+	if err != nil {
+		return nil, err
+	}
+
+	if config.FetcherConfig.Type == "" {
+		config.FetcherConfig.Type = fetch.DefaultFetcherType()
+	}
+
+	return &config, err
+}
 
 // GenerateConfig generates a scraper configuration for the given scraper s's URL
 // by analyzing the HTML structure and allowing the user to select fields interactively.
 // minOcc specifies the minimum occurrences a field must have to be included.
 // If removeStaticFields is true, fields that have static values will be removed from the configuration.
 // modelName and wordsDir are used for text analysis to predict field names.
-func GenerateConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool, modelName, wordsDir string, interactive bool) error {
+func GenerateConfig(s *scraper.Scraper, gc *Config, interactive bool) error {
 	slog.Info(fmt.Sprintf("analyzing url %s", s.URL))
 	if s.URL == "" {
 		return errors.New("URL field cannot be empty")
 	}
 	s.Name = s.URL
 
-	fetcher, err := fetch.NewFetcher(&s.FetcherConfig)
+	fetcher, err := fetch.NewFetcher(&gc.FetcherConfig)
 	if err != nil {
 		return fmt.Errorf("error creating fetcher: %v", err)
 	}
@@ -53,7 +78,7 @@ func GenerateConfig(s *scraper.Scraper, minOcc int, removeStaticFields bool, mod
 	}
 
 	fieldMgr := newFieldManagerFromHtml(htmlStr)
-	err = fieldMgr.process(minOcc, removeStaticFields, modelName, wordsDir)
+	err = fieldMgr.process(gc)
 	if err != nil {
 		return err
 	}

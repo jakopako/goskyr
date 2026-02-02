@@ -1,4 +1,4 @@
-package autoconfig
+package generate
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"unicode"
 
 	"github.com/agnivade/levenshtein"
-	"github.com/jakopako/goskyr/utils"
+	"github.com/jakopako/goskyr/internal/utils"
 )
 
 // A node is our representation of a node in an html tree

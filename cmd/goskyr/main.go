@@ -16,14 +16,12 @@ import (
 	"sync"
 
 	"github.com/alecthomas/kong"
-	"github.com/jakopako/goskyr/autoconfig"
-	"github.com/jakopako/goskyr/config"
-	"github.com/jakopako/goskyr/fetch"
-	"github.com/jakopako/goskyr/log"
-	"github.com/jakopako/goskyr/ml"
-	"github.com/jakopako/goskyr/output"
-	"github.com/jakopako/goskyr/scraper"
-	"github.com/jakopako/goskyr/types"
+	"github.com/jakopako/goskyr/internal/generate"
+	"github.com/jakopako/goskyr/internal/log"
+	"github.com/jakopako/goskyr/internal/ml"
+	"github.com/jakopako/goskyr/internal/output"
+	"github.com/jakopako/goskyr/internal/scraper"
+	"github.com/jakopako/goskyr/internal/types"
 	"github.com/miekg/king"
 	"gopkg.in/yaml.v3"
 )
@@ -93,14 +91,14 @@ func (acc *CompletionCommand) Run() error {
 }
 
 type ScrapeCmd struct {
-	Config string `short:"c" default:"./config.yml" help:"The location of the configuration. Can be a directory containing config files or a single config file." completion:"<file>"`
+	Config string `short:"c" default:"./config.yaml" help:"The location of the configuration. Can be a directory containing config files or a single config file." completion:"<file>"`
 	Name   string `short:"n" help:"The name of the scraper to be run, if only one of the configured ones should be run." completion:"goskyr list -c \"$config\" -C 2>/dev/null"`
 	Stdout bool   `short:"o" help:"If set to true the scraped data will be written to stdout despite any other existing writer configurations."`
 	DryRun bool   `short:"D" help:"If set to true the scraper will not persist any scraped data (currently only has an effect on the APIWriter)."`
 }
 
 func (scc *ScrapeCmd) Run() error {
-	config, err := scraper.NewConfig(scc.Config)
+	config, err := scraper.NewScraperConfig(scc.Config)
 	if err != nil {
 		slog.Error(fmt.Sprintf("%v", err))
 		return err
@@ -168,7 +166,7 @@ func (scc *ScrapeCmd) Run() error {
 	for i := range nrWorkers {
 		go func(j int) {
 			defer workerWg.Done()
-			worker(scraperChan, itemChan, statusChan, config.Global, j)
+			worker(scraperChan, itemChan, statusChan, j)
 		}(i)
 	}
 
@@ -192,12 +190,12 @@ func (scc *ScrapeCmd) Run() error {
 	return nil
 }
 
-func worker(sc <-chan scraper.Scraper, ic chan<- map[string]any, stc chan<- types.ScraperStatus, gc *scraper.GlobalConfig, threadNr int) {
+func worker(sc <-chan scraper.Scraper, ic chan<- map[string]any, stc chan<- types.ScraperStatus, threadNr int) {
 	workerLogger := slog.With(slog.Int("thread", threadNr))
 	for s := range sc {
 		scraperLogger := workerLogger.With(slog.String("name", s.Name))
 		scraperLogger.Info("starting scraping task")
-		result, err := s.Scrape(gc, false)
+		result, err := s.Scrape(false)
 		if err != nil {
 			scraperLogger.Error(fmt.Sprintf("%s: %s", s.Name, err))
 			continue
@@ -240,38 +238,31 @@ func collector(itemChan <-chan map[string]any, statusChan <-chan types.ScraperSt
 }
 
 type GenerateCmd struct {
-	URL            string `short:"u" long:"url" help:"The URL for which to generate the scraper configuration file." required:""`
-	MinOccurrence  int    `short:"m" default:"10" help:"The minimum number of occurrences of a certain field on an html page to be included in the suggested fields. This is needed to filter out noise."`
-	Distinct       bool   `short:"D" help:"If set to true only fields with distinct values will be included in the suggested fields."`
-	RenderJS       bool   `short:"r" help:"Render javascript before analyzing the html page."`
-	PageLoadWaitMS int    `short:"p" default:"2000" help:"The number of milliseconds to wait for the page to load when rendering javascript."`
-	WordLists      string `short:"w" default:"word-lists" help:"The directory that contains a number of files containing words of different languages, needed for extracting ML features." completion:"<directory>"`
-	ModelName      string `short:"M" help:"The name to a pre-trained ML model to infer names of extracted fields." completion:"<file>"`
-	Stdout         bool   `short:"o" long:"stdout" help:"If set to true the the generated configuration will be written to stdout."`
-	Config         string `short:"c" long:"config" default:"./config.yml" help:"The file that the generated configuration will be written to." completion:"<file>"`
-	Interactive    bool   `short:"i" help:"If set to true, the user will be prompted to select which fields to include in the generated configuration interactively."`
+	URL           string `short:"u" long:"url" help:"The URL for which to generate the scraper configuration file." required:""`
+	Config        string `short:"c" long:"config" default:"./generate-config.yaml" help:"The generate configuration file to use." completion:"<file>"`
+	Stdout        bool   `short:"o" long:"stdout" help:"If set to true the the generated configuration will be written to stdout."`
+	ScraperConfig string `short:"s" long:"scraper-config" default:"./config.yaml" help:"The file that the generated configuration will be written to." completion:"<file>"`
+	Interactive   bool   `short:"i" help:"If set to true, the user will be prompted to select which fields to include in the generated configuration interactively."`
 }
 
 func (g *GenerateCmd) Run() error {
-	s := &scraper.Scraper{
-		URL: g.URL,
-		FetcherConfig: fetch.FetcherConfig{
-			Type: fetch.STATIC_FETCHER_TYPE, // default to static fetcher
-		},
-	}
-
-	if g.RenderJS {
-		s.FetcherConfig.Type = fetch.DYNAMIC_FETCHER_TYPE
-		s.FetcherConfig.PageLoadWaitMS = g.PageLoadWaitMS
-	}
-
-	err := autoconfig.GenerateConfig(s, g.MinOccurrence, g.Distinct, g.ModelName, g.WordLists, g.Interactive)
+	generateConfig, err := generate.NewConfigFromFile(g.Config)
 	if err != nil {
+		slog.Error(fmt.Sprintf("error reading generate config file: %v", err))
+		return err
+	}
+
+	s := &scraper.Scraper{
+		URL:           g.URL,
+		FetcherConfig: generateConfig.FetcherConfig,
+	}
+
+	if err = generate.GenerateConfig(s, generateConfig, g.Interactive); err != nil {
 		slog.Error(fmt.Sprintf("%v", err))
 		return err
 	}
 
-	c := scraper.Config{
+	c := scraper.ScraperConfig{
 		Scrapers: []scraper.Scraper{
 			*s,
 		},
@@ -288,7 +279,7 @@ func (g *GenerateCmd) Run() error {
 	if g.Stdout {
 		fmt.Println(yamlStr)
 	} else {
-		f, err := os.Create(g.Config)
+		f, err := os.Create(g.ScraperConfig)
 		if err != nil {
 			slog.Error(fmt.Sprintf("error opening file: %v", err))
 			return err
@@ -300,20 +291,20 @@ func (g *GenerateCmd) Run() error {
 			slog.Error(fmt.Sprintf("error writing to file: %v", err))
 			return err
 		}
-		slog.Info(fmt.Sprintf("successfully wrote config to file %s", g.Config))
+		slog.Info(fmt.Sprintf("successfully wrote scraper config to file %s", g.ScraperConfig))
 	}
 
 	return nil
 }
 
 type ExtractCmd struct {
-	Config    string `short:"c" default:"./config.yml" help:"The location of the configuration file." completion:"<file>"`
+	Config    string `short:"c" default:"./config.yaml" help:"The location of the configuration file." completion:"<file>"`
 	OutFile   string `short:"o" help:"The file to which the extracted features will be written in csv format." required:""`
 	WordLists string `short:"w" default:"word-lists" help:"The directory that contains a number of files containing words of different languages, needed for extracting ML features." completion:"<directory>"`
 }
 
 func (e *ExtractCmd) Run() error {
-	config, err := scraper.NewConfig(e.Config)
+	config, err := scraper.NewScraperConfig(e.Config)
 	if err != nil {
 		slog.Error(fmt.Sprintf("%v", err))
 		return err
@@ -342,12 +333,12 @@ func (t *TrainCmd) Run() error {
 }
 
 type ListCmd struct {
-	Config     string `short:"c" default:"./config.yml" help:"The location of the configuration. Can be a directory containing config files or a single config file." completion:"<file>"`
+	Config     string `short:"c" default:"./config.yaml" help:"The location of the configuration. Can be a directory containing config files or a single config file." completion:"<file>"`
 	Completion bool   `short:"C" help:"If set to true, the output will be formatted for autocompletion scripts and errors will not be printed."`
 }
 
 func (lc *ListCmd) Run() error {
-	config, err := scraper.NewConfig(lc.Config)
+	config, err := scraper.NewScraperConfig(lc.Config)
 	if err != nil {
 		if lc.Completion {
 			// in completion mode, we just return an empty output on error
@@ -390,9 +381,9 @@ func main() {
 			"version": string(cli.Version),
 		})
 
-	config.Debug = cli.Debug
-	// not very nice that the config package is global state,
-	// and that the following function relies on the config.Debug variable being set
+	log.Debug = cli.Debug
+	// not very nice that the log package contains global state,
+	// and that the following function relies on the log.Debug variable being set
 	log.InitializeDefaultLogger()
 
 	err := ctx.Run()

@@ -18,7 +18,7 @@
    1. [Interaction](#interaction)
    1. [Pagination](#pagination)
    1. [Output](#output)
-1. [Build ML Model for Improved Auto-Config](#build-ml-model-for-improved-auto-config)
+1. [Build local ML Model for Auto-Config](#build-local-ml-model-for-auto-config)
 1. [Related Projects](#related-projects)
 1. [Build & Release](#build--release)
 1. [Contributing](#contributing)
@@ -92,21 +92,17 @@ JazzCafeAlto    JazzCafeLondon  JazzNoJazz      JazzOnze        JazzStudio      
 
 ## Semi-Automatic Configuration
 
-As shown under [Quick Start](#quick-start) goskyr can be used to automatically extract a configuration for a given url. A number of different options are available. For details check the help section.
+As shown under [Quick Start](#quick-start) goskyr can be used to automatically extract a configuration for a given url. A number of different command line options are available. For details check the help section.
 
 ```bash
 goskyr generate -h
 ```
 
-A few more details on the ML part.
+More settings are available by passing a config file (option `-c/--config`) to the `generate` target. Read the comments in the example configuration file `generate-config-example.yaml` for more details.
 
-With the `-M` / `--model-name` flag, you can pass a reference to a ML model that suggests names for the extracted fields. Note that the model currently consists of two files that have to be named exactly the same except for the ending. The string that you have to pass to the `--model` flag has to be the filename without the ending. Check out the section on [building a ML model](#build-ml-model-for-improved-auto-config).
+Note that when using machine learning & a properly trained model or a remote LLM with the correct label_set, the auto configuration is capable of determining what fields could be a date and what date components they contain. With that information another algorithm then tries to derive the format of the date that is needed for proper parsing. So in the best case you have to do nothing more than rename some of the fields to get the desired configuration.
 
-The flag `-w` / `--word-lists` is used to pass a the name of a directory that contains a bunch of text files with dictionary words. This is needed for feature extraction for the ML stuff. This repository contains an example of such a directory, `word-lists`, although the lists are pretty limited. Default is `word-lists`.
-
-Note that when using machine learning & a properly trained model, the auto configuration is capable of determining what fields could be a date and what date components they contain. With that information another algorithm then tries to derive the format of the date that is needed for proper parsing. So in the best case you have to do nothing more than rename some of the fields to get the desired configuration.
-
-Note that the machine learning feature is rather limited and might not always work well, especially since it only takes into account a fields value and not its position in the DOM. A basic model is contained in the `ml-models` directory. It uses the labels `text`, `url` and `date-component-*`. You could for instance run `goskyr generate -u https://www.schuur.ch/programm/ --model-name ml-models/knn-types-v0.4.4 -i` which would suggest the following fields to you.
+Note that the local machine learning feature is rather limited and might not always work well, especially since it only takes into account a fields value and not its position in the DOM. A basic model is contained in the `ml-models` directory. It uses the labels `text`, `url` and `date-component-*`. You could for instance run `goskyr generate -u https://www.schuur.ch/programm/ -c generate-config-example.yaml -i` which would among others suggest the following fields to you.
 
 ![screenshot field extraction](schuur-extract.png)
 
@@ -614,12 +610,12 @@ writer:
   filepath: test-file.json
 ```
 
-## Build ML Model for Improved Auto-Config
+## Build local ML Model for Auto-Config
 
-In order for the auto configuration feature to find suitable names for the extracted fields, since `v0.4.0` machine learning can be used. Goskyr allows you to extract a fixed set of features based on an existing goskyr configuration. Basically, goskyr scrapes all the websites you configured, extracts the raw text values based on the configured fields per site and then calculates the features for each extracted value, labeling the resulting vector with the field name you defined in the configuration. Currently, all features are based on the extracted text only, i.e. not on the location within the website. Checkout the `Features` struct in the `ml/ml.go` file if you want to know what exactly those features are. Extraction command:
+In order for the auto configuration feature to find suitable names for the extracted fields machine learning can be used. Goskyr allows you to extract a fixed set of features based on an existing goskyr configuration. Basically, goskyr scrapes all the websites you configured, extracts the raw text values based on the configured fields per site and then calculates the features for each extracted value, labeling the resulting vector with the field name you defined in the configuration. Currently, all features are based on the extracted text only, i.e. not on the location within the website. Checkout the `Features` struct in the `ml/ml.go` file if you want to know what exactly those features are. Extraction command:
 
 ```bash
-goskyr extract -o features.csv -w word-lists -c some-goskyr-config.yml
+goskyr extract -o features.csv -w word-lists -c some-goskyr-scraper-config.yml
 ```
 
 Note that `-w` and `-c` are optional. The respective defaults are `word-lists` and `config.yml`. The resulting csv file can optionally be edited (eg if you want to remove or replace some labels) and consequently be used to build a ML model, like so:

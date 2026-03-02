@@ -213,6 +213,30 @@ func TestNewElementManagerFromHtml(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "nth child after self-closing tags",
+			html: `<html><body><br/><img/><meta/><div>Text 1</div><input/><link/><div>Text 2</div></body></html>`,
+			expected: []*fieldProps{
+				{
+					path: []node{
+						{tagName: "body"},
+						{tagName: "div"},
+					},
+					count:    1,
+					examples: []fieldExample{{example: "Text 1", origI: 0}},
+					origI:    0,
+				},
+				{
+					path: []node{
+						{tagName: "body"},
+						{tagName: "div", pseudoClasses: []string{"nth-child(7)"}},
+					},
+					count:    1,
+					examples: []fieldExample{{example: "Text 2", origI: 1}},
+					origI:    1,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

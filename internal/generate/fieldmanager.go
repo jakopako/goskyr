@@ -279,7 +279,7 @@ parse:
 			if inBody {
 				tn, _ := z.TagName()
 				tagNameStr := string(tn)
-				if tagNameStr == "br" || tagNameStr == "input" || tagNameStr == "img" || tagNameStr == "link" {
+				if slices.Contains([]string{"br", "input", "img", "link", "meta"}, tagNameStr) {
 					attrs, cls, pCls := getTagMetadata(tagNameStr, z, childNodes[nodePath.string()])
 					nrChildren[nodePath.string()] += 1
 					childNodes[nodePath.string()] = append(childNodes[nodePath.string()], node{tagName: tagNameStr, classes: cls})

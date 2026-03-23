@@ -1,11 +1,11 @@
 module github.com/jakopako/goskyr
 
-go 1.25.0
+go 1.26
 
 require (
 	github.com/PuerkitoBio/goquery v1.11.0
-	github.com/chromedp/cdproto v0.0.0-20250724212937-08a3db8b4327
-	github.com/chromedp/chromedp v0.14.2
+	github.com/chromedp/cdproto v0.0.0-20260320225252-cf654f46fc63
+	github.com/chromedp/chromedp v0.15.0
 	github.com/gdamore/tcell/v2 v2.13.8
 	github.com/goodsign/monday v1.0.2
 	github.com/ilyakaznacheev/cleanenv v1.5.0
@@ -34,7 +34,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dlclark/regexp2 v1.10.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/go-json-experiment/json v0.0.0-20250725192818-e39067aee2d2 // indirect
+	github.com/go-json-experiment/json v0.0.0-20260214004413-d219187c3433 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect

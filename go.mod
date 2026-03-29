@@ -30,7 +30,7 @@ require (
 	cloud.google.com/go/iam v1.2.2 // indirect
 	cloud.google.com/go/longrunning v0.6.2 // indirect
 	cloud.google.com/go/vertexai v0.12.0 // indirect
-	github.com/antchfx/xpath v1.3.4 // indirect
+	github.com/antchfx/xpath v1.3.6 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dlclark/regexp2 v1.10.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect

@@ -3,7 +3,7 @@ module github.com/jakopako/goskyr
 go 1.26
 
 require (
-	github.com/PuerkitoBio/goquery v1.11.0
+	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/chromedp/cdproto v0.0.0-20260321001828-e3e3800016bc
 	github.com/chromedp/chromedp v0.15.1
 	github.com/gdamore/tcell/v2 v2.13.8

@@ -877,7 +877,13 @@ func getURLString(e *ElementLocation, s *goquery.Selection, baseURL string) (str
 	urlVal = strings.TrimSpace(urlVal)
 	if urlVal == "" {
 		return "", nil
-	} else if strings.HasPrefix(urlVal, "http") {
+	}
+
+	parsedURL, err := url.Parse(urlVal)
+	if err != nil {
+		return "", err
+	}
+	if parsedURL.Scheme != "" {
 		urlRes = urlVal
 	} else if strings.HasPrefix(urlVal, "?") || strings.HasPrefix(urlVal, ".?") {
 		urlVal = strings.TrimLeft(urlVal, ".")

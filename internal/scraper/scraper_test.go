@@ -656,6 +656,20 @@ func TestExtractFieldUrlOrText(t *testing.T) {
 			baseUrl:  "https://www.roxy.ulm.de/programm/programm.php",
 			expected: "https://www.roxy.ulm.de/programm/programm.php?m=4&j=2023&vid=4378",
 		},
+		"url data protocol": {
+			htmlString: `<html><body><a href="data:text/plain;base64,SGVsbG8=">Link</a></body></html>`,
+			field: &Field{
+				Name: "url",
+				Type: "url",
+				ElementLocations: []ElementLocation{
+					{
+						Selector: "a",
+					},
+				},
+			},
+			baseUrl:  "https://example.com/page",
+			expected: "data:text/plain;base64,SGVsbG8=",
+		},
 		"url parent dir": {
 			htmlString: htmlString6,
 			field: &Field{

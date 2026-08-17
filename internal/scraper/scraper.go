@@ -289,6 +289,7 @@ type Scraper struct {
 	Paginator     Paginator            `yaml:"paginator,omitempty"`
 	Interaction   []*types.Interaction `yaml:"interaction,omitempty"`
 	FetcherConfig fetch.FetcherConfig  `yaml:"fetcher"`
+	Limit         int                  `yaml:"limit,omitempty"`
 	fetcher       fetch.Fetcher
 }
 
@@ -346,6 +347,7 @@ func (c Scraper) Scrape(rawDyn bool) (*ScraperResult, error) {
 
 	hasNextPage := true
 	currentPage := 0
+	limitReached := false
 	var doc *goquery.Document
 
 	hasNextPage, pageURL, doc, err := c.fetchPage(ctx, nil, currentPage, c.URL, c.Interaction)
@@ -353,9 +355,13 @@ func (c Scraper) Scrape(rawDyn bool) (*ScraperResult, error) {
 		return result, err
 	}
 
-	for hasNextPage {
+	for hasNextPage && !limitReached {
 		baseUrl := getBaseURL(pageURL, doc)
-		doc.Find(c.Item).Each(func(i int, s *goquery.Selection) {
+		doc.Find(c.Item).EachWithBreak(func(i int, s *goquery.Selection) bool {
+			if limitReached {
+				return false
+			}
+
 			currentItem := make(map[string]any)
 			for _, f := range c.Fields {
 				if f.Value != "" {
@@ -375,7 +381,7 @@ func (c Scraper) Scrape(rawDyn bool) (*ScraperResult, error) {
 						if err != nil {
 							scrLogger.Error(fmt.Sprintf("error while parsing field %s: %v. Skipping item %v.", f.Name, err, currentItem))
 							result.Stats.NrErrors++
-							return
+							return true
 						}
 					}
 					// to speed things up we check the filter after each field.
@@ -384,7 +390,7 @@ func (c Scraper) Scrape(rawDyn bool) (*ScraperResult, error) {
 					// certain elements would need to be fetched from subpages.
 					// filter fast!
 					if !c.filterItem(currentItem) {
-						return
+						return true
 					}
 				}
 			}
@@ -402,7 +408,7 @@ func (c Scraper) Scrape(rawDyn bool) (*ScraperResult, error) {
 							if err != nil {
 								scrLogger.Error(fmt.Sprintf("%v. Skipping item %v.", err, currentItem))
 								result.Stats.NrErrors++
-								return
+								return true
 							}
 							subDocs[subpageURL] = subDoc
 						}
@@ -411,11 +417,11 @@ func (c Scraper) Scrape(rawDyn bool) (*ScraperResult, error) {
 						if err != nil {
 							scrLogger.Error(fmt.Sprintf("error while parsing field %s: %v. Skipping item %v.", f.Name, err, currentItem))
 							result.Stats.NrErrors++
-							return
+							return true
 						}
 						// filter fast!
 						if !c.filterItem(currentItem) {
-							return
+							return true
 						}
 					}
 				}
@@ -427,7 +433,13 @@ func (c Scraper) Scrape(rawDyn bool) (*ScraperResult, error) {
 				currentItem = c.removeHiddenFields(currentItem)
 				result.Items = append(result.Items, currentItem)
 				result.Stats.NrItems++
+
+				if c.Limit > 0 && result.Stats.NrItems >= c.Limit {
+					limitReached = true
+				}
 			}
+
+			return true
 		})
 
 		currentPage++

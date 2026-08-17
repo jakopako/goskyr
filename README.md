@@ -600,6 +600,10 @@ paginator:
 
 If the dynamic fetcher is used the scraper will simulate a mouse click on the given selector to loop over the pages.
 
+### Limit
+
+With the `limit` key the number of items that is being fetched can be limited. This can be useful when testing a scraper config for a website that has a lot of items or that requires js rendering, which slows down the scraping process.
+
 ### Output
 
 Currently, the scraped data can either be written to stdout or to a file. If you don't explicitely configure the output in the configuration file the data is written to stdout. Otherwise you have to add the following snippet to your configuration file.

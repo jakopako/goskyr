@@ -305,9 +305,11 @@ type ScraperResult struct {
 // only on the location are returned (ignore regex_extract??). And only those
 // of dynamic fields, ie fields that don't have a predefined value and that are
 // present on the main page (not subpages). This is used by the ML feature generation.
-func (c Scraper) Scrape(rawDyn bool) (*ScraperResult, error) {
-	// we create a separate context so that we can pass a custom logger via context
-	ctx := context.Background()
+func (c Scraper) Scrape(ctx context.Context, rawDyn bool) (*ScraperResult, error) {
+	// if no context provided, use background
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	var logBuffer bytes.Buffer
 

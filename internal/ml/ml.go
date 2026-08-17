@@ -3,6 +3,7 @@ package ml
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -139,7 +140,7 @@ func writeFeaturesToFile(filename string, featuresChan <-chan *Features, wg *syn
 func calculateScraperFeatures(s scraper.Scraper, featuresChan chan<- *Features, wordMap map[string]bool, wg *sync.WaitGroup) {
 	defer wg.Done()
 	log.Printf("calculating features for %s\n", s.Name)
-	result, err := s.Scrape(true)
+	result, err := s.Scrape(context.Background(), true)
 	if err != nil {
 		log.Printf("%s ERROR: %s", s.Name, err)
 		return

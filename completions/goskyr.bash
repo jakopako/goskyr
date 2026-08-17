@@ -106,7 +106,7 @@ _goskyr_completions() {
       while read -r; do COMPREPLY+=("$REPLY"); done < <(compgen -W "$(_goskyr_filter "--config -c --out-file -o --word-lists -w")" -- "$cur")
       ;;
     'scrape'*)
-      while read -r; do COMPREPLY+=("$REPLY"); done < <(compgen -W "$(_goskyr_filter "--config -c --name -n --stdout -o --dry-run -D")" -- "$cur")
+      while read -r; do COMPREPLY+=("$REPLY"); done < <(compgen -W "$(_goskyr_filter "--config -c --name -n --stdout -o --dry-run -D --limit -l")" -- "$cur")
       ;;
     'train'*)
       while read -r; do COMPREPLY+=("$REPLY"); done < <(compgen -W "$(_goskyr_filter "--feature-file -f")" -- "$cur")

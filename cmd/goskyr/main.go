@@ -6,6 +6,7 @@ Have a look at the README.md for more information.
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"math"
@@ -95,6 +96,7 @@ type ScrapeCmd struct {
 	Name   string `short:"n" help:"The name of the scraper to be run, if only one of the configured ones should be run." completion:"goskyr list -c \"$config\" -C 2>/dev/null"`
 	Stdout bool   `short:"o" help:"If set to true the scraped data will be written to stdout despite any other existing writer configurations."`
 	DryRun bool   `short:"D" help:"If set to true the scraper will not persist any scraped data (currently only has an effect on the APIWriter)."`
+	Limit  int    `short:"l" long:"limit" help:"Stop after <limit> number of items. 0 means unlimited."`
 }
 
 func (scc *ScrapeCmd) Run() error {
@@ -161,12 +163,15 @@ func (scc *ScrapeCmd) Run() error {
 	workerWg := sync.WaitGroup{}
 	workerWg.Add(nrWorkers)
 
+	// context used to cancel scraping when limit is reached
+	ctx, cancel := context.WithCancel(context.Background())
+
 	itemChan := make(chan map[string]any)
 	slog.Debug("starting workers")
 	for i := range nrWorkers {
 		go func(j int) {
 			defer workerWg.Done()
-			worker(scraperChan, itemChan, statusChan, j)
+			worker(ctx, scraperChan, itemChan, statusChan, j)
 		}(i)
 	}
 
@@ -176,7 +181,7 @@ func (scc *ScrapeCmd) Run() error {
 	go func() {
 		defer collectorWg.Done()
 		slog.Debug("starting collector")
-		collector(itemChan, statusChan, writer)
+		collector(ctx, itemChan, statusChan, writer, scc.Limit, cancel)
 	}()
 
 	workerWg.Wait()
@@ -190,36 +195,55 @@ func (scc *ScrapeCmd) Run() error {
 	return nil
 }
 
-func worker(sc <-chan scraper.Scraper, ic chan<- map[string]any, stc chan<- types.ScraperStatus, threadNr int) {
+func worker(ctx context.Context, sc <-chan scraper.Scraper, ic chan<- map[string]any, stc chan<- types.ScraperStatus, threadNr int) {
 	workerLogger := slog.With(slog.Int("thread", threadNr))
 	for s := range sc {
+		select {
+		case <-ctx.Done():
+			workerLogger.Info("canceled, stopping worker")
+			return
+		default:
+		}
 		scraperLogger := workerLogger.With(slog.String("name", s.Name))
 		scraperLogger.Info("starting scraping task")
-		result, err := s.Scrape(false)
+		result, err := s.Scrape(ctx, false)
 		if err != nil {
 			scraperLogger.Error(fmt.Sprintf("%s: %s", s.Name, err))
 			continue
 		}
 		scraperLogger.Info(fmt.Sprintf("fetched %d items", result.Stats.NrItems))
 		for _, item := range result.Items {
-			ic <- item
+			select {
+			case <-ctx.Done():
+				workerLogger.Info("canceled while sending items")
+				return
+			case ic <- item:
+			}
 		}
 		// if the scraper status channel is not nil, it means that we are collecting stats
 		if stc != nil {
-			stc <- *result.Stats
+			select {
+			case <-ctx.Done():
+				workerLogger.Info("canceled before sending status")
+				return
+			case stc <- *result.Stats:
+			}
 		}
 	}
 	workerLogger.Info("done working")
 }
 
-func collector(itemChan <-chan map[string]any, statusChan <-chan types.ScraperStatus, writer output.Writer) {
+func collector(ctx context.Context, itemChan <-chan map[string]any, statusChan <-chan types.ScraperStatus, writer output.Writer, limit int, cancel func()) {
 	collectorLogger := slog.With(slog.String("collector", "main"))
 	writerWg := sync.WaitGroup{}
 	writerWg.Add(1)
+
+	// proxied channel lets us count items before forwarding to writer
+	proxiedChan := make(chan map[string]any)
 	go func() {
 		defer writerWg.Done()
 		collectorLogger.Debug("starting writing items")
-		writer.Write(itemChan)
+		writer.Write(proxiedChan)
 	}()
 
 	if statusChan != nil {
@@ -230,9 +254,33 @@ func collector(itemChan <-chan map[string]any, statusChan <-chan types.ScraperSt
 			collectorLogger.Debug("starting writing scraper status")
 			writer.WriteStatus(statusChan)
 		}()
-		statusWg.Wait()
-		collectorLogger.Debug("done writing scraper status")
+		// do not wait here; we'll wait later after forwarding items
+		go func() {
+			statusWg.Wait()
+			collectorLogger.Debug("done writing scraper status")
+		}()
 	}
+
+	// forward items from itemChan to proxiedChan while counting and honoring the limit
+	count := 0
+forwardLoop:
+	for item := range itemChan {
+		if limit > 0 && count >= limit {
+			collectorLogger.Info(fmt.Sprintf("limit %d reached, cancelling scraping", limit))
+			// signal cancellation to stop workers
+			cancel()
+			break forwardLoop
+		}
+		select {
+		case <-ctx.Done():
+			collectorLogger.Info("context canceled, stopping collector forward loop")
+			break forwardLoop
+		case proxiedChan <- item:
+			count++
+		}
+	}
+	close(proxiedChan)
+
 	writerWg.Wait()
 	collectorLogger.Debug("done writing items")
 }

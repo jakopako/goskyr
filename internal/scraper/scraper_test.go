@@ -1137,6 +1137,36 @@ func TestGetDate(t *testing.T) {
 			},
 			err: fmt.Errorf("unknown time zone Does/Not/Exist"),
 		},
+		"missing required date parts": {
+			htmlString: "",
+			field: &Field{
+				Name:         "date",
+				Type:         "date",
+				DateLocation: "Europe/Berlin",
+			},
+			err: fmt.Errorf("date parsing error: missing required date parts: day, month, time"),
+		},
+		"missing month": {
+			htmlString: "",
+			field: &Field{
+				Name: "date",
+				Type: "date",
+				Components: []DateComponent{
+					{
+						Covers:          date.CoveredDateParts{Day: true},
+						ElementLocation: ElementLocation{Default: "1"},
+						Layout:          []string{"2"},
+					},
+					{
+						Covers:          date.CoveredDateParts{Time: true},
+						ElementLocation: ElementLocation{Default: "19:00"},
+						Layout:          []string{"15:04"},
+					},
+				},
+				DateLocation: "Europe/Berlin",
+			},
+			err: fmt.Errorf("date parsing error: missing required date parts: month"),
+		},
 	}
 
 	for name, test := range tests {

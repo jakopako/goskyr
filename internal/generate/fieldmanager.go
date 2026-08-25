@@ -35,6 +35,11 @@ type fieldExample struct {
 	origI   int
 }
 
+type tagAttribute struct {
+	key   string
+	value string
+}
+
 func (fe fieldExample) exampleString() string {
 	return fe.example
 }
@@ -247,11 +252,11 @@ parse:
 					depth++
 					childNodes[nodePath.string()] = []node{}
 
-					for attrKey, attrValue := range attrs {
+					for _, attr := range attrs {
 						lp := fieldProps{
 							path:     make([]node, len(nodePath)),
-							examples: []fieldExample{{example: attrValue, origI: index}},
-							attr:     attrKey,
+							examples: []fieldExample{{example: attr.value, origI: index}},
+							attr:     attr.key,
 							count:    1,
 							origI:    index,
 						}
@@ -294,11 +299,11 @@ parse:
 						}
 						tmpNodePath = append(tmpNodePath, newNode)
 
-						for attrKey, attrValue := range attrs {
+						for _, attr := range attrs {
 							lp := fieldProps{
 								path:     make([]node, len(tmpNodePath)),
-								examples: []fieldExample{{example: attrValue, origI: index}},
-								attr:     attrKey,
+								examples: []fieldExample{{example: attr.value, origI: index}},
+								attr:     attr.key,
 								count:    1,
 								origI:    index,
 							}
@@ -673,15 +678,15 @@ func (fm fieldManager) labelFields(lc *LablerConfig) error {
 	return labler.labelFields(fm)
 }
 
-// getTagMetadata, for a given node returns a map of key value pairs (only for the attriutes we're interested in) and
+// getTagMetadata, for a given node returns the key value pairs (only for the attriutes we're interested in) in source order and
 // a list of this node's classes and a list of this node's pseudo classes (currently only nth-child).
-func getTagMetadata(tagName string, z *html.Tokenizer, siblingNodes []node) (map[string]string, []string, []string) {
+func getTagMetadata(tagName string, z *html.Tokenizer, siblingNodes []node) ([]tagAttribute, []string, []string) {
 	allowedAttrs := map[string]map[string]bool{
 		"a":   {"href": true, "title": true},
 		"img": {"src": true, "title": true},
 	}
 	moreAttr := true
-	attrs := make(map[string]string)
+	attrs := []tagAttribute{}
 	var cls []string       // classes
 	if tagName != "body" { // we don't care about classes for the body tag
 		for moreAttr {
@@ -702,7 +707,7 @@ func getTagMetadata(tagName string, z *html.Tokenizer, siblingNodes []node) (map
 			}
 			if _, found := allowedAttrs[tagName]; found {
 				if _, found := allowedAttrs[tagName][kString]; found {
-					attrs[kString] = vString
+					attrs = append(attrs, tagAttribute{key: kString, value: vString})
 				}
 			}
 			moreAttr = m

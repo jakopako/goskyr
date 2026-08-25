@@ -797,8 +797,18 @@ func getDate(f *Field, s *goquery.Selection) (time.Time, error) {
 	}
 
 	// currently not all date parts have default values
-	if !combinedParts.Day || !combinedParts.Month || !combinedParts.Time {
-		return t, errors.New("date parsing error: to generate a date at least a time, a day and a month are needed")
+	missingParts := []string{}
+	if !combinedParts.Day {
+		missingParts = append(missingParts, "day")
+	}
+	if !combinedParts.Month {
+		missingParts = append(missingParts, "month")
+	}
+	if !combinedParts.Time {
+		missingParts = append(missingParts, "time")
+	}
+	if len(missingParts) > 0 {
+		return t, fmt.Errorf("date parsing error: missing required date parts: %s", strings.Join(missingParts, ", "))
 	}
 
 	// year is special in the sense that it defaults to the current year

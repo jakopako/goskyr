@@ -517,6 +517,8 @@ fetcher:
 
 To render javascript before extracting any data from a web page, you need to use the dynamic fetcher. For this to work the `google-chrome` binary needs to be installed.
 
+The dynamic fetcher also traverses shadow DOMs, so elements rendered inside a shadow root can be selected normally.
+
 ```yaml
 fetcher:
   type: dynamic

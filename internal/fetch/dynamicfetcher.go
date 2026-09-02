@@ -26,6 +26,10 @@ type DynamicFetcher struct {
 	cancelAlloc  context.CancelFunc
 }
 
+func outerHTMLParams(nodeID cdp.NodeID) *dom.GetOuterHTMLParams {
+	return dom.GetOuterHTML().WithNodeID(nodeID).WithIncludeShadowDOM(true)
+}
+
 func NewDynamicFetcher(fc *FetcherConfig) *DynamicFetcher {
 	opts := append(
 		chromedp.DefaultExecAllocatorOptions[:],
@@ -131,7 +135,7 @@ func (d *DynamicFetcher) Fetch(ctx context.Context, urlStr string, opts FetchOpt
 		if err != nil {
 			return err
 		}
-		body, err = dom.GetOuterHTML().WithNodeID(node.NodeID).Do(ctx)
+		body, err = outerHTMLParams(node.NodeID).Do(ctx)
 		return err
 	}))
 

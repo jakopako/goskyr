@@ -17,6 +17,7 @@
    1. [Filters](#filters)
    1. [Interaction](#interaction)
    1. [Pagination](#pagination)
+   1. [Limit](#limit)
    1. [Output](#output)
 1. [Build local ML Model for Auto-Config](#build-local-ml-model-for-auto-config)
 1. [Related Projects](#related-projects)

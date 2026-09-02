@@ -862,6 +862,34 @@ func TestGuessYear(t *testing.T) {
 			},
 			referenceDate: time.Date(2023, 11, 30, 20, 30, 0, 0, loc),
 		},
+		"guess year uses provided reference when prior item has no date": {
+			scraper: &Scraper{
+				Fields: []Field{
+					{
+						Type:      "date",
+						GuessYear: true,
+						Name:      "date",
+					},
+				},
+			},
+			items: []map[string]any{
+				{
+					"title": "Event without a date",
+				},
+				{
+					"date": time.Date(2023, 1, 2, 20, 0, 0, 0, loc),
+				},
+			},
+			expected: []map[string]any{
+				{
+					"title": "Event without a date",
+				},
+				{
+					"date": time.Date(2024, 1, 2, 20, 0, 0, 0, loc),
+				},
+			},
+			referenceDate: time.Date(2023, 12, 30, 20, 30, 0, 0, loc),
+		},
 		"guess year unordered": {
 			scraper: &Scraper{
 				Fields: []Field{

@@ -489,14 +489,17 @@ func (c *Scraper) guessYear(items []map[string]any, ref time.Time) {
 						// of 'now'.
 						// Obviously, this is still far from perfect and it only works in a certain
 						// number of cases.
+						referenceDate := ref
 						if i > 0 {
-							ref, _ = items[i-1][name].(time.Time)
+							if previousDate, ok := items[i-1][name].(time.Time); ok {
+								referenceDate = previousDate
+							}
 						}
 						diff := time.Since(time.Unix(0, 0))
 						newDate := t
-						for y := ref.Year() - 1; y <= ref.Year()+1; y++ {
+						for y := referenceDate.Year() - 1; y <= referenceDate.Year()+1; y++ {
 							tmpT := time.Date(y, t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
-							if newDiff := tmpT.Sub(ref).Abs(); newDiff < diff {
+							if newDiff := tmpT.Sub(referenceDate).Abs(); newDiff < diff {
 								diff = newDiff
 								newDate = time.Date(y, t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
 							}

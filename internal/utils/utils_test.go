@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"slices"
 	"testing"
 )
 
@@ -33,7 +34,7 @@ func TestMostOcc_Int(t *testing.T) {
 	}{
 		{[]int{1, 2, 2, 3, 2, 4}, 2},
 		{[]int{5, 5, 5, 5}, 5},
-		// {[]int{1, 2, 3, 4}, 1}, // all unique, returns first seen; INCORRECT, returns random int
+		{[]int{1, 2, 3, 4}, 1},
 		{[]int{}, 0}, // zero value for int
 	}
 
@@ -51,7 +52,7 @@ func TestMostOcc_String(t *testing.T) {
 		expected string
 	}{
 		{[]string{"a", "b", "a", "c", "a"}, "a"},
-		// {[]string{"x", "y", "z"}, "x"}, // all unique, returns first seen; INCORRECT, returns random string
+		{[]string{"x", "y", "z"}, "x"},
 		{[]string{"foo", "foo", "bar"}, "foo"},
 		{[]string{}, ""}, // zero value for string
 	}
@@ -200,6 +201,25 @@ func TestSliceEquals_String(t *testing.T) {
 		if result != tt.expected {
 			t.Errorf("SliceEquals(%v, %v) = %v; want %v", tt.a, tt.b, result, tt.expected)
 		}
+	}
+}
+
+func TestSliceOperationsDoNotModifyInputs(t *testing.T) {
+	a := []int{3, 1, 2}
+	b := []int{2, 3, 1}
+
+	if !SliceEquals(a, b) {
+		t.Fatal("SliceEquals returned false for equal slices")
+	}
+	if !slices.Equal(a, []int{3, 1, 2}) || !slices.Equal(b, []int{2, 3, 1}) {
+		t.Fatalf("SliceEquals modified inputs: a=%v, b=%v", a, b)
+	}
+
+	if got := IntersectionSlices(a, b); !slices.Equal(got, []int{1, 2, 3}) {
+		t.Fatalf("IntersectionSlices() = %v, want [1 2 3]", got)
+	}
+	if !slices.Equal(a, []int{3, 1, 2}) || !slices.Equal(b, []int{2, 3, 1}) {
+		t.Fatalf("IntersectionSlices modified inputs: a=%v, b=%v", a, b)
 	}
 }
 

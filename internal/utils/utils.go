@@ -61,17 +61,15 @@ func HSVToRGB(h, s, v float64) (int32, int32, int32) {
 	return int32(r), int32(g), int32(b)
 }
 
-// MostOcc returns the most occurring element in a slice of comparable elements.
+// MostOcc returns the most occurring element, preferring the first occurrence on ties.
 func MostOcc[T comparable](items []T) T {
-	count := map[T]int{}
-	for _, item := range items {
-		count[item]++
-	}
+	counts := map[T]int{}
 	var mostOcc T
 	maxOcc := 0
-	for item, c := range count {
-		if c > maxOcc {
-			maxOcc = c
+	for _, item := range items {
+		counts[item]++
+		if counts[item] > maxOcc {
+			maxOcc = counts[item]
 			mostOcc = item
 		}
 	}
@@ -100,6 +98,8 @@ func OnlyContainsDigits(s string) bool {
 
 // IntersectionSlices returns the intersection of two slices.
 func IntersectionSlices[T cmp.Ordered](a, b []T) []T {
+	a = slices.Clone(a)
+	b = slices.Clone(b)
 	slices.Sort(a)
 	slices.Sort(b)
 	result := []T{}
@@ -122,6 +122,8 @@ func SliceEquals[T cmp.Ordered](a, b []T) bool {
 	if len(a) != len(b) {
 		return false
 	}
+	a = slices.Clone(a)
+	b = slices.Clone(b)
 	slices.Sort(a)
 	slices.Sort(b)
 	for i := range a {

@@ -15,7 +15,7 @@ require (
 )
 
 require (
-	github.com/antchfx/jsonquery v1.3.6
+	github.com/antchfx/jsonquery v1.3.7
 	github.com/sjwhitworth/golearn v0.0.0-20221228163002-74ae077eafb2
 	github.com/tmc/langchaingo v0.1.14
 )

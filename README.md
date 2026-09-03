@@ -3,7 +3,6 @@
 <div style="text-align:center"><img src="goskyr-logo.png" alt="goskyr logo" style="height: 300px; width:300px;"/></div>
 
 [![Release](https://img.shields.io/github/release/jakopako/goskyr.svg)](https://github.com/jakopako/goskyr/releases)
-[![Go Report Card](https://goreportcard.com/badge/github.com/jakopako/goskyr)](https://goreportcard.com/report/github.com/jakopako/goskyr)
 ![tests](https://github.com/jakopako/goskyr/actions/workflows/go-tests.yml/badge.svg?event=push)
 
 1. [Quick Start](#quick-start)

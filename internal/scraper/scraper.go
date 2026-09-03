@@ -632,7 +632,36 @@ func (c *Scraper) fetchToDoc(ctx context.Context, urlStr string, opts fetch.Fetc
 	if err != nil {
 		return nil, err
 	}
+	if c.FetcherConfig.Type == fetch.DYNAMIC_FETCHER_TYPE {
+		flattenShadowDOM(doc.Selection.Get(0))
+	}
 	return doc, nil
+}
+
+func flattenShadowDOM(n *html.Node) {
+	for child := n.FirstChild; child != nil; {
+		next := child.NextSibling
+		flattenShadowDOM(child)
+		if child.Type == html.ElementNode && child.Data == "template" && hasShadowRootAttribute(child) {
+			for content := child.FirstChild; content != nil; {
+				nextContent := content.NextSibling
+				child.RemoveChild(content)
+				n.InsertBefore(content, child)
+				content = nextContent
+			}
+			n.RemoveChild(child)
+		}
+		child = next
+	}
+}
+
+func hasShadowRootAttribute(n *html.Node) bool {
+	for _, attr := range n.Attr {
+		if attr.Key == "shadowrootmode" || attr.Key == "shadowroot" {
+			return true
+		}
+	}
+	return false
 }
 
 func extractField(field *Field, event map[string]any, s *goquery.Selection, baseURL string) error {

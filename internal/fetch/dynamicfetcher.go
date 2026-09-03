@@ -1,12 +1,14 @@
 package fetch
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
 	"net/url"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/chromedp/cdproto/browser"
@@ -17,6 +19,7 @@ import (
 	"github.com/jakopako/goskyr/internal/log"
 	"github.com/jakopako/goskyr/internal/types"
 	"github.com/jakopako/goskyr/internal/utils"
+	"golang.org/x/net/html"
 )
 
 // The DynamicFetcher renders js
@@ -28,6 +31,45 @@ type DynamicFetcher struct {
 
 func outerHTMLParams(nodeID cdp.NodeID) *dom.GetOuterHTMLParams {
 	return dom.GetOuterHTML().WithNodeID(nodeID).WithIncludeShadowDOM(true)
+}
+
+func flattenShadowDOM(body string) (string, error) {
+	doc, err := html.Parse(strings.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	flattenShadowDOMNodes(doc)
+	var buf bytes.Buffer
+	if err := html.Render(&buf, doc); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func flattenShadowDOMNodes(n *html.Node) {
+	for child := n.FirstChild; child != nil; {
+		next := child.NextSibling
+		flattenShadowDOMNodes(child)
+		if child.Type == html.ElementNode && child.Data == "template" && hasShadowRootAttribute(child) {
+			for content := child.FirstChild; content != nil; {
+				nextContent := content.NextSibling
+				child.RemoveChild(content)
+				n.InsertBefore(content, child)
+				content = nextContent
+			}
+			n.RemoveChild(child)
+		}
+		child = next
+	}
+}
+
+func hasShadowRootAttribute(n *html.Node) bool {
+	for _, attr := range n.Attr {
+		if attr.Key == "shadowrootmode" || attr.Key == "shadowroot" {
+			return true
+		}
+	}
+	return false
 }
 
 func NewDynamicFetcher(fc *FetcherConfig) *DynamicFetcher {
@@ -170,6 +212,10 @@ func (d *DynamicFetcher) Fetch(ctx context.Context, urlStr string, opts FetchOpt
 	// elapsed := time.Since(start)
 	// log.Printf("fetching %s took %s", url, elapsed)
 
+	if err != nil {
+		return "", err
+	}
+	body, err = flattenShadowDOM(body)
 	if err != nil {
 		return "", err
 	}

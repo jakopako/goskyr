@@ -64,8 +64,8 @@ func (w *APIWriter) Write(itemChan <-chan map[string]any) {
 					w.logger.Error(fmt.Sprintf("error while trying to cast the date field of item %v to time.Time. The date field is mandatory if using the APIWriter.", item))
 					continue
 				}
-				firstDateUTCF := firstDate.UTC().Format("2006-01-02 15:04")
-				deleteURL := fmt.Sprintf("%s?sourceUrl=%s&datetime=%s", w.Uri, url.QueryEscape(currentSrcStr), url.QueryEscape(firstDateUTCF))
+				firstDateRFC3339 := firstDate.UTC().Format(time.RFC3339)
+				deleteURL := fmt.Sprintf("%s?sourceUrl=%s&fromTime=%s", w.Uri, url.QueryEscape(currentSrcStr), url.QueryEscape(firstDateRFC3339))
 				req, _ := http.NewRequest("DELETE", deleteURL, nil)
 				req.SetBasicAuth(w.User, w.Password)
 				resp, err := client.Do(req)

@@ -21,14 +21,15 @@ import (
 	"github.com/antchfx/jsonquery"
 	"github.com/goodsign/monday"
 	"github.com/ilyakaznacheev/cleanenv"
+	"golang.org/x/net/html"
+	"gopkg.in/yaml.v3"
+
 	"github.com/jakopako/goskyr/internal/date"
 	"github.com/jakopako/goskyr/internal/fetch"
 	"github.com/jakopako/goskyr/internal/log"
 	"github.com/jakopako/goskyr/internal/output"
 	"github.com/jakopako/goskyr/internal/types"
 	"github.com/jakopako/goskyr/internal/utils"
-	"golang.org/x/net/html"
-	"gopkg.in/yaml.v3"
 )
 
 // GlobalScraperConfig is used for storing global configuration parameters that
@@ -1103,12 +1104,12 @@ func transformString(t *TransformConfig, s string) (string, error) {
 
 func getBaseURL(pageUrl string, doc *goquery.Document) string {
 	// relevant info: https://www.w3.org/TR/WD-html40-970917/htmlweb.html#relative-urls
-	// currently this function does not fully implement the standard
-	baseURL := doc.Find("base").AttrOr("href", "")
-	if baseURL == "" {
-		baseURL = pageUrl
+	rawBaseURL := doc.Find("base").AttrOr("href", "")
+	baseURL, err := url.Parse(rawBaseURL)
+	if err != nil || !baseURL.IsAbs() {
+		rawBaseURL = pageUrl
 	}
-	return baseURL
+	return rawBaseURL
 }
 
 func extractJsonField(p string, s string) (string, error) {

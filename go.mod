@@ -15,7 +15,7 @@ require (
 )
 
 require (
-	github.com/antchfx/jsonquery v1.3.6
+	github.com/antchfx/jsonquery v1.3.8
 	github.com/sjwhitworth/golearn v0.0.0-20221228163002-74ae077eafb2
 	github.com/tmc/langchaingo v0.1.14
 )
@@ -30,7 +30,7 @@ require (
 	cloud.google.com/go/iam v1.5.3 // indirect
 	cloud.google.com/go/longrunning v0.8.0 // indirect
 	cloud.google.com/go/vertexai v0.12.0 // indirect
-	github.com/antchfx/xpath v1.3.6 // indirect
+	github.com/antchfx/xpath v1.3.9 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dlclark/regexp2 v1.10.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect

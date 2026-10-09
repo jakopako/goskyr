@@ -4,8 +4,8 @@ go 1.26.0
 
 require (
 	github.com/PuerkitoBio/goquery v1.13.0
-	github.com/chromedp/cdproto v0.0.0-20260714215040-dc233986426f
-	github.com/chromedp/chromedp v0.16.0
+	github.com/chromedp/cdproto v0.157.8
+	github.com/chromedp/chromedp v0.20.1
 	github.com/gdamore/tcell/v2 v2.13.10
 	github.com/goodsign/monday v1.0.2
 	github.com/ilyakaznacheev/cleanenv v1.5.0
@@ -78,11 +78,7 @@ require (
 	github.com/agnivade/levenshtein v1.2.1
 	github.com/alecthomas/kong v1.16.1
 	github.com/andybalholm/cascadia v1.3.4 // indirect
-	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/gdamore/encoding v1.0.1 // indirect
-	github.com/gobwas/httphead v0.1.0 // indirect
-	github.com/gobwas/pool v0.2.1 // indirect
-	github.com/gobwas/ws v1.4.0 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.3.0 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect

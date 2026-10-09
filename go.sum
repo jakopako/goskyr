@@ -382,8 +382,8 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07/go.mod h1:kDXzergiv9cbyO7IOYJZWg1U88JhDg3PB6klq9Hg2pA=
 github.com/tealeg/xlsx/v3 v3.0.0/go.mod h1:fSua0Owrk9yAMAFGZI7piq5UL2BcubuQuLNOEhr3X80=
-github.com/tmc/langchaingo v0.1.14 h1:o1qWBPigAIuFvrG6cjTFo0cZPFEZ47ZqpOYMjM15yZc=
-github.com/tmc/langchaingo v0.1.14/go.mod h1:aKKYXYoqhIDEv7WKdpnnCLRaqXic69cX9MnDUk72378=
+github.com/tmc/langchaingo v0.1.15 h1:zbRfW3RiX8SSX9ck0P1y3Q7FV6VRwusRSKFykaZOh/4=
+github.com/tmc/langchaingo v0.1.15/go.mod h1:aKKYXYoqhIDEv7WKdpnnCLRaqXic69cX9MnDUk72378=
 github.com/wcharczuk/go-chart v2.0.1+incompatible/go.mod h1:PF5tmL4EIx/7Wf+hEkpCqYi5He4u90sw+0+6FhrryuE=
 github.com/xitongsys/parquet-go v1.5.1/go.mod h1:xUxwM8ELydxh4edHGegYq1pA8NnMKDx0K/GyB0o2bww=
 github.com/xitongsys/parquet-go v1.5.2/go.mod h1:90swTgY6VkNM4MkMDsNxq8h30m6Yj1Arv9UMEl5V5DM=
